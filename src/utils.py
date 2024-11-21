@@ -270,3 +270,12 @@ def load_checkpoint(model, optimizer, path_checkpoint):
   loss = checkpoint['loss']
   print(f"Checkpoint loaded: Epoch {epoch}, Loss {loss}")
   return model, optimizer, epoch, loss
+
+
+def get_paths(path_root, datakey, dataset_name, date):
+  paths = {}
+  paths["path_dataset"] = os.path.join(path_root, "data", datakey, dataset_name)
+  paths["path_logs"] = os.path.join(path_root, "logs", dataset_name, f"run_{date}")  # overall
+  paths["path_events"], paths["path_checkpoints"], paths["path_config"] = setup_logs(paths["path_logs"]) # subfolders
+  paths["path_models"] = os.path.join(path_root, "models") # best models of the run
+  return paths

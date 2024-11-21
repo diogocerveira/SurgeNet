@@ -3,6 +3,26 @@ seed: 53
 path_root: "."
 action: "train"
 
+# Data
+dataset: "LDSS_short"
+returnExtra:  # __get__ besides data, label
+ids: true
+ts: false
+vids: false
+return_extra:
+  ids: True
+  ts: False
+  vids: False
+
+# Architecture
+fx_weights: "default"
+n_stages_G: 1  # G for Guesser
+n_stages_R: 2  # R for Refiner
+n_filters: 64  # number of convolution filters == number of channels inside a stage
+filterTime: 3  # size in time
+n_resBlocks_G: 2  # inside the stage
+n_resBlocks_R: 2
+
 # Train
 n_epochs: 10
 fx_batchSize: 128  # training feature extractor
@@ -19,17 +39,4 @@ period_update: 1  # updates metrics with new data every batch
 period_compute: 100  # computes the metrics
 criterion: "cross_entropy"
 
-# Data
-dataset: "LDSS_short"
-returnExtra:  # __get__ besides data, label
-ids: true
-ts: false
-vids: false
 
-# Architecture
-n_GStages: 1  # G for Guesser
-n_RStages: 2  # R for Refiner
-n_filters: 64  # number of convolution filters == number of channels inside a stage
-filterTime: 3  # size in time
-n_resBlocks_G: 2  # inside the stage
-n_resBlocks_R: 2

@@ -75,10 +75,10 @@ class SurgeryStillsDataset(Dataset):
     # self.labels = self.filter_valid_frames(self.labels) # Useful when using short version of the dataset with the full labels.csv
     # print("self_labels\n", self.labels)
 
-    self.idx_to_class = self.get_idx_to_class() # gets dict for getting class name from int value
+    self.idxToClass = self.get_idxToClass() # gets dict for getting class name from int value
     self.video_ids = self.labels["video_id"].unique()  # Extract unique video identifiers
     self.video_to_group = {video_id: idx for idx, video_id in enumerate(self.video_ids)}
-    self.n_classes = len(self.idx_to_class.keys())
+    self.n_classes = len(self.idxToClass.keys())
   def __len__(self):
     return len(self.labels)
 
@@ -173,7 +173,7 @@ class SurgeryStillsDataset(Dataset):
       if l.isdigit():
         return (l, protoclass[protoclass.find(l) + 3:])
 
-  def get_idx_to_class(self):
+  def get_idxToClass(self):
     ''' Extract existing classes from the video annotations '''
 
     def get_sigla(string):
@@ -188,10 +188,10 @@ class SurgeryStillsDataset(Dataset):
         annot_random = json.load(f)
 
         protoclasses = [m["content"] for m in annot_random]
-        idx_to_class = {int(self.parse_class(p)[0]): self.parse_class(p)[0] + get_sigla(self.parse_class(p)[1]) for p in protoclasses}
-        idx_to_class[0] = "0ther"
+        idxToClass = {int(self.parse_class(p)[0]): self.parse_class(p)[0] + get_sigla(self.parse_class(p)[1]) for p in protoclasses}
+        idxToClass[0] = "0ther"
 
-      return idx_to_class
+      return idxToClass
 
   def get_grouping(self, idx=None):
     ''' Returns a list of numeric labels corresponding to the video groups '''
@@ -213,7 +213,7 @@ class SurgeryStillsDataset(Dataset):
       # if os.path.exists(frame_path): print("frame_path", frame_path)
       return os.path.exists(frame_path)
   """
-  def idx_to_video(self, list_of_idxs):
+  def get_idxToVideo(self, list_of_idxs):
     ''' Extract video IDs (check for overlap in sets) - specific to each labels.csv implementation
         List of idxs [[tr_i, va_i, te_i], ...] --> List of videos [[vidsx, vidsy, vidsz], ...]
     '''
@@ -246,7 +246,7 @@ class SurgeryStillsDataset(Dataset):
     # print(list_out)
     return list_out
   
-  def get_class_weights(self):
+  def get_classWeights(self):
     # print(self.labels.columns)
     cw = self.labels["class"].value_counts() / self.__len__()
     return torch.tensor(cw.values, dtype=torch.float32)
@@ -256,11 +256,22 @@ def get_dataset(path_dataset, datakey="local", transform=None, return_extra={"id
     path_inputs = os.path.join(path_dataset, "inputs")
     path_labels = os.path.join(path_dataset, "labels.csv")
     path_annots = os.path.join(path_dataset, "annotations")
-    return SurgeryStillsDataset(path_inputs, path_labels, path_annots, transform, return_extra, update_labels)
+    dataset = SurgeryStillsDataset(path_inputs, path_labels, path_annots, transform, return_extra, update_labels)
+    idxToClass = dataset.idxToClass
+    datasetSize = len(dataset)
+          
   if datakey == "external":
     train_dataset = datasets.CIFAR10(root='./data', train=True, download=True, transform=transform)
     test_dataset = datasets.CIFAR10(root='./data', train=False, download=True, transform=transform)
-    return train_dataset, test_dataset
+    dataset = (train_dataset, test_dataset)
+    idxToClass = {i: c for c, i in dataset[1].class_to_idx.items()};
+    datasetSize = len(dataset[0]) + len(dataset[1])
+  
+  n_classes = dataset.n_classes;
+  classWeights = dataset.get_classWeights()
+
+  return dataset, idxToClass, datasetSize, n_classes, classWeights
+
 
 def splits(dataset, datakey, k_folds):
   ''' returns ( [])
@@ -284,7 +295,7 @@ def splits(dataset, datakey, k_folds):
       list_of_idxs.append([train_idx, valid_idx, test_idx])
       # print('\n', [train_idx, valid_idx, test_idx], '\n')
 
-    videos_split = dataset.idx_to_video(list_of_idxs)
+    videos_split = dataset.get_idxToVideo(list_of_idxs)
     # print(videos_split[0])
     # print(list_of_idxs[0])
     return tuple(zip(list_of_idxs, videos_split))

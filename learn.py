@@ -16,73 +16,49 @@ from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader
 import argparse
 import yaml
+import random
 import torchvision.models.feature_extraction as fxs
 
 from src import data, utils, net, train, validate, test, phase_metric
 t2 = time.time()
 
-def learn(**kwargs):
-  # tensorboard --logdir=./logs/
-  # print(f"Imports took {t2 - t1:.2f} seconds")
-  ''' FOR NOW, NOT USING EXTERNAL json FOR VALUES
-  with open("config/hyper_config.json", 'r') as file:
-      config = json.load(file)
-  '''
+def learn(**the):
+  # I'm trying out 'the' instead of 'kwargs' for readability purposes
   # ---------------------------- #
   # dataset_name = "LDSS"
   # dataset_name = "CIFAR10"
   dataset_name = "LDSS_short"
   # ---------------------------- #
-  print(kwargs["action"])
-  assert 1 == 0
+
+  # Setup Parameters
+  device = "cuda" if torch.cuda.is_available() else "cpu"
+  np.random.seed(the["seed"])
+  torch.manual_seed(the["seed"])
+  random.seed(the["seed"])
   datakey = "local" if (dataset_name == "LDSS" or dataset_name == "LDSS_short") else "external" # if its local ldss, there's group splitting
   date = datetime.datetime.now().strftime('%Y%m%d-%H')
-  path_dataset = os.path.join(kwargs["path_root"], "data", datakey, dataset_name)
-  path_logs = os.path.join(kwargs["path_root"], "logs", dataset_name, f"run_{date}")  # overall
-  path_events, path_checkpoints, path_config = utils.setup_logs(path_logs) # subfolders
-  path_models = os.path.join(kwargs["path_root"], "models") # best models of the run
-  device = "cuda" if torch.cuda.is_available() else "cpu"
-  np.random.seed(kwargs["seed"])
-  torch.manual_seed(kwargs["seed"])
-  print(f"\nData location: {kwargs["path_root"]} | Hardware device: {device}")
+  path_dataset, path_logs, path_events, path_checkpoints, path_config, path_models = utils.get_paths(the["path_root"], datakey, dataset_name, date).values()
+  print(f"\nData location: {the['path_root']} | Hardware device: {device}")
 
-  # Model
-  model_weights = ResNet50_Weights.DEFAULT  # https://pytorch.org/vision/main/models/generated/torchvision.models.resnet50.html#torchvision.models.ResNet50_Weights
+  # Model/Data
+  model_weights = ResNet50_Weights.DEFAULT if the["fx_weights"] == "default" else None # https://pytorch.org/vision/main/models/generated/torchvision.models.resnet50.html#torchvision.models.ResNet50_Weights
   k_folds = 7 if (dataset_name == "LDSS" or dataset_name == "LDSS_short") else 5 # CIFAR10 has 60000 images (10000 for test)
-  n_epochs = 10
-  size_batch = 128
-  lr = 0.01
-  momentum = 0.9
-  ES = utils.EarlyStopper(patience=3, min_delta=1) # stops the training after 3 decreases of 5
-  step_size = 30  # optimizer scheduler (to change mid train)
-  gamma = 0.1
-
-  # Data
-  return_extra = {"ids": True, "ts": False, "vids": False}
   preprocessing = utils.get_preprocessing()
-  # augmentation = utils.get_augmentation()
-  dataset = data.get_dataset(path_dataset, datakey=datakey, transform=preprocessing, update_labels=False, return_extra=return_extra)
-  idx_to_class = dataset.idx_to_class if datakey == "local" else {i: c for c, i in dataset[1].class_to_idx.items()};
-  size_dataset = len(dataset) if datakey == "local" else len(dataset[0]) + len(dataset[1])
-  n_classes = dataset.n_classes; print(f"Dataset ({datakey}): {dataset_name} | {n_classes} classes"); print(idx_to_class)
-  class_weights = dataset.get_class_weights().to(device)
-  t4 = time.time()
-  # print(f"Configuration took {t4 - t3:.2f} seconds")
-  print(f"{size_dataset} samples | Batch size of {size_batch} | {k_folds} folds | {n_epochs} epochs\n")
+  dataset, idxToClass, n_classes, datasetSize, classWeights = data.get_dataset(path_dataset, datakey=datakey, transform=preprocessing, update_labels=False, return_extra=the["return_extra"])
+  print(f"Dataset ({datakey}): {dataset_name} | {n_classes} classes"); print(idxToClass)
+  print(f"{datasetSize} samples | Batch size of {the["size_batch"]} | {k_folds} folds | {the["n_epochs"]} epochs\n")
 
   # Metrics
-  criterion = nn.CrossEntropyLoss(weight=class_weights)
+  criterion = nn.CrossEntropyLoss(weight=classWeights)
   agg = "macro" # accuracy is locked to micro (see utils.py)
   period_compute, period_update = 100, 1  # num batches between metric computations
   metric_train, metric_valid = MulticlassAccuracy(device=device), MulticlassAccuracy(device=device)
   RM_train = utils.RunningMetric(metric_train, period_compute)
   RM_valid = utils.RunningMetric(metric_valid, period_compute // 2)
   BM_test = utils.BunchMetrics({"accuracy": 1, "precision": 1, "recall": 1, "f1score": 1,
-                          "confusionMatrix": 1}, n_classes, idx_to_class, agg, device)
+                          "confusionMatrix": 1}, n_classes, idxToClass, agg, device)
                           
-  # ----------------- #
-  skip_folds = []
-  path_resume = None
+
   # path_resume = os.path.join(path_checkpoints, f"checkpoint_epoch1.pth")
   # ----------------- #
   ## LEARN ##
