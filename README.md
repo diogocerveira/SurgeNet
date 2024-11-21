@@ -1,6 +1,8 @@
-# Surgical Neural Networks Project
+# SurgeNet
 
+TEMPLATE
 ## Description
+Machine Learning for Surgical Video Phase Analysis
 This project aims to develop and evaluate machine learning models, specifically neural networks, to assist in various surgical procedures. Our objective is to enhance precision, improve patient outcomes, and reduce risks through intelligent data analysis.
 
 ## Table of Contents
