@@ -1,0 +1,35 @@
+# General
+seed: 53
+path_root: "."
+action: "train"
+
+# Train
+n_epochs: 10
+fx_batchSize: 128  # training feature extractor
+lr: 0.0005
+momentum: 0.9
+gamma: 0.1
+stepSize: 30  # optimizer scheduler (to change mid train)
+path_resume: null  # to continue training from a checkpoint model
+skipFolds: []  # 0 for fold 1...
+
+# Eval
+agg: "macro"  # accuracy is locked to micro (see utils.py)
+period_update: 1  # updates metrics with new data every batch
+period_compute: 100  # computes the metrics
+criterion: "cross_entropy"
+
+# Data
+dataset: "LDSS_short"
+returnExtra:  # __get__ besides data, label
+ids: true
+ts: false
+vids: false
+
+# Architecture
+n_GStages: 1  # G for Guesser
+n_RStages: 2  # R for Refiner
+n_filters: 64  # number of convolution filters == number of channels inside a stage
+filterTime: 3  # size in time
+n_resBlocks_G: 2  # inside the stage
+n_resBlocks_R: 2
