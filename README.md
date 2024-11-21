@@ -1,2 +1,2 @@
 # surgenet
-Machine Learning for Surgical Phase Video Analysis
+Machine Learning for Surgical Video Phase Analysis
