@@ -2,3 +2,4 @@ data/
 logs/
 models/
 notebooks/
+__pycache__/

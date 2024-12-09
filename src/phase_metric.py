@@ -13,7 +13,7 @@ from torchvision.models import resnet50, ResNet50_Weights
 import sys
 import torchvision.models.feature_extraction as fxs
 
-from src import utils, data, net, test
+from src import catalogue, machine, utils, test
 # from model_practice import path_root, path_logs, device
 
 def get_bundle(final_imageNames, final_preds, final_targets):
@@ -257,7 +257,7 @@ def phase_metric():
   size_batch = 128
   k_folds = 7 if (dataset_name == "LDSS" or dataset_name == "LDSS_short") else 5
   preprocessing = utils.get_preprocessing()
-  dataset = data.get_dataset(path_dataset, datakey=datakey, transform=preprocessing, return_extra=return_extra)
+  dataset = catalogue.get_dataset(path_dataset, datakey=datakey, transform=preprocessing, return_extra=return_extra)
   idx_to_class = dataset.idx_to_class
   n_classes = len(idx_to_class.keys()); print(n_classes, "classes")
 
@@ -269,7 +269,7 @@ def phase_metric():
   skip_folds = [1, 2, 3, 4, 5, 6]
   path_resume = None
 
-  for fold, ((_, _, test_idx), (train_videos, valid_videos, test_videos)) in enumerate(data.splits(dataset, datakey, k_folds)):  
+  for fold, ((_, _, test_idx), (train_videos, valid_videos, test_videos)) in enumerate(catalogue.splits(dataset, datakey, k_folds)):  
     if fold in skip_folds: continue # if something crashes allows to skip and restart from certain point
     print(f"Fold {fold + 1} split:\ttrain {train_videos}\n\t\tvalid {valid_videos}\n\t\ttest {test_videos}")
     # test_idx = np.arange(len(dataset))  # whole dataset
@@ -279,18 +279,18 @@ def phase_metric():
     path_model_fx = os.path.join(path_models, "LDSS-20241104-00--0.837800.pth")
     state_dict = torch.load(path_model_fx, weights_only=False, map_location=device)
   
-    model_fx = net.get_resnet50(n_classes, model_weights=model_weights, state_dict=state_dict, extract_features=True)
+    model_fx = machine.get_resnet50(n_classes, model_weights=model_weights, state_dict=state_dict, extract_features=True)
     last_layer = fxs.get_graph_node_names(model_fx)[0][-2]  # last is fc converted to identity so -2
-    fextractor = net.Fextractor(mode="offline")
+    fextractor = machine.Fextractor(mode="offline")
     fextractor.load(last_layer, path_features)
     features_size = fextractor.features_size
-    guesser = net.Guesser(features_size, n_classes, n_blocks, n_filters, filter_size)
-    improver = net.Improver(n_classes, n_stages, n_blocks, n_filters, filter_size)
+    guesser = machine.Guesser(features_size, n_classes, n_blocks, n_filters, filter_size)
+    improver = machine.Improver(n_classes, n_stages, n_blocks, n_filters, filter_size)
     # _, _, testloader = data.load_data(dataset, size_batch, test_idx=test_idx, datakey=datakey)
-    _, _, testloader = data.load_features(fextractor.features, last_layer, dataset, size_batch, test_idx=test_idx)
+    _, _, testloader = catalogue.load_features(fextractor.features, last_layer, dataset, size_batch, test_idx=test_idx)
     
     # model = net.get_resnet50(n_classes, state_dict=torch.load(path_model, weights_only=False, map_location=device))
-    model = net.SurgeNet(n_classes, fextractor, guesser, improver)
+    model = machine.SurgeNet(n_classes, fextractor, guesser, improver)
 
     load = False
     if not load:
