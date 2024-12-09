@@ -53,6 +53,8 @@ def choose_in_path(path):
         continue
 
 class Pathtaker():
+  ''' Handles paths to the local everywhere
+  '''
   def __init__(self, path_root, datakey, datasetName, date):
     self.path_root = path_root
     for attrKey, attrValue in self._setup_paths(datakey, datasetName, date):
@@ -60,11 +62,10 @@ class Pathtaker():
 
   def _setup_paths(self, datakey, datasetName, date):
     ''' Make sure paths/files exist before setting them as attrs (in constructor)'''
-    paths_data = self._setup_data(self, datakey, datasetName, date)
-    paths_logs = self._setup_data(self, datakey, datasetName, date)
-    paths_models = self._setup_data(self, datakey, datasetName, date)
-    paths_all = {**paths_data, **paths_logs, **paths_models} # merges dicts
-    for k, v in paths_data.items():
+    paths_data = self._setup_data(self, datakey, datasetName)
+    paths_logs = self._setup_logs(self, datasetName, date)
+    paths_all = {**paths_data, **paths_logs} # merges dicts
+    for k, v in paths_all.items():
       os.makedirs(v, exist_ok=True)
     open(paths_data["path_labels"], 'w', newline='').close()
     open(paths_logs["path_config"], 'w', newline='').close()
@@ -72,30 +73,33 @@ class Pathtaker():
     # with open(path_config, "w") as config:
     #   config.write("learning_rate: \nbatch_size: \nepochs: \n")
 
-  def _get_paths_data(self, datakey, datasetName, date):
+  def _get_paths_data(self, datakey, datasetName):
     ''' Get dictionary with paths for everything data'''
     paths_data = {}
     paths_data["path_dataset"] = os.path.join(self.path_root, "data", datakey, datasetName)
-    paths_data["path_features"] = os.path.join(paths_data["path_dataset"], "features", f"run_{date}")
     paths_data["path_samples"] = os.path.join(paths_data["path_dataset"], "samples")
     paths_data["path_labels"] = os.path.join(paths_data["path_dataset"], "labels.csv")
     paths_data["path_annots"] = os.path.join(paths_data["path_dataset"], "annotations")
     return paths_data
-  
-  def _get_paths_models(self, date):
-    ''' Get dictionary with paths to save the best models/checkpoints in'''
-    paths_models = {}
-    paths_models["models"] = os.path.join(self.root, "models", f"run_{date}")
-    paths_models["path_checkpoints"] = os.path.join(paths_models["path_models"], "checkpoints")
-    return paths_models
 
-  def _get_paths_logs(self, datakey, datasetName, date):
-    ''' Get dictionary with paths to save events, phasegraphs, and parameters used (config)'''
+
+  def _get_paths_logs(self, datasetName, date):
+    ''' Get dictionary with paths to everything related to a run'''
     paths_logs = {}
-    paths_logs["path_logs"] = os.path.join(self.path_root, "data", datakey, datasetName, f"run_{date}")
-    paths_logs["path_events"] = os.path.join(paths_logs["path_logs"], "features")
-    paths_logs["path_config"] = os.path.join(paths_logs["path_logs"], "labels.csv")
-    paths_logs["path_phasecharts"] = os.path.join(paths_logs["path_logs"], "phasegraphs")
+    paths_logs["path_logs"] = os.path.join(self.path_root, "logs")
+    paths_logs["path_run"] = os.path.join(paths_logs["path_logs"], f"{datasetName}-{date}")
+    paths_logs["path_runInfo"] = os.path.join(paths_logs["path_run"], "run-info.yml")
+    paths_logs["path_eval"] = os.path.join(paths_logs["path_run"], "eval")
+    paths_logs["path_aprfc"] = os.path.join(paths_logs["path_eval"], "aprfc")
+    paths_logs["path_phaseCharts"] = os.path.join(paths_logs["path_eval"], "phase-charts")
+    paths_logs["path_phaseTiming"] = os.path.join(paths_logs["path_eval"], "phase-timing")
+    paths_logs["path_train"] = os.path.join(paths_logs["path_run"], "train")
+    paths_logs["path_features"] = os.path.join(paths_logs["path_train"], "features")
+    paths_logs["path_predictions"] = os.path.join(paths_logs["path_train"], "predictions")
+    paths_logs["path_events"] = os.path.join(paths_logs["path_train"], "events")
+    paths_logs["path_checkpoints"] = os.path.join(paths_logs["path_train"], "checkpoints")
+    paths_logs["path_process"] = os.path.join(paths_logs["path_run"], "process")
+    paths_logs["path_modeFilter"] = os.path.join(paths_logs["path_process"], "mode-filter")
     return paths_logs
 
 def get_metrics(classWeights, device, computePeriod, n_classes, idxToClass, agg):

@@ -30,7 +30,7 @@ def learning(**the):
   PTK = utils.Pathtaker(the["path_root"], the["datakey"], the["datasetName"], the["date"])
 
   # Data
-  CTL = catalogue.Cataloguer(PTK.paths_dataset, the["datakey"], the["prepkey"], datapointExtra=the["datapointExtra"], update_labels=False, featureLayer=None)
+  CTL = catalogue.Cataloguer(PTK.paths_dataset, the["datakey"], the["prepkey"], datapointExtras=the["datapointExtras"], update_labels=False, featureLayer=None)
   
   # TEACHER (Train/Valid/Test and Metrics)
   trainer = teaching.Trainer()
@@ -43,7 +43,6 @@ def learning(**the):
       CTL.n_classes, os.path.join(PTK.path_models, the["modelName"]), the["fx_modelType"], the["fx_preweights"])
   guesser = machine.Guesser(fextractor.featureSize, CTL.n_classes, the["n_blocks"], the["n_filters"], the["filterTime"])
   refiner = machine.Improver(CTL.n_classes, the["n_stages"], the["n_blocks"], the["n_filters"], the["filter_size"])
-  
 
   print(f"\nData location: {the['path_root']} | Hardware device: {device}")
   print(f"Dataset ({the["datakey"]}): {the["datasetName"]} | {CTL.n_classes} classes"); print(CTL.labelToClass)
@@ -52,19 +51,36 @@ def learning(**the):
   if the["action"] == "process":
     if the["processkey"] == "sample":
       return True
-    elif the["processkey"] == "fextract":
-      t1 = time.time()
-      fextractor.export(DataLoader(dataset=CTL.dataset, batch_size=the["fx_batchSize"]), path_feature, device)
-      t2 = time.time()
-      print(f"Exporting features took {(t2 - t1) // 3600} hours and {(((t2 - t1) % 3600) / 60):.1f} minutes!")
-      return True
     elif the["processkey"] == "modeFilter":
       return True
     else:
       raise ValueError("Invalid processkey!")
 
+  # elif the["processkey"] == "fextract":
+  #   t1 = time.time()
+  #   fextractor.export(DataLoader(dataset=CTL.dataset, batch_size=the["fx_batchSize"]), path_feature, device)
+  #   t2 = time.time()
+  #   print(f"Exporting features took {(t2 - t1) // 3600} hours and {(((t2 - t1) % 3600) / 60):.1f} minutes!")
+  # STUDENT (model)
+  if the["modelkey"] == "spatial":
+    model = machine.SurgeNet(CTL.n_classes, fextractor)
+  elif the["modelkey"] == "temporal":
+    model = machine.SurgeNet(CTL.n_classes, fextractor, guesser, refiner)
+  else:
+    raise ValueError("Invalid trainkey!")
+ 
+    
+  if the["action"] == "train":
+    TCH.teach(model, trainloader, validloader, the["n_epochs"], fold, the["path_resume"],
+        PTK.path_checkpoints, writer)
+    
+  if the["action"] == "eval":
+    stateDict = torch.load(path_model, weights_only=False, map_location=device)
+    model.load_state_dict(stateDict, strict=False)
+    TCH.evaluate(model, testloader, teskey, path_load, path_save, return_extra, fold)
+
   # "Classroom" with 'k_folds' students (models), all learning from the same teacher one at a time
-  for fold, splits in enumerate(CTL.split(CTL.dataset, the["datakey"], the["k_folds"])):
+  for fold, splits in enumerate(CTL.split(the["k_folds"])):
     # iterating through each fold, which has the idxs [0] and corresponding video names [1]
     ((train_idxs, valid_idxs, test_idxs), (train_vidNames, valid_vidNames, test_vidNames)) = splits
     if fold in the["skipFolds"]: continue # after a break (e.g. crash) allows to skip folds and restart from a checkpoint
@@ -72,23 +88,8 @@ def learning(**the):
     writer = SummaryWriter(os.path.join(PTK.path_events, str(f"fold{fold + 1}"))) # object for logging stats
     trainloader, validloader, testloader = CTL.batch(the["batchSize"], train_idxs, valid_idxs, test_idxs)
 
-    # STUDENT (model)
-    if the["trainkey"] == "spatial":
-      model = machine.SurgeNet(CTL.n_classes, fextractor)
-    elif the["trainkey"] == "temporal":
-      model = machine.SurgeNet(CTL.n_classes, fextractor, guesser, refiner)
-    else:
-      raise ValueError("Invalid trainkey!")
- 
+
     
-    if the["action"] == "train":
-      TCH.teach(model, trainloader, validloader, the["n_epochs"], fold, the["path_resume"],
-          PTK.path_checkpoints, fold, writer)
-      
-    if the["action"] == "eval":
-      stateDict = torch.load(path_model, weights_only=False, map_location=device)
-      model.load_state_dict(stateDict, strict=False)
-      TCH.evaluate(model, testloader, teskey, path_load, path_save, return_extra, fold)
 
 
     
@@ -109,7 +110,7 @@ def learning(**the):
  
 if __name__ == "__main__":
   # Load default parameters from config.yml
-  with open(os.path.join("config", "config.yml"), "r") as file:
+  with open(os.path.join("settings", "config-default.yml"), "r") as file:
     config = yaml.safe_load(file)
 
   # Set up argparse fir runtime overriding
