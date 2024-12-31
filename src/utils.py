@@ -10,8 +10,6 @@ import datetime
 from collections import defaultdict
 import torch.nn as nn
 
-from . import train, validate
-
 def modeFilter(preds, windowSize):
   def mode(sequence):
     # not handling ties yet
@@ -55,21 +53,33 @@ def choose_in_path(path):
 class Pathtaker():
   ''' Handles paths to the local everywhere
   '''
-  def __init__(self, path_root, datakey, datasetName, date):
+  def __init__(self, path_root, datakey, datasetName, date, run=None):
     self.path_root = path_root
+    if run:
+      assert run.split()[0] == datasetName, "Unmatched run and datasetName"
     for attrKey, attrValue in self._setup_paths(datakey, datasetName, date):
       setattr(self, attrKey, attrValue)
 
-  def _setup_paths(self, datakey, datasetName, date):
-    ''' Make sure paths/files exist before setting them as attrs (in constructor)'''
-    paths_data = self._setup_data(self, datakey, datasetName)
-    paths_logs = self._setup_logs(self, datasetName, date)
+  def _setup_paths(self, datakey, datasetName, date, run=None):
+    ''' Make sure paths/files exist before setting them as attrs (in constructor)
+        And returns dict items
+    '''
+    paths_data = self._get_paths_data(datakey, datasetName)
+    paths_logs = self._get_paths_logs(datasetName, date, run=None)
     paths_all = {**paths_data, **paths_logs} # merges dicts
+    os.makedirs(paths_all["path_dataset"], exist_ok=True)
+    os.makedirs(paths_all["path_run"], exist_ok=True)
     for k, v in paths_all.items():
-      os.makedirs(v, exist_ok=True)
-    open(paths_data["path_labels"], 'w', newline='').close()
-    open(paths_logs["path_config"], 'w', newline='').close()
-    return paths_all
+      # print(v, '\n')
+      if os.path.splitext(v)[1] in (".csv", ".yml"):  # If it's a file
+        # print("ITS A FILE")
+        os.makedirs(os.path.dirname(v), exist_ok=True)  # Create only the parent directory
+        if not os.path.exists(v):  # Only create the file if it doesn't exist
+          open(v, 'w', newline='').close()
+      else:  # Otherwise, it's a directory path
+        os.makedirs(v, exist_ok=True)
+
+    return paths_all.items()
     # with open(path_config, "w") as config:
     #   config.write("learning_rate: \nbatch_size: \nepochs: \n")
 
@@ -83,11 +93,14 @@ class Pathtaker():
     return paths_data
 
 
-  def _get_paths_logs(self, datasetName, date):
+  def _get_paths_logs(self, datasetName, date, run=None):
     ''' Get dictionary with paths to everything related to a run'''
     paths_logs = {}
     paths_logs["path_logs"] = os.path.join(self.path_root, "logs")
-    paths_logs["path_run"] = os.path.join(paths_logs["path_logs"], f"{datasetName}-{date}")
+    if run:
+      paths_logs["path_run"] = os.path.join(paths_logs["path_logs"], run)
+    else:
+      paths_logs["path_run"] = os.path.join(paths_logs["path_logs"], f"{datasetName}_{date}")
     paths_logs["path_runInfo"] = os.path.join(paths_logs["path_run"], "run-info.yml")
     paths_logs["path_eval"] = os.path.join(paths_logs["path_run"], "eval")
     paths_logs["path_aprfc"] = os.path.join(paths_logs["path_eval"], "aprfc")

@@ -1,13 +1,12 @@
 import torch.nn as nn
 from torcheval.metrics import MulticlassAccuracy, MulticlassPrecision, MulticlassRecall, MulticlassF1Score, MulticlassConfusionMatrix
-import utils
+from src import utils, machine
 import torch
 import numpy as np
 import torch.optim as optim
 import os
 from torch.utils.tensorboard import SummaryWriter
 import matplotlib.pyplot as plt
-import machine
 import seaborn as sns
 import pickle
 import time
@@ -22,31 +21,33 @@ class Teacher():
       Action - teach, eval
       Pipeline: (train -> validate) x n_epochs -> test
   '''
-  def __init__(self, trainer, validater, tester, criterion, n_classes, classWeights, labelToClass):
+  def __init__(self, trainer, validater, tester, criterion, classWeights, path_eval):
     if criterion == "crossEntropy":
-      self.criterion = nn.CrossEntropyLoss(weight=classWeights)
+      self.criterion = nn.CrossEntropyLoss(weight=classWeights.to("cuda"))
     else:
       raise ValueError("Invalid criterion chosen (crossEntropy, )")
     self.trainer = trainer
     self.validater = validater
     self.tester = tester
-
+    
+    self.path_eval = path_eval
     self.highScore = -np.inf
     self.bestState = {}
 
     
   def teach(self, model, trainloader, validloader, n_epochs, fold, path_resume, path_checkpoints, writer):
-    ''' Iterate through epochs of model learning with training and validation
+    ''' Iterate through folds and epochs of model learning with training and validation
         In: Untrained model, data, etc
         Out: Trained model (state_dict)
     '''
+   
     earlyStopper = EarlyStopper()
-    optimizer = optim.SGD(model.parameters(), lr=self.trainer.lr, momentum=self.trainer.momentum)
+    optimizer = optim.SGD(model.parameters(), lr=self.trainer.learningRate, momentum=self.trainer.momentum)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=self.trainer.stepSize, gamma=self.trainer.gamma) # updates the optimizer by the gamma factor after the step_size
     # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=50)
 
     betterState, valid_minLoss = {}, np.inf
-    self.trainer.earlyStopper.reset()
+    earlyStopper.reset()
     if path_resume: # Loading checkpoint before resuming training
       model, optimizer, startEpoch, cpLoss = self.load_checkpoint(model, optimizer, path_resume)
     else:
@@ -54,8 +55,9 @@ class Teacher():
 
     for epoch in range(startEpoch, n_epochs):
       print(f"     Epoch {epoch + 1}")
-      train_loss, train_score = self.trainer.train(model, trainloader, self.criterion, optimizer, epoch, self.device)
-      valid_loss, valid_score = self.validater.validate(model, validloader, self.criterion, epoch, self.device)
+      train_loss, train_score = self.trainer.train(model, trainloader, self.criterion, optimizer, epoch)
+      # assert 1 == 0
+      valid_loss, valid_score = self.validater.validate(model, validloader, self.criterion, epoch)
 
       writer.add_scalar("Loss/train", train_loss, epoch + 1)
       writer.add_scalar("Loss/valid", valid_loss, epoch + 1)
@@ -75,25 +77,54 @@ class Teacher():
         print(f"\n* Checkpoint reached ({epoch + 1}/{n_epochs}) *\n")
         path_checkpoint = os.path.join(path_checkpoints, f"checkpoint_fold{fold + 1}_epoch{epoch + 1}.pth")
         machine.save_checkpoint(model, optimizer, epoch, valid_loss, path_checkpoint)
+    
     return betterState
 
-  def evaluate(self, model, testloader, testkey, path_load=None, path_save="test_results.pk1", return_extra=None):
+  def evaluate(self, model, testloader, evalkeys, fold, writer, date, n_classes, idx_to_class, extradataDict=None, path_eval=None, path_aprfc=None, path_phaseCharts=None, path_bundle=''):
     
-    if path_load:
-      with open(path_load, 'rb') as f:  # Load the DataFrame
-        test_bundle = pickle.load(f)
-    else:
+    if not path_bundle:
       t1 = time.time()
-      preds, targets, sampleNames = self.tester.test(model, testloader, return_extra)
+      final_preds, final_targets, final_imageNames  = self.tester.test(model, testloader, extradataDict=extradataDict)
       t2 = time.time()
       print(f"Testing took {t2 - t1:.2f} seconds")
-      self.tester.test_metrics.display()
-      # print(sampleNames[0], preds[0], targets[0])
+      # print(final_imageNames[0], final_preds[0], final_targets[0])
       # torch.nn.functional.one_hot(tensor, n_classes=-1)
-      test_bundle = self.get_bundle(preds, targets, sampleNames)
-      with open(path_save, 'wb') as f: # Save the DataFrame
+      final_bundle = self._get_bundle(final_preds, final_targets, final_imageNames)
+      path_to = os.path.join(path_eval, f"results_fold{fold}")
+      with open(path_to, 'wb') as f: # Save the DataFrame
+        pickle.dump(final_bundle, f)
+      path_bundle = path_to
+
+    with open(path_bundle, 'rb') as f:  # Load the DataFrame
+      final_bundle = pickle.load(f)
+    self.tester._acpref1com(writer, path_aprfc, fold, path_bundle)
+    # print(list(final_bundle.groupby("Video")))
+    outText = self.tester._phase_lengths(final_bundle, n_classes, idx_to_class, path_bundle)
+    self.tester._phase_graph(final_bundle, path_phaseCharts, fold, date, outText, path_bundle)
+
+  def evaluate2(self, model, testloader, evalkeys, extradataDict=None, path_to=None):
+    # _, ext = os.path.splitext(path_from)
+    # if ext == ".pkl": # pickle file for results
+    #   with open(path_from, 'rb') as f:  # Load the DataFrame
+    #     test_bundle = pickle.load(f)
+    # elif ext == ".pth": # torch model to eval
+    # model = torch.load(path_from, weights_only=False)
+    t1 = time.time()
+    preds, targets, extradata = self.tester.test(model, testloader, extradataDict)
+    t2 = time.time()
+    print(f"Testing took {t2 - t1:.2f} seconds")
+    # self.tester.test_metrics.display()
+    # print(sampleNames[0], preds[0], targets[0])
+    # torch.nn.functional.one_hot(tensor, n_classes=-1)
+    test_bundle = self._get_bundle(preds, targets, extradata)
+    if path_to:
+      with open(path_to, 'wb') as f: # Save the DataFrame
         pickle.dump(test_bundle, f)
 
+    self._do_tests(test_bundle, evalkeys)
+ 
+
+  def _do_tests(self, test_bundle, testkey):
     testsAvailable = {
       "acpref1com": self.tester.acpref1com,
       "timing": self.tester.phaseTiming,
@@ -105,30 +136,36 @@ class Teacher():
       for action in testsAvailable.values():
         action(test_bundle)
 
-
-  def get_bundle(self, sampleNames, preds, targets):
-    df = pd.DataFrame({
-      "SampleName": sampleNames,
+  def _get_bundle(self, preds, targets, extradata):
+    preBundle = {
       "Preds": preds,
-      'Targets': targets
-    })
+      'Targets': targets,
+      'SampleName': extradata
+    }
+    # if extradata:
+    #   preBundle.update(extradata)
+    # print(len(preds), len(targets), len(extradata))
+    # print(f"Sample Names Type: {type(extradata[0])}, Content: {extradata[:5]}")
+    bundle = pd.DataFrame(preBundle)
+    # print(bundle.head())
+
     # assuming frames in the structure of videoName_relativeTime
-    df[['Video', 'Timestamp']] = df["SampleName"].str.split('_', expand=True) # expand creates two columns, instead of just leaving data as a split list
-    df["Timestamp"] = df["Timestamp"].astype(int)
-    df = df.sort_values(by=['Video', 'Timestamp']) # Sort the DataFrame by VIDEO and TIME
-    #df['AbsoluteTime'] = df.groupby('Video').cumcount() # Convert Relative Time to Absolute Time
-    return df
+    bundle[['Video', 'Timestamp']] = bundle["SampleName"].str.split('_', expand=True) # expand creates two columns, instead of just leaving data as a split list
+    bundle["Timestamp"] = bundle["Timestamp"].astype(int)
+    bundle = bundle.sort_values(by=['Video', 'Timestamp']) # Sort the DataFrame by VIDEO and TIME
+    #bundle['AbsoluteTime'] = bundle.groupby('Video').cumcount() # Convert Relative Time to Absolute Time
+    return bundle
 
 class Trainer():
   ''' Part of the teacher that knows how to train models based on data
   '''
-  def __init__(self, metricName, computeFrequency, updateFrequency, learningRate, momentum, stepSize, gamma, device):
+  def __init__(self, hyperparameters, metric, device):
     self.device = device
-    self.train_metric = utils.RunningMetric(metricName, computeFrequency, device, updateFrequency)
-    self.learningRate = learningRate
-    self.momentum = momentum
-    self.stepSize = stepSize
-    self.gamma = gamma
+    self.train_metric = metric
+    self.learningRate = hyperparameters["learningRate"]
+    self.momentum = hyperparameters["momentum"]
+    self.stepSize = hyperparameters["stepSize"]
+    self.gamma = hyperparameters["gamma"]
   def train(self, model, trainloader, criterion, optimizer, epoch):
     ''' In: model, data, criterion (loss function), optimizer
         Out: train_loss, train_score
@@ -141,25 +178,25 @@ class Trainer():
     model.train().to(self.device); print("\tTraining...")
     for batch, data in enumerate(trainloader, 0):   # start at batch 0
       inputs, targets = data[0].to(self.device), data[1].to(self.device) # data is a list of [inputs, labels]
-      print("inputs: ", inputs.shape, "\ttargets: ", targets.shape, '\n')
+      # print("inputs: ", inputs.shape, "\ttargets: ", targets.shape, '\n')
       optimizer.zero_grad() # reset the parameter gradients before backward step
       outputs = model(inputs).squeeze(0).permute(1, 0) # forward pass
-      print("\noutputs: ", outputs.shape)
+      # print("\noutputs: ", outputs.shape)
       loss = criterion(outputs, targets) # calculate loss  # -1 for getting last stage guesses
       loss.backward() # backward pass
       optimizer.step()    # a single optimization step
       runningLoss += loss.item() # accumulate loss
       self.train_metric.update(outputs, targets)
-      if batch % self.train_metric.period_compute == 0:
+      if batch % self.train_metric.computeFreq == 0:
         print(f"\t  T [E{epoch + 1} B{batch + 1}]   scr: {self.train_metric.score():.4f}")
     return runningLoss / len(trainloader), self.train_metric.score()
 
 class Validater():
   ''' Part of the teacher that knows how to validate a run of model training
   '''
-  def __init__(self, metricName, computeFrequency, updateFrequency, device):
+  def __init__(self, metric, device):
     self.device = device
-    self.valid_metric = utils.RunningMetric(metricName, computeFrequency // 2, device)
+    self.valid_metric = metric
   def validate(self, model, validloader, criterion, epoch):
     ''' In: model, data, criterion (loss function)
         Out: valid_loss, valid_score
@@ -175,58 +212,198 @@ class Validater():
         loss = criterion(outputs, targets)
         runningLoss += loss.item()
         self.valid_metric.update(outputs, targets)  # updates with data from new batch
-        if batch % self.valid_metric.period_compute == 0:
+        if batch % self.valid_metric.computeFreq == 0:
           print(f"\t  V [E{epoch + 1} B{batch + 1}]   scr: {self.valid_metric.score():.4f}")
     return runningLoss / len(validloader), self.valid_metric.score()
 
 class Tester():
   ''' Part of the teacher that knows how to test a model knowledge in multiple ways
   '''
-  def __init__(self, metricSwitches, n_classes, labelToClass, agg, device):
-    self.test_metrics = MetricBunch(metricSwitches, n_classes, labelToClass, agg, device)
+  def __init__(self, metrics, device):
+    self.test_metrics = metrics
+    self.device = device
   
-  def test(self, model, testloader, return_extra):
+  def test(self, model, testloader, extradataDict):
     ''' Test the model - return Preds, labels and sampleNames
     '''
     self.test_metrics.reset()
     preds = []
-    targets = []
-    sampleNames = []
+    targetsList = []
+    sampleNamesList = []
     model.eval().to(self.device); print("\n\tTesting...")
-    print(return_extra)
+    print(extradataDict)
     with torch.no_grad():
       for batch, data in enumerate(testloader):
-        if return_extra["ids"]:
+        if extradataDict["id"]:
           inputs, targets, sampleNames = data[0].to(self.device), data[1].to(self.device), data[2]
-          sampleNames.append(sampleNames)
+          sampleNamesList.extend(sampleNames)
         else:
           inputs, targets = data[0].to(self.device), data[1].to(self.device)
         outputs = model(inputs).squeeze(0).permute(1, 0)
         _, batchPreds = torch.max(outputs, 1)  # get labels with max prediction values
         preds.append(batchPreds)
-        targets.append(targets)
+        targetsList.append(targets)
         self.test_metrics.update(outputs, targets)
-        if batch % self.test_metric.accuracy.period_compute == 0:
+        if batch % self.test_metrics.accuracy.computeFreq == 0:
           print(f"\t  T [B{batch + 1}]   scr: {self.test_metrics.accuracy.score():.4f}")
     preds = torch.cat(preds).cpu().tolist()  # flattens the list of tensor
-    targets = torch.cat(targets).cpu().tolist()
-    sampleNames = [os.path.splitext(os.path.basename(imgn))[0] for batch in sampleNames for imgn in batch]
-    return preds, targets, sampleNames
+    targetsList = torch.cat(targetsList).cpu().tolist()
+    # sampleNamesList = [imgn for batch in sampleNames for imgn in batch]
+    
+    # print(len(preds), len(targetsList), len(sampleNamesList))
+    # print(f"Sample Names Type: {type(sampleNamesList[0])}, Content: {sampleNamesList[:5]}")
+    return preds, targetsList, sampleNamesList
 
-  def acpref1com(self, preds, targets):
-    def score_log(BM, writer, path_logs, fold):
+  def _acpref1com(self, writer, path_to, fold, path_bundle):
+    # self.test_metrics.display()
+    def score_log(BM, writer, path_to, fold, path_bundle):
       ''' Log metrics to TensorBoard
       '''
       writer.add_scalar(f"accuracy/test", BM.get_accuracy(), fold)
       writer.add_scalar(f"precision/test", BM.get_precision(), fold)
       writer.add_scalar(f"recall/test", BM.get_recall(), fold)
       writer.add_scalar(f"f1score/test", BM.get_f1score(), fold)
-      image_cf = plt.imread(BM.get_confusionMatrix(path_logs))
+      image_cf = plt.imread(BM.get_confusionMatrix(path_to, path_bundle))
       tensor_cf = torch.tensor(image_cf).permute(2, 0, 1)
       writer.add_image(f"confusion_matrix/test", tensor_cf, fold)
       writer.close()
+    score_log(self.test_metrics, writer, path_to, fold, path_bundle)
     
+  def _phase_lengths_i2(self, df, n_classes, idx_to_class, samplerate=1):
+    outText = []
+    lp, lt = len(df["Preds"]), len(df["Targets"])
+    # n_classes = (max(df["Targets"]) + 1)  # assuming regular int encoding
+    # n_classes = len(preds[0]) # assuming one hot encoding
+    assert lp == lt, "Targets and Preds Size Incompatibility"
+    videos = df["Video"].unique()
+    phases_preds_sum = np.zeros(n_classes)
+    phases_gt_sum = np.zeros(n_classes)
+    phases_diff_sum = np.zeros(n_classes)
 
+    for idx, video in enumerate(videos):
+      print()
+      df_filtered = df[df["Video"] == video][["Preds", "Targets"]]
+      
+      classes_video = pd.Series(df_filtered["Targets"].unique())
+      # pd.set_option("display.max_rows", 100)
+      # print(df_filtered["Targets"].iloc[:100])
+      print(classes_video.reindex(range(n_classes), fill_value=-1).values)
+      # Reset for each video
+      
+      phases_preds_video = df_filtered["Preds"].value_counts().reindex(range(n_classes), fill_value=0) # Targets video counts
+      phases_gt_video = df_filtered["Targets"].value_counts().reindex(range(n_classes), fill_value=0) # Targets video counts
+      # ensures every class is accounted for in cumulative count, even with no occurrences
+      phases_preds_sum += phases_preds_video.values
+      phases_gt_sum += phases_gt_video.values
+      phases_diff_sum += np.abs(phases_preds_video.values - phases_gt_video.values)
+      # print(phases_diff_sum)
+      
+      # Optionally print counts for each video
+      print("phases_preds counts:", phases_preds_video.values, '\t', sum(phases_preds_video))
+      print("phases_gt counts:", phases_gt_video.to_numpy(), '\t', sum(phases_gt_video.to_numpy()))
+      
+      mix = list(zip(phases_preds_video / (60 * samplerate), phases_gt_video / (60 * samplerate), phases_diff_sum))
+      ot = f"\nVideo {video} Phase Report\n" + f"{'':<12} |   T Preds    |    T Targets     ||  Diff\n" + '\n'.join(
+            f"{idx_to_class[i]:<12} | {mix[i][0]:<8.2f}min | {mix[i][1]:<8.2f}min || {(mix[i][0] - mix[i][1]):<8.2f}min"
+            for i in range(n_classes)
+        )
+      outText.append(ot)
+      print(ot)
+    # Average Overall Results
+    phases_preds_avg = phases_preds_sum / len(videos) / (60 * samplerate)
+    phases_gt_avg = phases_gt_sum / len(videos) / (60 * samplerate)
+    phases_diff_avg = phases_diff_sum / len(videos) / (60 * samplerate)
+    mix = list(zip(phases_preds_avg, phases_gt_avg, phases_diff_avg))
+    
+    otavg = "\n\nOverall Average Phase Report\n" + f"{'':<12} | T Avg Preds  |  T Avg Targets   || Total AE\n" + '\n'.join(
+            f"{idx_to_class[i]:<12} | {mix[i][0]:<8.2f}min | {mix[i][1]:<8.2f}min || {(mix[i][2]):<8.2f}min"
+            for i in range(n_classes)
+      )
+    print(otavg)
+    outText.append(otavg)
+  # phase_metric([1, 1, 2, 3, 3, 4, 0, 5], [0, 0, 0, 2, 3, 4, 5, 1])
+    return outText
+
+  def _phase_lengths(self, df, n_classes, idx_to_class, samplerate=1):
+    return self._phase_lengths_i2(df, n_classes, idx_to_class, samplerate=1)
+
+  def _phase_graph(self, df, path_out, fold, date, outText, path_bundle):
+      # df = pd.DataFrame({
+      #     'SampleName': ['vid1_1', 'vid1_3', 'vid1_2', 'vid2_20', 'vid2_23', 'vid2_40', 'vid2_51', 'vid2_52'],
+      #     'Targets': [0, 1, 1, 2, 0, 1, 1, 1],  # Example target labels
+      #     'Preds': [0, 1, 0, 2, 1, 4, 3, 2],  # Example predictions (e.g., class indices)
+
+      # })
+      # Prepare for plotting
+      videos = df['Video'].unique()
+      num_videos = len(videos)
+      print(f'\n\nNumber of videos: {num_videos}')
+      color_map = {0: 'springgreen', 1: 'goldenrod', 2: 'tomato', 3: 'mediumslateblue', 4: 'plum', 5: 'deepskyblue'}
+      plt.rcParams['font.family'] = 'monospace'
+      # for saving all videos to same img
+      # fig, axes = plt.subplots(num_videos, 1, figsize=(9, 5), sharex=True) # Create subplots
+      # if num_videos == 1: axes = [axes] # prevent errors if only 1 video
+      t1 = time.time()
+      # Plotting
+      for idx, video in enumerate(videos):
+
+        data_video = df[df['Video'] == video][["Targets", "Preds"]]
+        fig, (ax, ax_text) = plt.subplots(nrows=2, gridspec_kw={'height_ratios': [3, 1]}, figsize=(9, 6))
+          
+        # ax = axes[idx]  # for saving all videos to same image
+        
+        # Prepare the bar data
+        for j, stage in enumerate(data_video.columns):
+          start_positions = np.arange(len(data_video))
+          class_values = data_video[stage].values
+          ax.broken_barh(list(zip(start_positions, np.ones(len(start_positions)))), (j - 0.4, 0.8), facecolors=[color_map[val] for val in class_values])
+
+        # Add vertical separators
+        # ax.axvline(x=len(data_video), color='grey', linestyle='--', linewidth=0.5)
+
+        # Set labels
+        ax.set_yticks(np.arange(len(data_video.columns)))  # Middle of the two rows
+        ax.set_yticklabels(data_video.columns)
+        ax.set_xticks([])
+        ax.set_xlabel("Time Steps")
+        ax.set_title(f"Video: {video}")
+
+        # Add the summary paragraph below the graph
+        ax_text.axis('off')  # Hide axis for the text box
+        ot = outText[idx].replace('\t', '     ').replace('\u200b', '')  # Removes hidden tabs and zero-width spaces
+
+        # print(ot)
+        ax_text.text(0, 0.5, ot, transform=ax_text.transAxes, fontsize=11, 
+                    verticalalignment='center', horizontalalignment='left',
+                    bbox=dict(boxstyle="round,pad=0.3", edgecolor="black", facecolor="white"))
+
+      
+        # Create custom legend
+        handles = [plt.Rectangle((0, 0), 1, 1, color=color_map[i]) for i in color_map.keys()]
+        labels = [f'{i}' for i in color_map.keys()]
+        ax.legend(handles, labels, loc='upper right', title='Classes')
+
+        plt.tight_layout()
+        # plt.show(block=True)
+        plt.savefig(os.path.join(path_out, f"{date}_{os.path.basename(path_bundle)}_{video[:4]}.png"))
+        plt.close(fig)
+
+      plt.figure()
+      fig, ax_text = plt.subplots(figsize=(6, 2))
+      ax_text.axis('off')  # Hide axis for the text box
+      ot = outText[-1].replace('\t', '      ').replace('\u200b', '')  # Removes hidden tabs and zero-width spaces
+      # print(ot)
+      ax_text.text(0, 0.5, ot, transform=ax_text.transAxes, fontsize=11, 
+                  verticalalignment='center', horizontalalignment='left',
+                  bbox=dict(boxstyle="round,pad=0.3", edgecolor="black", facecolor="white"))
+      plt.tight_layout()
+      plt.show(block=True)
+      plt.savefig(os.path.join(path_out, f"{date}_{os.path.basename(path_bundle)}_oa-avg-phase-rep.png"))
+      plt.close()
+
+      t2 = time.time()
+      print(f"Video graphing took {t2 - t1:.2f} seconds")
+      print(f"\nSaved phase metric graphs to {path_out}")
 
 class EarlyStopper:
   ''' Controls the validation loss progress to keep it going down and improve times
@@ -264,9 +441,9 @@ class StillMetric:
     elif metricName == "recall":
       self.metric = MulticlassRecall(average=agg, num_classes=n_classes, device=device)
     elif metricName == "f1score":
-      self.metric = MulticlassF1Score(average=agg, um_classes=n_classes, device=device)
+      self.metric = MulticlassF1Score(average=agg, num_classes=n_classes, device=device)
     elif metricName == "confusionMatrix":
-      self.metric = MulticlassConfusionMatrix(average=agg, num_classes=n_classes, device=device)
+      self.metric = MulticlassConfusionMatrix(num_classes=n_classes, device=device)
     else:
       raise ValueError("Invalid Metric Name")
   def reset(self):
@@ -277,15 +454,15 @@ class StillMetric:
 class RunningMetric(StillMetric):
   ''' Extends StillMetric to updates on the run
   '''
-  def __init__(self, metricName, n_classes, device, agg, computeFrequency, updateFrequency=1):
+  def __init__(self, metricName, n_classes, device, agg, computeFreq, updateFreq=1):
     super().__init__(metricName, n_classes, device, agg)
-    self.computeFrequency = computeFrequency  # num of batches between computations
-    self.updateFrequency = updateFrequency  # num of batches between updates
+    self.computeFreq = computeFreq  # num of batches between computations
+    self.updateFreq = updateFreq  # num of batches between updates
     
   # def running(self, outputs, labels, batch, epoch):
-  #   if (batch + 1) % self.updateFrequency == 0:
+  #   if (batch + 1) % self.updateFreq == 0:
   #     self.metric.update(outputs, labels)
-  #   if (batch + 1) % self.computeFrequency == 0:
+  #   if (batch + 1) % self.computeFreq == 0:
   #     metric_result = self.metric.compute().item()
   #     print(f"\t  [E{epoch + 1} B{batch + 1}]   scr: {metric_result:.4f}")
   #     return metric_result
@@ -298,21 +475,21 @@ class MetricBunch:
   ''' Gets a bunch of still metrics at cheap price
       Accuracy locked at agg==micro for now
   '''
-  def __init__(self, metricSwitches, n_classes, labelToClass, agg, device):  # metricSwitches is a boolean dict switch for getting metrics
+  def __init__(self, metricSwitches, n_classes, labelToClass, agg, computeFreq, device):  # metricSwitches is a boolean dict switch for getting metrics
     self.metricSwitches = metricSwitches
     self.labelToClass = labelToClass
     self.agg = agg
     
     if self.metricSwitches["accuracy"]:
-      self.accuracy = RunningMetric("accuracy", n_classes, device, agg="micro")
+      self.accuracy = RunningMetric("accuracy", n_classes, device, "micro", computeFreq)
     if self.metricSwitches["precision"]:
-      self.precision = RunningMetric("precision", n_classes, device, agg=agg)
+      self.precision = RunningMetric("precision", n_classes, device, agg, computeFreq)
     if self.metricSwitches["recall"]:
-      self.recall = RunningMetric("recall", n_classes, device, agg=agg)
+      self.recall = RunningMetric("recall", n_classes, device, agg, computeFreq)
     if self.metricSwitches["f1score"]:
-      self.f1score = RunningMetric("f1score", n_classes, device, agg=agg)
+      self.f1score = RunningMetric("f1score", n_classes, device, agg, computeFreq)
     if self.metricSwitches["confusionMatrix"]:
-      self.confusionMatrix = RunningMetric("confusionMatrix", n_classes, device, agg=agg)
+      self.confusionMatrix = RunningMetric("confusionMatrix", n_classes, device, agg, computeFreq)
 
   def reset(self):
     if self.accuracy: self.accuracy.reset()
@@ -342,38 +519,38 @@ class MetricBunch:
 
   def get_accuracy(self):
     try:
-      return self.accuracy.compute().item()
+      return self.accuracy.score()
     except:
       print("! Dataset group lacks representation of all classes !")
       return -1
   def get_precision(self):
     try:
-      return self.precision.compute().item()
+      return self.precision.score()
     except:
       print("! Dataset group lacks representation of all classes !")
       return -1
   def get_recall(self):
     try:
-      return self.recall.compute().item()
+      return self.recall.score()
     except:
       print("! Dataset group lacks representation of all classes !")
       return -1
   def get_f1score(self):
     try:
-      return self.f1score.compute().item()
+      return self.f1score.score()
     except:
       print("! Dataset group lacks representation of all classes !")
       return -1
-  def get_confusionMatrix(self, path_to=''):
+  def get_confusionMatrix(self, path_to='', path_bundle=''):
     try:
       fig, ax = plt.subplots(figsize=(10, 7))
-      sns.heatmap(self.confusionMatrix.compute().cpu(), annot=True, fmt='.2f', cmap='Blues',
+      sns.heatmap(self.confusionMatrix.metric.compute().cpu(), annot=True, fmt='.2f', cmap='Blues',
                   xticklabels=self.labelToClass.values(), yticklabels=self.labelToClass.values(), ax=ax)
       ax.set_xlabel('Predicted')
       ax.set_ylabel('True')
       ax.set_title('Confusion Matrix')
       if path_to:
-        path_img = os.path.join(path_to, os.path.basename(path_to) + ".png")
+        path_img = os.path.join(path_to, f"cm_{os.path.basename(path_bundle)}.png")
         plt.savefig(path_img)
         return path_img
     except:
@@ -381,5 +558,3 @@ class MetricBunch:
       return path_to
     
   
-
-

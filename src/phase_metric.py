@@ -13,7 +13,7 @@ from torchvision.models import resnet50, ResNet50_Weights
 import sys
 import torchvision.models.feature_extraction as fxs
 
-from src import catalogue, machine, utils, test
+from src import catalogue, machine, utils
 # from model_practice import path_root, path_logs, device
 
 def get_bundle(final_imageNames, final_preds, final_targets):

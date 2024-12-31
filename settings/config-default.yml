@@ -2,21 +2,24 @@
 seed: 53  # 5 --> 3 or 3 --> 5
 device: None
 path_root: .
+run: #LDSS-24110400
 action: train # process (sample, modeFitler)
                 # train (spatial, temporal)
                 # eval (aprfc, phaseTiming, phaseChart)
 
 # Data
 datakey: local  # match with datasetName (local for LDSS, external for CIFAR10)
-datasetName: LDSS-lite
+datasetName: LDSS
 preprocessing: basic  # basic, augmentation
-datapointExtras: # for local dataset (extend __getitem__() return beyond datapoint and label)
+extradata: # for local dataset (extend __getitem__() return beyond datapoint and label)
   id: True
+  video: False
+  timestamp: False
 
 # Model
-modelkey: spatial # spatial, temporal
+modelkey: temporal # spatial, temporal
 fx_weights: default
-fx_model: LDSS-20241104-00--0.837800.pth
+fx_model: logs/LDSS-24110400/train/checkpoints/LDSS-20241104-00-fold6-0.837800.pth
 fx_batchSize: 128  # training feature extractor
 n_stages_G: 1  # G for Guesser
 n_stages_R: 2  # R for Refiner
@@ -37,15 +40,17 @@ train_outputs:
   events: True
   bestModel: True
 k_folds: 7 # match with datasetName (7 for LDSS, 5 for CIFAR10)
-n_epochs: 10
+n_epochs: 50
 batchSize: 128
+batchMode: features
 criterion: crossEntropy
 train_metric: accuracy
 valid_metric: accuracy
-learningRate: 0.0005
-momentum: 0.9
-gamma: 0.1
-stepSize: 30  # optimizer scheduler (to change mid train)
+hyperparameters:
+  learningRate: 0.0005
+  momentum: 0.9
+  gamma: 0.1
+  stepSize: 30  # optimizer scheduler (to change mid train)
 path_resume: null  # to continue training from a checkpoint model
 checkpointFrequency: 5 # epoch frequency to save a checkpoint
 skipFolds: []  # 0 for fold 1...
@@ -56,9 +61,9 @@ evalkeys:
   phaseTiming: False
   phaseChart: False
 agg: macro  # accuracy is locked to micro (see utils.py)
-updateFrequency: 1  # updates metrics with new data every batch
-computeFrequency: 100  # computes the metrics
-metricSwitches:
+updateFreq: 1  # updates metrics with new data every batch
+computeFreq: 100  # computes the metrics
+test_metrics:
   accuracy: True
   precision: True
   recall: True

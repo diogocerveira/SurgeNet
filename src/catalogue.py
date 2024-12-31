@@ -17,7 +17,7 @@ from torchvision.transforms import v2 as transforms
 import sys
 import torch.nn as nn
 from torcheval.metrics import MulticlassAccuracy, MulticlassPrecision, MulticlassRecall, MulticlassF1Score, MulticlassConfusionMatrix
-import utils
+from . import utils
 
 import matplotlib
 matplotlib.use('Agg')
@@ -57,7 +57,7 @@ class Showcaser:
 class SurgeryStillsDataset(Dataset):
   ''' Custom dataset of frames from sampled surgery videos
   '''
-  def __init__(self, path_samples, path_labels, path_annots, transform=None, return_extra={"ids": False, "ts": False, "vids": False}, update_labels=False):
+  def __init__(self, datakey, path_samples, path_labels, path_annots, extradata, transform=None, updateLabels=False):
     '''
       Args:
         path_labels (str): path to csv with annotations
@@ -65,26 +65,26 @@ class SurgeryStillsDataset(Dataset):
         path_annots (str): path to raw annotations (to extract classes)
         transform (callable, optional): transform a sample
     '''
-    self.datakey
+    self.datakey = datakey
     self.path_samples = path_samples
     self.path_labels = path_labels
     self.path_annots = path_annots
-    if update_labels:
+    if updateLabels:
       self.update_labels_csv()
-    self.labels = self.get_labels(path_labels) # frame_id, video, frame_label
+    self.labels = self._get_labels(path_labels) # frame_id, video, frame_label
     # print(self.labels.index)
-    # print(self.labels.index)
+    self.extradata = extradata
+    # print(type(extradata))
     self.transform = transform
-    self.return_extra = return_extra
     # NOT WORKING
     # Filter labels to include only rows where the frame file exists
     # self.labels = self.filter_valid_frames(self.labels) # Useful when using short version of the dataset with the full labels.csv
     # print("self_labels\n", self.labels)
 
-    self.labelToClass = self.get_labelToClass() # gets dict for getting class name from int value
     self.videoNames = self.labels["video_id"].unique()  # Extract unique video identifiers
     self.videoToGroup = {video_id: idx for idx, video_id in enumerate(self.videoNames)}
-    self.n_classes = len(self.labelToClass.keys())
+    
+    self.n_classes = len(self.labels["class"].unique())
   def __len__(self):
     return len(self.labels)
 
@@ -104,11 +104,11 @@ class SurgeryStillsDataset(Dataset):
       # print(self.labels.iloc[idx[0], 0].split('_')[0])
       path_imgs = [os.path.join(self.path_samples, self.labels.loc[i, "video_id"], self.labels.loc[i, "frame"] + ".png") for i in idx]
       
-      if self.return_extra["ids"]:
+      if self.extradata["id"]:
         extra.append([self.labels.loc[i, "frame"] for i in idx]) 
-      if self.return_extra["ts"]:
+      if self.extradata["timestamp"]:
         extra.append([[self.labels.loc[i, "frame"] for i in idx].split('_')[1] for i in idx]) 
-      if self.return_extra["vids"]:
+      if self.extradata["video"]:
         extra.append([[self.labels.loc[i, "frame"] for i in idx].split('_')[0] for i in idx])
 
       imgs = [iio.imread(p) for p in path_imgs]
@@ -121,11 +121,11 @@ class SurgeryStillsDataset(Dataset):
     else:  # For single index (using same return variables for these have only one element)
       path_imgs = os.path.join(self.path_samples, self.labels.loc[idx, "video_id"], self.labels.loc[idx, "frame"] + ".png")
 
-      if self.return_extra["ids"]:
+      if self.extradata["id"]:
         extra.append(self.labels.loc[idx, "frame"]) 
-      if self.return_extra["ts"]:
+      if self.extradata["timestamp"]:
         extra.append(self.labels.loc[idx, "frame"].split('_')[1]) 
-      if self.return_extra["vids"]:
+      if self.extradata["video"]:
         extra.append(self.labels.loc[idx, "frame"].split('_')[0])
 
       imgs = iio.imread(path_imgs)
@@ -136,15 +136,19 @@ class SurgeryStillsDataset(Dataset):
 
     return imgs, labels, *extra
   
-  def get_labels(self, path_labels):
-    df = pd.read_csv(path_labels)
-    # print(df.columns)
-    df.reset_index(drop=True, inplace=True) # Create a new integer index and drop the old index
-    # (Optional) Create a new column for video_id based on the frame column
-    df['video_id'] = df['frame'].str.split('_', expand=True)[0]
-    # print(df.columns)
-    # self.write_labels_csv(df, "deg.csv")
-    return df
+  def _get_labels(self, path_labels):
+    try:
+      print(path_labels)
+      labels = pd.read_csv(path_labels)
+      # print(df.columns)
+      labels.reset_index(drop=True, inplace=True) # Create a new integer index and drop the old index
+      # (Optional) Create a new column for video_id based on the frame column
+      labels['video_id'] = labels['frame'].str.split('_', expand=True)[0]
+      # print(df.columns)
+      # self.write_labels_csv(df, "deg.csv")
+      return labels
+    except:
+      raise ValueError("Invalid path or labels.csv file")
   
   def write_labels_csv(self, df, path_to):
     df.to_csv(path_to, index=False)
@@ -256,8 +260,8 @@ class SurgeryStillsDataset(Dataset):
     cw = self.labels["class"].value_counts() / self.__len__()
     return torch.tensor(cw.values, dtype=torch.float32)
 """
-def get_preprocessing(prepkey):
-  if prepkey == "basic":
+def get_preprocessing(preprocessing):
+  if preprocessing == "basic":
     transform = transforms.Compose([
       transforms.Resize((224, 224), antialias=True),
       transforms.ToImage(), # only for v2
@@ -279,8 +283,14 @@ def get_augmentation():
     transforms.ColorJitter(10, 2)
     ])
 """
-
-
+class VideoFeaturesDataset(SurgeryStillsDataset):
+  def __init__(self, parent, path_features, featureLayer):
+    attrToInherit = ["datakey", "labels", "metadata", "labelToClass", "n_classes"]
+    for attr in attrToInherit:
+      if hasattr(parent, attr):
+        setattr(self, attr, getattr(parent, attr))
+    self.featuresDict = torch.load(path_features)
+    
 
 
 
@@ -291,28 +301,36 @@ class Cataloguer():
       Pipeline: [sample] -> [label] -> [preprocess] -> [batch]
       Out - split and batched dataset to a Teacher
   '''
-  def __init__(self, path_dataset, datakey, prepkey=None, return_extra={"ids": False, "ts": False, "vids": False}, update_labels=False, featureLayer=None):
+  def __init__(self, path_dataset, datakey, preprocessing=None, extradata={}, updateLabels=False):
     self.datasetName = os.path.basename(os.path.normpath(path_dataset)) # normpath handles paths ending with '/'
-    self.datakey = datakey
-    self.dataset = self._get_dataset(path_dataset, prepkey, return_extra, update_labels)
-    self.path_samples = os.path.join(path_dataset, "inputs")
+    self.extradata = extradata
+    self.path_samples = os.path.join(path_dataset, "samples")
     self.path_labels = os.path.join(path_dataset, "labels.csv")
     self.path_annots = os.path.join(path_dataset, "annotations")
-    print(f"\nUsing {prepkey} Preprocessing")
-    self.labelToClass = self._get_labelToClass(self.path_annots)
+    self.dataset = self._get_dataset(datakey, preprocessing, extradata, updateLabels)
+
+    print(f"[{preprocessing}] Preprocessing")
+   
+    self.labelToClass = self._get_labelToClass()   # gets dict for getting class name from int value
     self.n_classes = self.dataset.n_classes
     self.datasetSize = self._get_datasetSize()
-    self.classWeights = self.dataset._get_classWeights()
+    self.classWeights = self._get_classWeights()
+    print(self.classWeights)
 
+    self.features = None
+    self.featureLayer = None
+
+  def update_features(self, features, featureLayer):
     self.features = features
-    self.featureLayers = featureLayers
+    self.featureLayer = featureLayer
 
-  def split(self, dataset, datakey, k_folds):
+  def split(self, k_folds, dataset=None):
     ''' returns ([])
     '''
+    dataset = self.dataset
     # Practice / Test Split
     listOfIdxs = []
-    if datakey == "local":
+    if dataset.datakey == "local":
       outerKF = GroupKFold(n_splits=k_folds)
       outerGroups = dataset.get_grouping()
       outerKFSplit = outerKF.split(np.arange(len(dataset)), groups=outerGroups)  # train/valid and test split - fold split
@@ -335,7 +353,7 @@ class Cataloguer():
       return tuple(zip(listOfIdxs, videosSplit))
 
     # Train / Valid Split
-    elif datakey == "external":
+    elif dataset.datakey == "external":
       indices = np.arange(len(dataset[0]))
       train_idx, valid_idx = train_test_split(indices, train_size = (k_folds - 1) / (k_folds), random_state=randomState)
       # print(train_idx, valid_idx)
@@ -345,30 +363,54 @@ class Cataloguer():
 
     # print(f"Train idxs: {train_idx}\nValid idxs: {valid_idx}\nTest idxs: {test_idx}")
     # return train_idx, valid_idx, test_idx
-  def batch(self, fx_mode, batchSize, train_idx=None, valid_idx=None, test_idx=None, datakey="local"):
+
+  
+  def batch(self, batchMode, batchSize, train_idx=None, valid_idx=None, test_idx=None):
     ''' helper for loading data, features or stopping when fx_mode == 'export'
     '''
-    if fx_mode == "classify":
-      return self._batch_imgs(batchSize, train_idx, valid_idx, test_idx, self.dataset.datakey)
-    elif fx_mode == "export":
-      "\nTerminating program as feature export already terminated."
-      sys.exit()
-    elif fx_mode == "load":
+    if batchMode == "images":
+      return self._batch_images(batchSize, train_idx, valid_idx, test_idx)
+    elif batchMode == "features":
       return self._batch_features(train_idx, valid_idx, test_idx)
-
-  def _batch_imgs(self, batchSize, train_idx=None, valid_idx=None, test_idx=None, datakey="local"):
-    if datakey == "local":
-      trainloader = DataLoader(dataset=self.dataset, batch_size=batchSize, sampler=torch.utils.data.SubsetRandomSampler(train_idx))
-      validloader = DataLoader(dataset=self.dataset, batch_size=batchSize, sampler=torch.utils.data.SubsetRandomSampler(valid_idx))
-      testloader = DataLoader(dataset=self.dataset, batch_size=batchSize, sampler=torch.utils.data.SubsetRandomSampler(test_idx))
-    elif datakey == "external":
+    else:
+      raise ValueError("Invalid Batch Mode!")
+  
+  def _batch_images(self, batchSize, train_idx=None, valid_idx=None, test_idx=None):
+    loaders = {}
+    if self.dataset.datakey == "local":
+      if train_idx:
+        loaders["trainloader"] = DataLoader(dataset=self.dataset, batch_size=batchSize, sampler=torch.utils.data.SubsetRandomSampler(train_idx))
+      if valid_idx:
+        loaders["validloader"] = DataLoader(dataset=self.dataset, batch_size=batchSize, sampler=torch.utils.data.SubsetRandomSampler(valid_idx))
+      if test_idx.any():
+        loaders["testloader"] = DataLoader(dataset=self.dataset, batch_size=batchSize, sampler=torch.utils.data.SubsetRandomSampler(test_idx))
+    elif self.dataset.datakey == "external":
       # test_idx actually carries the test part of the dataset when using CIFAR-10
-      trainloader = DataLoader(dataset=self.dataset[0], batch_size=batchSize, sampler=torch.utils.data.SubsetRandomSampler(train_idx))
-      validloader = DataLoader(dataset=self.dataset[0], batch_size=batchSize, sampler=torch.utils.data.SubsetRandomSampler(valid_idx))
-      testloader = DataLoader(dataset=test_idx, batch_size=batchSize, shuffle=True)
+      if train_idx:
+        loaders["trainloader"] = DataLoader(dataset=self.dataset[0], batch_size=batchSize, sampler=torch.utils.data.SubsetRandomSampler(train_idx))
+      if valid_idx:
+        loaders["validloader"] = DataLoader(dataset=self.dataset[0], batch_size=batchSize, sampler=torch.utils.data.SubsetRandomSampler(valid_idx))
+      if test_idx:
+        loaders["testloader"] = DataLoader(dataset=test_idx, batch_size=batchSize, shuffle=True)
       # print(next(trainloader).shape)
-    return trainloader, validloader, testloader # loader
-
+    return loaders
+  
+  def _collate_features(batch):
+    # Pad features to the same length
+    maxLen = max(feat.size(-1) for feat, _, _ in batch)
+    paddedFeatures = [torch.nn.functional.pad(feat, (0, maxLen - feat.size(-1))) for feat, _, _ in batch]
+    features = torch.stack(paddedFeatures)
+    labels = [label for _, label, _ in batch]
+    frameNames = [frames for _, _, frames in batch]
+    return features, labels, frameNames
+  def _batch_features2(self, batchSize, train_idx=None, valid_idx=None, test_idx=None):
+    if train_idx.any():
+      trainloader = DataLoader(dataset=self.dataset, batch_size=batchSize, sampler=torch.utils.data.SubsetRandomSampler(train_idx))
+    if valid_idx.any():
+      validloader = DataLoader(dataset=self.dataset, batch_size=batchSize, sampler=torch.utils.data.SubsetRandomSampler(valid_idx))
+    if test_idx.any():
+      testloader = DataLoader(dataset=self.dataset, batch_size=batchSize, sampler=torch.utils.data.SubsetRandomSampler(test_idx))
+    return trainloader, validloader, testloader
   def _batch_features(self, train_idx=None, valid_idx=None, test_idx=None):
     # batch size is "one video"
     loader = [[], [], []] 
@@ -380,6 +422,7 @@ class Cataloguer():
       # print(df)
       for vid, group in df.groupby("video_id"):
         try:
+          # print(self.features[list(self.features.keys())[-1]])
           # Accumulate features, labels and frame_nmes as tensors for each video
           feats = torch.stack([self.features[frame["frame"]][self.featureLayer] for _, frame in group.iterrows()])
           labels = torch.tensor(group["class"].values)
@@ -388,7 +431,7 @@ class Cataloguer():
           # Ensure the channel dimension is present
           # print(features.shape)
           feats = feats.permute(1, 0).unsqueeze(0)  # to [batchSize, features_size, n_frames]
-          print(feats.shape, labels.shape, len(frameNames))
+          # print(feats.shape, labels.shape, len(frameNames))
           # Store tuple of tensors (features, labels, frame indices) for this video in loader[i]
           loader[i].append((feats, labels, frameNames))
         except KeyError as e: 
@@ -406,34 +449,35 @@ class Cataloguer():
 
     return loader # trainloader, validloader, testloader
 
-  def _get_dataset(self, prepkey=None, return_extra={"ids": False, "ts": False, "vids": False}, update_labels=False):
+  def _get_dataset(self, datakey, preprocessing=None, extradata={}, updateLabels=False):
     ''' Get the Dataset objects according to the datakey'''
-    transform = self.get_preprocessing(prepkey); print(f"Using {prepkey} Preprocessing")
-    if self.datakey == "local":
-      dataset = SurgeryStillsDataset(self.path_samples, self.path_labels, self.path_annots, transform, return_extra, update_labels)    
-    elif self.datakey == "external":
-      train_dataset = datasets.CIFAR10(root='./data', train=True, download=True, transform=prepkey)
-      test_dataset = datasets.CIFAR10(root='./data', train=False, download=True, transform=prepkey)
+    transform = self._get_preprocessing(preprocessing);
+    if datakey == "local":
+      dataset = SurgeryStillsDataset(datakey,
+        self.path_samples, self.path_labels, self.path_annots, extradata, transform, updateLabels)    
+    elif datakey == "external":
+      train_dataset = datasets.CIFAR10(root='./data', train=True, download=True, transform=preprocessing)
+      test_dataset = datasets.CIFAR10(root='./data', train=False, download=True, transform=preprocessing)
       dataset = (train_dataset, test_dataset)
     else:
       raise ValueError("Invalid datakey!")
     return dataset
   
   def _get_datasetSize(self):
-    if self.datakey == "local":
+    if self.dataset.datakey == "local":
       return len(self.dataset)
-    elif self.datakey == "external":
+    elif self.dataset.datakey == "external":
       return len(self.dataset[0]) + len(self.dataset[1])
     
   def _get_classWeights(self):
     ''' Get class distribution form the Dataset object'''
     # print(self.labels.columns)
-    cw = self.dataset.labels["class"].value_counts() / self.__len__()
+    cw = self.dataset.labels["class"].value_counts() / self.datasetSize
     return torch.tensor(cw.values, dtype=torch.float32)
   
   def _get_labelToClass(self):
     ''' Get a map from labels (int) to classes (string) '''
-    if self.datakey == "local":
+    if self.dataset.datakey == "local":
       def get_sigla(string):
         # get the first letter of each word in a string in uppercase
         return "".join([word[0].upper() for word in string.split()])
@@ -460,14 +504,14 @@ class Cataloguer():
           labelToClass[0] = "0ther"
         return labelToClass
       
-    elif self.datakey == "external":
+    elif self.dataset.datakey == "external":
       return {i: c for c, i in self.dataset[1].class_to_idx.items()};
     else:
       raise ValueError("Invalid datakey!")
   
-  def _get_preprocessing(prepkey):
+  def _get_preprocessing(self, preprocessing):
     ''' Get torch group of tranforms directly applied to torch Dataset object'''
-    if prepkey == "basic":
+    if preprocessing == "basic":
       transform = transforms.Compose([
         transforms.Resize((224, 224), antialias=True),
         transforms.ToImage(), # only for v2
@@ -478,7 +522,7 @@ class Cataloguer():
         # transforms.ToTensor(),
         # transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
         ])
-    elif prepkey == "aug":
+    elif preprocessing == "aug":
       transform = transforms.Compose([
       # from 0-255 Image/numpy.ndarray to 0.0-1.0 torch.FloatTensor
       transforms.Resize((32, 32)),
