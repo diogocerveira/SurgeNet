@@ -365,7 +365,7 @@ class Cataloguer():
     # return train_idx, valid_idx, test_idx
 
   
-  def batch(self, batchMode, batchSize, train_idx=None, valid_idx=None, test_idx=None):
+  def batch(self, batchSize, batchMode, train_idx=None, valid_idx=None, test_idx=None):
     ''' helper for loading data, features or stopping when fx_mode == 'export'
     '''
     if batchMode == "images":

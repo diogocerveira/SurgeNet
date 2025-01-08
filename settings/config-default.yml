@@ -21,28 +21,25 @@ modelkey: temporal # spatial, temporal
 fx_weights: default
 fx_model: logs/LDSS-24110400/train/checkpoints/LDSS-20241104-00-fold6-0.837800.pth
 fx_batchSize: 128  # training feature extractor
-n_stages_G: 1  # G for Guesser
-n_stages_R: 2  # R for Refiner
+n_stages: 2
 n_filters: 64  # number of convolution filters == number of channels inside a stage
 filterTime: 3  # size in time
-n_resBlocks_G: 2  # inside the stage
-n_resBlocks_R: 2
+n_resBlocks: 2  # inside the stage
 
 # Process
-processkey: modeFilter  # (sample, fextract, modeFilter)
+processkey: modeFilter  # (sample, modeFilter)
 
 # Train
-trainkey: start # (start, resume)
-train_outputs:
+trainkey: spatial # (full, spatial, temporal)  # spatial extract features, temporal loads them
+train_point: start # (start, resume)
+train_out:
   predictions: True
-  features: True
   checkpoints: True
   events: True
   bestModel: True
 k_folds: 7 # match with datasetName (7 for LDSS, 5 for CIFAR10)
 n_epochs: 50
 batchSize: 128
-batchMode: features
 criterion: crossEntropy
 train_metric: accuracy
 valid_metric: accuracy

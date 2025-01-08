@@ -18,36 +18,18 @@ class SurgeNet(nn.Module):
   ''' Receives [batch_size, in_channels, in_length] 1st guesses
       Outputs [output_stage_id, batch_size, n_classes, in_length] further guesses
   '''
-  def __init__(self, n_classes, fextractor, guesser, improver):
+  def __init__(self, n_classes, spatinator, tempinator):
     super().__init__()
-    # self.modelkey = modelkey  # defines operating mode: fextract, classify2d, classify3d
     self.n_classes = n_classes
-    # assert feature_extractor.compatible
-    # fextractor_in
-    self.fextractor = fextractor
-    # guesser_in = [o.shape[1] for o in self.dry_run(self.fextractor._extract()).values()]
-    self.guesser = guesser
-    # improver_in
-    self.improvers = nn.ModuleList([copy.deepcopy(improver) for _ in range(improver.n_stages)])
-    # improver_out
+    self.Spaceinator = spatinator
+    self.Timeinator = tempinator
   def forward(self, x):
     # print("In Shape: ", x.shape)
-    x = self.fextractor(x)  # running offline the features are fed as data
+    x = self.Spaceinator(x)  # running offline the features are fed as data
     # print("FEX Shape: ", x.shape)
-
-    x = self.guesser(x) # 1st stage
-    # print("Guesser Shape: ", x.shape)
-    x_acc = x.unsqueeze(0)  # add dimension for accumulation guesser/improvers guess results
-    for improver in self.improvers: # next stages
-      x = improver(F.softmax(x, dim=1))
-      # print("Refiner Shape: ", x.shape)
-      # print("x: ", x)
-      x_acc = torch.cat((x_acc, x.unsqueeze(0)), dim=0)
-      # print("x_acc: ", x_acc.shape)
-
-    # temporary output calculation:
-    # print("Out Shape: ", x.shape)
-    return x # x_acc for more in depth (returning last state guess)
+    x = self.Timeinator(x)
+    return x
+    
   
   def classify(self, x):
     return False
@@ -60,11 +42,11 @@ class SurgeNet(nn.Module):
     return out
 
 
-class Fextractor(nn.Module):
+class Spaceinator(nn.Module):
   ''' 2D Convolutional network object, able to be trained for feature extraction,
-      export them or load presaved ones
+      _features them or load presaved ones
       Modes - classify: train and classify in runtime
-              export: train and export features in runtime
+              _features: train and _features features in runtime
               load: load presaved features and forward them
   '''
   def __init__(self, n_classes, path_model=None, fx_modelType=None, preweights=None, nodesToExtract={}):
@@ -72,28 +54,17 @@ class Fextractor(nn.Module):
 
     fxWeights = self._get_preweights(preweights)
     if path_model:
-      self.model = self._get_model("resnet50_custom", fxWeights, torch.load(path_model, weights_only=False))  # to implement my own in model.py
-      # model = torch.nn.Sequential(*list(model.children())[:-1]) # remove last layer - FCL for classification
-    # model.fc = nn.Identity()  # "remove" last layer
-    # else: # classify aswell
-    #   model.fc = torch.nn.Linear(in_features=model.fc.in_features, out_features=n_classes)  # adjust out from 1000 (pretraining) to 6/10
-    # if state_dict:
-    #   # print(list(fx.get_graph_node_names(model)[1]))
-    #   model.load_state_dict(state_dict, strict=False)
-    #   # print(list(fx.get_graph_node_names(model)[1]))
-
-
+      self.spaceModel = self._get_model("resnet50_custom", fxWeights, torch.load(path_model, weights_only=False))  # to implement my own in model.py
     # fx_stateDict = torch.load(path_model, weights_only=False)
-    # fx_model = get_resnet50(n_classes, model_weights=modelPreWeights, state_dict=fx_stateDict, extract_features=True)
     self.featureLayer = fxs.get_graph_node_names(self.model)[0][-2]  # last is fc converted to identity so -2 for flattemed feature vectors
     print(self.featureLayer)  # get the last layer
     self.nodesToExtract = [self.featureLayer]
-    self.featureSize = None
+    self.featureSize = 2048 # default for resnet50
     self.features = None
   
-    # fx = Fextractor(fx_model, writer, nodesToExtract, mode=mode)
+    # fx = Spaceinator(fx_model, writer, nodesToExtract, mode=mode)
     # fx.load(featureLayer, path_feature)  # updates features attribute
-    # featureSize = fextractor.featureSize
+    # featureSize = Spaceinator.featureSize
         
     # if model:
     #   assert type(model) == resnet.ResNet or type(model) == torch.nn.modules.container.Sequential, "FeatureExtractor only accepting resnets for now"
@@ -110,10 +81,9 @@ class Fextractor(nn.Module):
     # print(train_nodes)
       # print(list(model.children()))
   def forward(self, x):
-    # x = self.model(x)
-    # if self.exportFeatures:
-    #   self._export
-    return x
+    return self.spaceModel(x)
+  def get_featureSize(self, x):
+
   
   def _get_preweights(self, weights):
     if weights == "default":
@@ -173,10 +143,10 @@ class Fextractor(nn.Module):
     print("\nE.g. Feature: ", example_feature.squeeze(-1).squeeze(-1))
     print("Features Size: ", self.featureSize, '\n')
 
-  def export(self, dataloader, path_to, device="cpu"):
-    # export features maps to external file
-    assert os.path.isdir(path_to), "Invalid features export path!"
-    out_features = defaultdict(Fextractor.getdd)  # default: ddict of features (at multiple nodes/layers) for each frame
+  def export_features(self, dataloader, path_to, device="cpu"):
+    # _features features maps to external file
+    assert os.path.isdir(path_to), "Invalid features _features path!"
+    out_features = defaultdict(Spaceinator.getdd)  # default: ddict of features (at multiple nodes/layers) for each frame
     self.model.eval().to(device) 
     with torch.no_grad():
       for bi, batch in enumerate(dataloader):
@@ -197,7 +167,27 @@ class Fextractor(nn.Module):
   def getdd(): # torch.save() can't pickle whatever if nested defaultdict uses lambda (dedicated function instead) 
     return defaultdict(None)
 
+class Timeinator(nn.Module):
+  ''' Receives [batch_size, in_channels, in_length] feature tensors
+      Outputs [batch_size, n_classes, in_length] further guesses
+  '''
+  def __init__(self, featureSize, n_classes, n_stages, n_blocks, n_filters, filterSize):
+    super().__init__()
+    self.n_stages = n_stages
+    self.n_blocks = n_blocks
+    self.conv1x1_in = nn.Conv1d(featureSize, n_filters, kernel_size=1)
+    self.blocks = nn.ModuleList([copy.deepcopy(_TCBlock(n_filters, n_filters, filterSize, 2**b)) for b in range(n_blocks)])
+    self.conv_out = nn.Conv1d(n_filters, n_classes, kernel_size=1)
 
+  def forward(self, x):
+    x = self.conv1x1_in(x)
+    x_acm = x.unsqueeze(0)  # add dimension for accumulation stage results
+    for _ in range(self.n_stages):
+      for block in self.blocks:
+        x = block(x)
+      x = F.softmax(self.conv_out(x), dim=1)  # get predictions from logits
+      x_acm = torch.cat((x_acm, x.unsqueeze(0)), dim=0)
+    return x # x_accm for more in depth (returning last state guess)
 
 class _TCBlock(nn.Module):
   # Dilated Residual Block of Layers
@@ -215,6 +205,7 @@ class _TCBlock(nn.Module):
     return x + res
 
 
+"""
 class Guesser(nn.Module):
   ''' Receives [batch_size, in_channels, in_length] feature tensors
       Outputs [batch_size, n_classes, in_length] 1st guesses
@@ -264,7 +255,7 @@ class Refiner(nn.Module):
       x = block(x)
     x = self.conv_out(x)
     return x
-
+"""
 
 def model_save(path_models, modelState, datasetName, date, test_score, path_model=None, title='', fold=''):
   if path_model:
@@ -295,11 +286,11 @@ def load_checkpoint(model, optimizer, path_checkpoint):
   print(f"Checkpoint loaded: Epoch {epoch}, Loss {loss}")
   return model, optimizer, epoch, loss
 
-def get_model(modelkey, n_classes, fextractor, guesser, refiner):
+def get_model(modelkey, n_classes, Spaceinator, guesser, refiner):
   if modelkey == "spatial":
-    model = SurgeNet(n_classes, fextractor)
+    model = SurgeNet(n_classes, Spaceinator)
   elif modelkey == "temporal":
-    model = SurgeNet(n_classes, fextractor, guesser, refiner)
+    model = SurgeNet(n_classes, Spaceinator, guesser, refiner)
   else:
     raise ValueError("Invalid modelkey!")
   return model

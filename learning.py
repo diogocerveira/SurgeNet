@@ -28,17 +28,17 @@ def learning(**the):
   # Setup Parameters
   date = datetime.datetime.now().strftime('%y%m%d%H')  # for organising model/logs saving
   device = "cuda" if torch.cuda.is_available() else "cpu" # where to save torch tensors (e.g. during training)
+  # utils.py (paths, mode filter)
   PTK = utils.Pathtaker(the["path_root"], the["datakey"], the["datasetName"], date, the["run"])
-  # Data
+  
+  # catalogue.py (dataset, data handling)
   CTL = catalogue.Cataloguer(PTK.path_dataset, the["datakey"],
       the["preprocessing"], extradata=the["extradata"], updateLabels=False)
   
-  # Metrics
+  # teaching.py (metrics, train, validation, test)
   train_metric = teaching.RunningMetric(the["train_metric"], CTL.dataset.n_classes, device, the["agg"], the["computeFreq"], the["updateFreq"])
   valid_metric = teaching.RunningMetric(the["train_metric"], CTL.dataset.n_classes, device, the["agg"], the["computeFreq"] // 2, the["updateFreq"])
-  test_metrics = teaching.MetricBunch(the["test_metrics"], CTL.n_classes, CTL.labelToClass, the["agg"], the["computeFreq"], device)
-
-  # Teacher (Train/Valid/Test)
+  test_metrics = teaching.MetricBunch(the["test_metrics"], CTL.dataset.n_classes, CTL.labelToClass, the["agg"], the["computeFreq"], device)
   trainer = teaching.Trainer(the["hyperparameters"], train_metric, device)
   validater = teaching.Validater(valid_metric, device)
   tester = teaching.Tester(test_metrics, device)
@@ -48,26 +48,45 @@ def learning(**the):
   print(f"Dataset ({the['datakey']}): {the['datasetName']} | {CTL.n_classes} classes"); print(CTL.labelToClass)
   print(f"{CTL.datasetSize} samples | FX Batch size of {the['fx_batchSize']} | {the['k_folds']} folds | {the['n_epochs']} epochs\n")
 
-  
+  # Virtual split of the dataset by the indexs 
   for fold, splits in enumerate(CTL.split(the["k_folds"])): # indexs dataset split (k_folds == 1? for no cross validation)
-    # iterating through each fold, which has the idxs [0] and corresponding video names [1]
+    # iterating through each fold, which has trio tuple of idxs [0] and corresponding trio for the video ids [1]
     ((train_idxs, valid_idxs, test_idxs), (train_vidNames, valid_vidNames, test_vidNames)) = splits
     if fold in the["skipFolds"]: continue # after a break (e.g. crash) allows to skip folds and restart from a checkpoint
     print(f"Fold {fold + 1} split:\ttrain {train_vidNames}\n\t\tvalid {valid_vidNames}\n\t\ttest {test_vidNames}")
     writer = SummaryWriter(os.path.join(PTK.path_events, str(f"fold{fold + 1}"))) # object for logging stats
     
-    # Student (model prototype)
-    fextractor = machine.Fextractor(CTL.n_classes, the["fx_model"], the["fx_weights"])
+    
+    if the["action"] == "train":
+      # path_bundle = ''
+      spaceinator = machine.Spatinator(CTL.n_classes, the["fx_model"], the["fx_weights"])
+      if the["trainkey"] == "spatial":
+        spaceinator.export_features(DataLoader(CTL.dataset, batch_size=the["batchSize"]), PTK.path_features, device)
+      else:
+        if the["trainkey"] == "temporal":
+          spaceinator.load(PTK.path_features)  # loads into Cataloguer dataset
+          # Get actual data from the split indexs, collate and batch it to a dataloader trio
+          trainloader, validloader, testloader = CTL.batch(
+              the["fx_batchSize"], batchMode="features", train_idx=train_idxs, valid_idx=valid_idxs, test_idx=test_idxs)
+        elif the["trainkey"] == "full":
+          trainloader, validloader, testloader = CTL.batch(
+              the["fx_batchSize"], batchMode="images", train_idx=train_idxs, valid_idx=valid_idxs, test_idx=test_idxs)  
+        timeinator = machine.timeinator(spaceinator.featureSize, CTL.n_classes, the["n_stages"], the["n_resBlocks"], the["n_filters"], the["filterTime"])
+        model = machine.SurgeNet(CTL.n_classes, spaceinator, timeinator)
+        
+        TCH.teach(model, trainloader, validloader, trainkey, the["n_epochs"], fold, the["path_resume"],
+            PTK.path_checkpoints, writer)
 
-    loaders = CTL.batch("images", the["fx_batchSize"], test_idx=test_idxs) # gets the actual data from idxs into batches
-    # fextractor.export(DataLoader(CTL.dataset, batch_size=the["batchSize"]), f"./data/local/LDSS/features/fold{fold + 1}", device)
-    fextractor.load(f"./data/local/LDSS/features/fold{fold + 1}")
-    CTL.update_features(fextractor.features, fextractor.featureLayer)
-    guesser = machine.Guesser(fextractor.featureSize, CTL.n_classes, the["n_resBlocks_G"], the["n_filters"], the["filterTime"])
-    refiner = machine.Refiner(CTL.n_classes, the["n_stages_R"], the["n_resBlocks_R"], the["n_filters"], the["filterTime"])
-    
-    trainloader, validloader, testloader = CTL.batch(the["batchMode"], the["batchSize"], train_idxs, valid_idxs, test_idxs) # gets the actual data from idxs into batches
-    
+    if the["action"] == "eval":
+      if path_results:
+        
+      stateDict = torch.load(PTK.path_model, weights_only=False, map_location=device)
+      model.load_state_dict(stateDict, strict=False)
+      TCH.evaluate(model, testloader, teskey, path_load, path_save, return_extra, fold)
+      TCH.evaluate(model, testloader, the["evalkeys"], fold + 1, writer, date, CTL.n_classes,
+        CTL.labelToClass, the["extradata"], PTK.path_eval, PTK.path_aprfc, PTK.path_phaseCharts, path_bundle)
+      
+
     if the["action"] == "process":
       if the["processkey"] == "sample":
         return True
@@ -91,28 +110,11 @@ def learning(**the):
         return True
       else:
         raise ValueError("Invalid processkey!")
-      
     path_bundle = os.path.join(PTK.path_eval, f"preresults_fold{fold + 1}")
-    model = machine.get_model(the["modelkey"], CTL.n_classes, fextractor, guesser, refiner)
     TCH.evaluate(model, testloader, the["evalkeys"], fold + 1, writer, date, CTL.n_classes,
         CTL.labelToClass, the["extradata"], PTK.path_eval, PTK.path_aprfc, PTK.path_phaseCharts)
+ 
     
-    if the["action"] == "train":
-      path_bundle = ''
-      TCH.teach(model, trainloader, validloader, the["n_epochs"], fold, the["path_resume"],
-          PTK.path_checkpoints, writer)
-    '''
-    if the["action"] == "eval":
-      if path_results:
-        
-      stateDict = torch.load(PTK.path_model, weights_only=False, map_location=device)
-      model.load_state_dict(stateDict, strict=False)
-      TCH.evaluate(model, testloader, teskey, path_load, path_save, return_extra, fold)
-
-
-    '''
-    TCH.evaluate(model, testloader, the["evalkeys"], fold + 1, writer, date, CTL.n_classes,
-        CTL.labelToClass, the["extradata"], PTK.path_eval, PTK.path_aprfc, PTK.path_phaseCharts, path_bundle)
     # score_test = test_bm.get_accuracy()
     # utils.score_log(test_bm, writer, path_logs, fold + 1)
     # utils.model_save(path_checkpoints, better_fold_state, datasetName, date, score_test, title="fold", fold=fold + 1)

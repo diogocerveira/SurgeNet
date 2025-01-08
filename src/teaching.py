@@ -35,7 +35,7 @@ class Teacher():
     self.bestState = {}
 
     
-  def teach(self, model, trainloader, validloader, n_epochs, fold, path_resume, path_checkpoints, writer):
+  def teach(self, model, trainloader, validloader, trainkey, n_epochs, fold, path_resume, path_checkpoints, writer):
     ''' Iterate through folds and epochs of model learning with training and validation
         In: Untrained model, data, etc
         Out: Trained model (state_dict)
