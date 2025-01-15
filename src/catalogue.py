@@ -65,7 +65,8 @@ class SurgeryStillsDataset(Dataset):
         path_annots (str): path to raw annotations (to extract classes)
         transform (callable, optional): transform a sample
     '''
-    self.datakey = datakey
+    self.datasetId = datakey.split('_')[0]
+    self.dataScope = datakey.split('_')[1]
     self.path_samples = path_samples
     self.path_labels = path_labels
     self.path_annots = path_annots
@@ -285,7 +286,7 @@ def get_augmentation():
 """
 class VideoFeaturesDataset(SurgeryStillsDataset):
   def __init__(self, parent, path_features, featureLayer):
-    attrToInherit = ["datakey", "labels", "metadata", "labelToClass", "n_classes"]
+    attrToInherit = ["dataScope", "labels", "metadata", "labelToClass", "n_classes"]
     for attr in attrToInherit:
       if hasattr(parent, attr):
         setattr(self, attr, getattr(parent, attr))
@@ -302,7 +303,7 @@ class Cataloguer():
       Out - split and batched dataset to a Teacher
   '''
   def __init__(self, path_dataset, datakey, preprocessing=None, extradata={}, updateLabels=False):
-    self.datasetName = os.path.basename(os.path.normpath(path_dataset)) # normpath handles paths ending with '/'
+    self.datasetId = os.path.basename(os.path.normpath(path_dataset)) # normpath handles paths ending with '/'
     self.extradata = extradata
     self.path_samples = os.path.join(path_dataset, "samples")
     self.path_labels = os.path.join(path_dataset, "labels.csv")
@@ -330,7 +331,7 @@ class Cataloguer():
     dataset = self.dataset
     # Practice / Test Split
     listOfIdxs = []
-    if dataset.datakey == "local":
+    if dataset.dataScope == "local":
       outerKF = GroupKFold(n_splits=k_folds)
       outerGroups = dataset.get_grouping()
       outerKFSplit = outerKF.split(np.arange(len(dataset)), groups=outerGroups)  # train/valid and test split - fold split
@@ -353,7 +354,7 @@ class Cataloguer():
       return tuple(zip(listOfIdxs, videosSplit))
 
     # Train / Valid Split
-    elif dataset.datakey == "external":
+    elif dataset.dataScope == "external":
       indices = np.arange(len(dataset[0]))
       train_idx, valid_idx = train_test_split(indices, train_size = (k_folds - 1) / (k_folds), random_state=randomState)
       # print(train_idx, valid_idx)
@@ -377,14 +378,14 @@ class Cataloguer():
   
   def _batch_images(self, batchSize, train_idx=None, valid_idx=None, test_idx=None):
     loaders = {}
-    if self.dataset.datakey == "local":
+    if self.dataset.dataScope == "local":
       if train_idx:
         loaders["trainloader"] = DataLoader(dataset=self.dataset, batch_size=batchSize, sampler=torch.utils.data.SubsetRandomSampler(train_idx))
       if valid_idx:
         loaders["validloader"] = DataLoader(dataset=self.dataset, batch_size=batchSize, sampler=torch.utils.data.SubsetRandomSampler(valid_idx))
       if test_idx.any():
         loaders["testloader"] = DataLoader(dataset=self.dataset, batch_size=batchSize, sampler=torch.utils.data.SubsetRandomSampler(test_idx))
-    elif self.dataset.datakey == "external":
+    elif self.dataset.dataScope == "external":
       # test_idx actually carries the test part of the dataset when using CIFAR-10
       if train_idx:
         loaders["trainloader"] = DataLoader(dataset=self.dataset[0], batch_size=batchSize, sampler=torch.utils.data.SubsetRandomSampler(train_idx))
@@ -450,23 +451,24 @@ class Cataloguer():
     return loader # trainloader, validloader, testloader
 
   def _get_dataset(self, datakey, preprocessing=None, extradata={}, updateLabels=False):
-    ''' Get the Dataset objects according to the datakey'''
+    ''' Get the Dataset objects according to the dataScope'''
     transform = self._get_preprocessing(preprocessing);
-    if datakey == "local":
-      dataset = SurgeryStillsDataset(datakey,
+    dataScope = datakey.split('_')[1]
+    if dataScope == "local":
+      dataset = SurgeryStillsDataset(dataScope,
         self.path_samples, self.path_labels, self.path_annots, extradata, transform, updateLabels)    
-    elif datakey == "external":
-      train_dataset = datasets.CIFAR10(root='./data', train=True, download=True, transform=preprocessing)
-      test_dataset = datasets.CIFAR10(root='./data', train=False, download=True, transform=preprocessing)
+    elif dataScope == "external":
+      train_dataset = datasets.CIFAR10(root=f"./data/{dataScope}", train=True, download=True, transform=preprocessing)
+      test_dataset = datasets.CIFAR10(root=f"./data/{dataScope}", train=False, download=True, transform=preprocessing)
       dataset = (train_dataset, test_dataset)
     else:
-      raise ValueError("Invalid datakey!")
+      raise ValueError("Invalid dataScope!")
     return dataset
   
   def _get_datasetSize(self):
-    if self.dataset.datakey == "local":
+    if self.dataset.dataScope == "local":
       return len(self.dataset)
-    elif self.dataset.datakey == "external":
+    elif self.dataset.dataScope == "external":
       return len(self.dataset[0]) + len(self.dataset[1])
     
   def _get_classWeights(self):
@@ -477,7 +479,7 @@ class Cataloguer():
   
   def _get_labelToClass(self):
     ''' Get a map from labels (int) to classes (string) '''
-    if self.dataset.datakey == "local":
+    if self.dataset.dataScope == "local":
       def get_sigla(string):
         # get the first letter of each word in a string in uppercase
         return "".join([word[0].upper() for word in string.split()])
@@ -504,10 +506,10 @@ class Cataloguer():
           labelToClass[0] = "0ther"
         return labelToClass
       
-    elif self.dataset.datakey == "external":
+    elif self.dataset.dataScope == "external":
       return {i: c for c, i in self.dataset[1].class_to_idx.items()};
     else:
-      raise ValueError("Invalid datakey!")
+      raise ValueError("Invalid dataScope!")
   
   def _get_preprocessing(self, preprocessing):
     ''' Get torch group of tranforms directly applied to torch Dataset object'''

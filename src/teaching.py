@@ -55,9 +55,9 @@ class Teacher():
 
     for epoch in range(startEpoch, n_epochs):
       print(f"     Epoch {epoch + 1}")
-      train_loss, train_score = self.trainer.train(model, trainloader, self.criterion, optimizer, epoch)
+      train_loss, train_score = self.trainer.train(model, trainloader, self.criterion, optimizer, epoch, trainkey)
       # assert 1 == 0
-      valid_loss, valid_score = self.validater.validate(model, validloader, self.criterion, epoch)
+      valid_loss, valid_score = self.validater.validate(model, validloader, self.criterion, epoch, trainkey)
 
       writer.add_scalar("Loss/train", train_loss, epoch + 1)
       writer.add_scalar("Loss/valid", valid_loss, epoch + 1)
@@ -80,27 +80,43 @@ class Teacher():
     
     return betterState
 
-  def evaluate(self, model, testloader, evalkeys, fold, writer, date, n_classes, idx_to_class, extradataDict=None, path_eval=None, path_aprfc=None, path_phaseCharts=None, path_bundle=''):
+  def evaluate(self, testloader, evalkeys, fold, writer, date, n_classes, labelToClass, model = None, extradataDict=None, path_eval=None, path_aprfc=None, path_phaseCharts=None, path_test_bundle=''):
     
-    if not path_bundle:
+    if path_test_bundle: # if specific test predictions are provided, use them instead of model
+      with open(path_test_bundle, 'rb') as f:  # Load the DataFrame
+        test_bundle = pickle.load(f)
+    else: # run test to obtain model predictions
       t1 = time.time()
-      final_preds, final_targets, final_imageNames  = self.tester.test(model, testloader, extradataDict=extradataDict)
+      preds, targets, imageIds  = self.tester.test(model, testloader, extradataDict=extradataDict)
       t2 = time.time()
       print(f"Testing took {t2 - t1:.2f} seconds")
       # print(final_imageNames[0], final_preds[0], final_targets[0])
       # torch.nn.functional.one_hot(tensor, n_classes=-1)
-      final_bundle = self._get_bundle(final_preds, final_targets, final_imageNames)
-      path_to = os.path.join(path_eval, f"results_fold{fold}")
-      with open(path_to, 'wb') as f: # Save the DataFrame
-        pickle.dump(final_bundle, f)
-      path_bundle = path_to
+      test_bundle = self._get_bundle(preds, targets, imageIds)
+    #   if path_to:
+    #   path_to = os.path.join(path_eval, f"results_fold{fold}")
+    #   with open(path_to, 'wb') as f: # Save the DataFrame
+    #     pickle.dump(test_bundle, f)
+    #   path_testBundle = path_to
 
-    with open(path_bundle, 'rb') as f:  # Load the DataFrame
-      final_bundle = pickle.load(f)
-    self.tester._acpref1com(writer, path_aprfc, fold, path_bundle)
-    # print(list(final_bundle.groupby("Video")))
-    outText = self.tester._phase_lengths(final_bundle, n_classes, idx_to_class, path_bundle)
-    self.tester._phase_graph(final_bundle, path_phaseCharts, fold, date, outText, path_bundle)
+    #   elif the["test_what"] == "results":
+    #     path_test_bundle = os.path.join(PTK.path_eval, f"results_fold{fold + 1}")
+    #     with open(path_test_bundle, 'rb') as f:  # Load the DataFrame
+    #       test_bundle = pickle.load(f)
+    # else:
+    #   raise ValueError("No model or path a to test_bundle provided for evaluation")
+
+    # with open(path_testBundle, 'rb') as f:  # Load the DataFrame
+    #   test_bundle = pickle.load(f)
+    # if evalkeys["aprfc"]:
+    #   self.tester._aprfc(writer, path_aprfc, fold, path_testBundle)
+    # if evalkeys["phaseTiming"]:
+    #   outText = self.tester._phase_lengths(test_bundle, n_classes, labelToClass)
+    #   self.tester._aprfc(writer, path_aprfc, fold, path_testBundle)
+    #   # print(list(final_bundle.groupby("Video")))
+    #   outText = self.tester._phase_lengths(test_bundle, n_classes, labelToClass, path_testBundle)
+    # if evalkeys["phaseChart"]:
+    #   self.tester._phase_graph(test_bundle, path_phaseCharts, fold, date, outText, path_testBundle)
 
   def evaluate2(self, model, testloader, evalkeys, extradataDict=None, path_to=None):
     # _, ext = os.path.splitext(path_from)
@@ -166,7 +182,7 @@ class Trainer():
     self.momentum = hyperparameters["momentum"]
     self.stepSize = hyperparameters["stepSize"]
     self.gamma = hyperparameters["gamma"]
-  def train(self, model, trainloader, criterion, optimizer, epoch):
+  def train(self, model, trainloader, criterion, optimizer, epoch, trainkey):
     ''' In: model, data, criterion (loss function), optimizer
         Out: train_loss, train_score
         Note - inputs can be samples (pics) or feature maps
@@ -254,22 +270,22 @@ class Tester():
     # print(f"Sample Names Type: {type(sampleNamesList[0])}, Content: {sampleNamesList[:5]}")
     return preds, targetsList, sampleNamesList
 
-  def _acpref1com(self, writer, path_to, fold, path_bundle):
+  def _aprfc(self, writer, path_to, fold, path_testBundle):
     # self.test_metrics.display()
-    def score_log(BM, writer, path_to, fold, path_bundle):
+    def score_log(BM, writer, path_to, fold, path_aprfc):
       ''' Log metrics to TensorBoard
       '''
       writer.add_scalar(f"accuracy/test", BM.get_accuracy(), fold)
       writer.add_scalar(f"precision/test", BM.get_precision(), fold)
       writer.add_scalar(f"recall/test", BM.get_recall(), fold)
       writer.add_scalar(f"f1score/test", BM.get_f1score(), fold)
-      image_cf = plt.imread(BM.get_confusionMatrix(path_to, path_bundle))
+      image_cf = plt.imread(BM.get_confusionMatrix(path_to, path_testBundle))
       tensor_cf = torch.tensor(image_cf).permute(2, 0, 1)
       writer.add_image(f"confusion_matrix/test", tensor_cf, fold)
       writer.close()
-    score_log(self.test_metrics, writer, path_to, fold, path_bundle)
+    score_log(self.test_metrics, writer, path_to, fold, path_testBundle)
     
-  def _phase_lengths_i2(self, df, n_classes, idx_to_class, samplerate=1):
+  def _phase_lengths_i2(self, df, n_classes, labelToClass, samplerate=1):
     outText = []
     lp, lt = len(df["Preds"]), len(df["Targets"])
     # n_classes = (max(df["Targets"]) + 1)  # assuming regular int encoding
@@ -304,7 +320,7 @@ class Tester():
       
       mix = list(zip(phases_preds_video / (60 * samplerate), phases_gt_video / (60 * samplerate), phases_diff_sum))
       ot = f"\nVideo {video} Phase Report\n" + f"{'':<12} |   T Preds    |    T Targets     ||  Diff\n" + '\n'.join(
-            f"{idx_to_class[i]:<12} | {mix[i][0]:<8.2f}min | {mix[i][1]:<8.2f}min || {(mix[i][0] - mix[i][1]):<8.2f}min"
+            f"{labelToClass[i]:<12} | {mix[i][0]:<8.2f}min | {mix[i][1]:<8.2f}min || {(mix[i][0] - mix[i][1]):<8.2f}min"
             for i in range(n_classes)
         )
       outText.append(ot)
@@ -316,7 +332,7 @@ class Tester():
     mix = list(zip(phases_preds_avg, phases_gt_avg, phases_diff_avg))
     
     otavg = "\n\nOverall Average Phase Report\n" + f"{'':<12} | T Avg Preds  |  T Avg Targets   || Total AE\n" + '\n'.join(
-            f"{idx_to_class[i]:<12} | {mix[i][0]:<8.2f}min | {mix[i][1]:<8.2f}min || {(mix[i][2]):<8.2f}min"
+            f"{labelToClass[i]:<12} | {mix[i][0]:<8.2f}min | {mix[i][1]:<8.2f}min || {(mix[i][2]):<8.2f}min"
             for i in range(n_classes)
       )
     print(otavg)
@@ -324,10 +340,10 @@ class Tester():
   # phase_metric([1, 1, 2, 3, 3, 4, 0, 5], [0, 0, 0, 2, 3, 4, 5, 1])
     return outText
 
-  def _phase_lengths(self, df, n_classes, idx_to_class, samplerate=1):
-    return self._phase_lengths_i2(df, n_classes, idx_to_class, samplerate=1)
+  def _phase_lengths(self, df, n_classes, labelToClass, samplerate=1):
+    return self._phase_lengths_i2(df, n_classes, labelToClass, samplerate=1)
 
-  def _phase_graph(self, df, path_out, fold, date, outText, path_bundle):
+  def _phase_graph(self, df, path_out, fold, date, outText, path_testBundle):
       # df = pd.DataFrame({
       #     'SampleName': ['vid1_1', 'vid1_3', 'vid1_2', 'vid2_20', 'vid2_23', 'vid2_40', 'vid2_51', 'vid2_52'],
       #     'Targets': [0, 1, 1, 2, 0, 1, 1, 1],  # Example target labels
@@ -385,7 +401,7 @@ class Tester():
 
         plt.tight_layout()
         # plt.show(block=True)
-        plt.savefig(os.path.join(path_out, f"{date}_{os.path.basename(path_bundle)}_{video[:4]}.png"))
+        plt.savefig(os.path.join(path_out, f"{date}_{os.path.basename(path_testBundle)}_{video[:4]}.png"))
         plt.close(fig)
 
       plt.figure()
@@ -398,7 +414,7 @@ class Tester():
                   bbox=dict(boxstyle="round,pad=0.3", edgecolor="black", facecolor="white"))
       plt.tight_layout()
       plt.show(block=True)
-      plt.savefig(os.path.join(path_out, f"{date}_{os.path.basename(path_bundle)}_oa-avg-phase-rep.png"))
+      plt.savefig(os.path.join(path_out, f"{date}_{os.path.basename(path_testBundle)}_oa-avg-phase-rep.png"))
       plt.close()
 
       t2 = time.time()
@@ -541,7 +557,7 @@ class MetricBunch:
     except:
       print("! Dataset group lacks representation of all classes !")
       return -1
-  def get_confusionMatrix(self, path_to='', path_bundle=''):
+  def get_confusionMatrix(self, path_to='', path_testBundle=''):
     try:
       fig, ax = plt.subplots(figsize=(10, 7))
       sns.heatmap(self.confusionMatrix.metric.compute().cpu(), annot=True, fmt='.2f', cmap='Blues',
@@ -550,7 +566,7 @@ class MetricBunch:
       ax.set_ylabel('True')
       ax.set_title('Confusion Matrix')
       if path_to:
-        path_img = os.path.join(path_to, f"cm_{os.path.basename(path_bundle)}.png")
+        path_img = os.path.join(path_to, f"cm_{os.path.basename(path_testBundle)}.png")
         plt.savefig(path_img)
         return path_img
     except:

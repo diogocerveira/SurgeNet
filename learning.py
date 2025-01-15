@@ -24,16 +24,15 @@ from src import catalogue, machine, teaching, utils
 t2 = time.time()
 
 def learning(**the):
-  ''' Trying out 'the' instead of 'kwargs'/'config' for readability purposes '''
+  ''' Note: trying out "the" instead of "kwargs"/"config" for readability purposes '''
   # Setup Parameters
   date = datetime.datetime.now().strftime('%y%m%d%H')  # for organising model/logs saving
   device = "cuda" if torch.cuda.is_available() else "cpu" # where to save torch tensors (e.g. during training)
-  # utils.py (paths, mode filter)
-  PTK = utils.Pathtaker(the["path_root"], the["datakey"], the["datasetName"], date, the["run"])
+  PTK = utils.Pathtaker(the["path_root"], the["datakey"], the["run"])
   
   # catalogue.py (dataset, data handling)
-  CTL = catalogue.Cataloguer(PTK.path_dataset, the["datakey"],
-      the["preprocessing"], extradata=the["extradata"], updateLabels=False)
+  CTL = catalogue.Cataloguer(PTK.path_dataset, the["datakey"], the["preprocessing"],
+      extradata=the["extradata"], updateLabels=False)
   
   # teaching.py (metrics, train, validation, test)
   train_metric = teaching.RunningMetric(the["train_metric"], CTL.dataset.n_classes, device, the["agg"], the["computeFreq"], the["updateFreq"])
@@ -55,64 +54,76 @@ def learning(**the):
     if fold in the["skipFolds"]: continue # after a break (e.g. crash) allows to skip folds and restart from a checkpoint
     print(f"Fold {fold + 1} split:\ttrain {train_vidNames}\n\t\tvalid {valid_vidNames}\n\t\ttest {test_vidNames}")
     writer = SummaryWriter(os.path.join(PTK.path_events, str(f"fold{fold + 1}"))) # object for logging stats
-    
-    
-    if the["action"] == "train":
-      # path_bundle = ''
-      spaceinator = machine.Spatinator(CTL.n_classes, the["fx_model"], the["fx_weights"])
-      if the["trainkey"] == "spatial":
-        spaceinator.export_features(DataLoader(CTL.dataset, batch_size=the["batchSize"]), PTK.path_features, device)
-      else:
-        if the["trainkey"] == "temporal":
-          spaceinator.load(PTK.path_features)  # loads into Cataloguer dataset
-          # Get actual data from the split indexs, collate and batch it to a dataloader trio
-          trainloader, validloader, testloader = CTL.batch(
-              the["fx_batchSize"], batchMode="features", train_idx=train_idxs, valid_idx=valid_idxs, test_idx=test_idxs)
-        elif the["trainkey"] == "full":
-          trainloader, validloader, testloader = CTL.batch(
-              the["fx_batchSize"], batchMode="images", train_idx=train_idxs, valid_idx=valid_idxs, test_idx=test_idxs)  
-        timeinator = machine.timeinator(spaceinator.featureSize, CTL.n_classes, the["n_stages"], the["n_resBlocks"], the["n_filters"], the["filterTime"])
-        model = machine.SurgeNet(CTL.n_classes, spaceinator, timeinator)
-        
-        TCH.teach(model, trainloader, validloader, trainkey, the["n_epochs"], fold, the["path_resume"],
-            PTK.path_checkpoints, writer)
+    bestState = None # for saving the best model state
 
-    if the["action"] == "eval":
-      if path_results:
-        
-      stateDict = torch.load(PTK.path_model, weights_only=False, map_location=device)
-      model.load_state_dict(stateDict, strict=False)
-      TCH.evaluate(model, testloader, teskey, path_load, path_save, return_extra, fold)
-      TCH.evaluate(model, testloader, the["evalkeys"], fold + 1, writer, date, CTL.n_classes,
-        CTL.labelToClass, the["extradata"], PTK.path_eval, PTK.path_aprfc, PTK.path_phaseCharts, path_bundle)
+    # path_result = ''
+    spaceinator = machine.Spatinator(CTL.n_classes, the["fx_model"], the["fx_weights"])
+    timeinator = machine.Timeinator(spaceinator.featureSize, CTL.n_classes, the["n_stages"], the["n_resBlocks"], the["n_filters"], the["filterTime"])
+    
+    if the["modelkey"] == "spatial":
+      model = machine.SurgeNet(CTL.n_classes, [spaceinator])
+      batchMode = "images"
+    if the["modelkey"] == "temporal":
+      spaceinator.load(PTK.path_features)  # loads into Cataloguer dataset
+      batchMode = "features"
+      # Get actual data from the split indexs, collate and batch it to a dataloader trio
+      model = machine.SurgeNet(CTL.n_classes, [timeinator])
+    if the["modelkey"] == "full":
+      batchMode = "images"
+      model = machine.SurgeNet(CTL.n_classes, [spaceinator, timeinator])
+    trainloader, validloader, testloader = CTL.batch(
+          the["batchSize"], batch_mode=batchMode, train_idx=train_idxs, valid_idx=valid_idxs, test_idx=test_idxs)
+    
+    if "train" in the["actions"]:
+      bestState = TCH.teach(model, trainloader, validloader, the["modelkey"], the["n_epochs"], fold, the["path_resume"],
+          PTK.path_checkpoints, writer)
       
-
     if the["action"] == "process":
-      if the["processkey"] == "sample":
-        return True
-      elif the["processkey"] == "modeFilter":
-        # preds = torch.load(os.path.join(PTK.path_predictions, fold))
-        path_bundle = os.path.join(PTK.path_eval, f"results_fold{fold + 1}")
-        with open(path_bundle, 'rb') as f:  # Load the DataFrame
-          final_bundle = pickle.load(f)
-        preds = np.array(final_bundle["Preds"])
-        modePreds = utils.modeFilter(preds, 10)
-        # torch.save(modePreds, PTK.path_modeFilter)
-        final_bundle["Preds"] = modePreds
-        path_bundle = os.path.splitext(path_bundle)[0] + "_moded"
-        with open(path_bundle, 'wb') as f:
-          pickle.dump(final_bundle, f)
-      elif the["processkey"] == "fextract":
+      if "sample" in the["processkeys"]:
+        pass
+      if "fx-spatial" in the["processkeys"]:
         t1 = time.time()
-        fextractor.export(DataLoader(dataset=CTL.dataset, batch_size=the["fx_batchSize"]), PTK.path_feature, device)
+        spaceinator.export_features(DataLoader(CTL.dataset, batch_size=the["batchSize"]), PTK.path_features, device)
         t2 = time.time()
         print(f"Exporting features took {(t2 - t1) // 3600} hours and {(((t2 - t1) % 3600) / 60):.1f} minutes!")
-        return True
+      if "mode-filter" in the["processkeys"]:
+        if "train" in the["actions"]:
+        # preds = torch.load(os.path.join(PTK.path_predictions, fold))
+        # path_result = os.path.join(PTK.path_eval, f"results_fold{fold + 1}")
+        with open(path_result, 'rb') as f:  # Load the DataFrame
+          pundle = pickle.load(f)
+        preds = np.array(pundle["Preds"])
+        modePreds = utils.modeFilter(preds, 10)
+        # torch.save(modePreds, PTK.path_modeFilter)
+        pundle["Preds"] = modePreds
+        path_result = os.path.splitext(path_result)[0] + "_moded"
+        with open(path_result, 'wb') as f:
+          pickle.dump(pundle, f)
       else:
-        raise ValueError("Invalid processkey!")
-    path_bundle = os.path.join(PTK.path_eval, f"preresults_fold{fold + 1}")
-    TCH.evaluate(model, testloader, the["evalkeys"], fold + 1, writer, date, CTL.n_classes,
-        CTL.labelToClass, the["extradata"], PTK.path_eval, PTK.path_aprfc, PTK.path_phaseCharts)
+        raise ValueError("No valid processkeys!")
+    
+    if "eval" in the["actions"]:
+      if the["eval_in"] == "predictions":
+        preds = torch.load(the["path_prediction"], map_location=device)
+        TCH.evaluate(preds, the["evalkeys"], fold + 1, writer, date, CTL.n_classes, CTL.labelToClass, model,
+          the["extradata"], PTK.path_eval, PTK.path_aprfc, PTK.path_phaseCharts, the["path_result"])
+      elif the["eval_in"] == "model":
+        if "train" in the["actions"]:
+          model.load_state_dict(bestState, strict=False)
+        elif the["path_model"] is not None:
+          stateDict = torch.load(the["path_model"], weights_only=False, map_location=device)
+          model.load_state_dict(stateDict, strict=False)
+        else:
+          raise ValueError("Invalid path_model choice!")
+      else:
+        raise ValueError("Invalid eval_in choice!")
+      
+      TCH.evaluate(testloader, the["evalkeys"], fold + 1, writer, date, CTL.n_classes, CTL.labelToClass, model,
+          the["extradata"], PTK.path_eval, PTK.path_aprfc, PTK.path_phaseCharts, the["path_prediction"])
+
+      
+
+
  
     
     # score_test = test_bm.get_accuracy()

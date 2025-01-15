@@ -50,22 +50,27 @@ def choose_in_path(path):
           return path
         continue
 
+class Run():
+  ''' Stores training, evaluation and processing data associated by date
+  '''
+  def __init__(self, date, path_root):
+    pass
 class Pathtaker():
   ''' Handles paths to the local everywhere
   '''
-  def __init__(self, path_root, datakey, datasetName, date, run=None):
+  def __init__(self, path_root, datakey, run):
     self.path_root = path_root
-    if run:
-      assert run.split()[0] == datasetName, "Unmatched run and datasetName"
-    for attrKey, attrValue in self._setup_paths(datakey, datasetName, date):
+    date = run.split("_")[1]
+    datasetId = run.split("_")[0]
+    for attrKey, attrValue in self._setup_paths(datakey, datasetId, date):
       setattr(self, attrKey, attrValue)
 
-  def _setup_paths(self, datakey, datasetName, date, run=None):
+  def _setup_paths(self, datakey, datasetId, date):
     ''' Make sure paths/files exist before setting them as attrs (in constructor)
         And returns dict items
     '''
-    paths_data = self._get_paths_data(datakey, datasetName)
-    paths_logs = self._get_paths_logs(datasetName, date, run=None)
+    paths_data = self._get_paths_data(datakey, datasetId)
+    paths_logs = self._get_paths_logs(datasetId, date)
     paths_all = {**paths_data, **paths_logs} # merges dicts
     os.makedirs(paths_all["path_dataset"], exist_ok=True)
     os.makedirs(paths_all["path_run"], exist_ok=True)
@@ -83,36 +88,32 @@ class Pathtaker():
     # with open(path_config, "w") as config:
     #   config.write("learning_rate: \nbatch_size: \nepochs: \n")
 
-  def _get_paths_data(self, datakey, datasetName):
+  def _get_paths_data(self, datakey, datasetId):
     ''' Get dictionary with paths for everything data'''
     paths_data = {}
-    paths_data["path_dataset"] = os.path.join(self.path_root, "data", datakey, datasetName)
+    paths_data["path_dataset"] = os.path.join(self.path_root, "data", datakey, datasetId)
     paths_data["path_samples"] = os.path.join(paths_data["path_dataset"], "samples")
     paths_data["path_labels"] = os.path.join(paths_data["path_dataset"], "labels.csv")
     paths_data["path_annots"] = os.path.join(paths_data["path_dataset"], "annotations")
     return paths_data
 
 
-  def _get_paths_logs(self, datasetName, date, run=None):
+  def _get_paths_logs(self, datasetId, date):
     ''' Get dictionary with paths to everything related to a run'''
     paths_logs = {}
     paths_logs["path_logs"] = os.path.join(self.path_root, "logs")
-    if run:
-      paths_logs["path_run"] = os.path.join(paths_logs["path_logs"], run)
-    else:
-      paths_logs["path_run"] = os.path.join(paths_logs["path_logs"], f"{datasetName}_{date}")
     paths_logs["path_runInfo"] = os.path.join(paths_logs["path_run"], "run-info.yml")
     paths_logs["path_eval"] = os.path.join(paths_logs["path_run"], "eval")
     paths_logs["path_aprfc"] = os.path.join(paths_logs["path_eval"], "aprfc")
     paths_logs["path_phaseCharts"] = os.path.join(paths_logs["path_eval"], "phase-charts")
     paths_logs["path_phaseTiming"] = os.path.join(paths_logs["path_eval"], "phase-timing")
     paths_logs["path_train"] = os.path.join(paths_logs["path_run"], "train")
-    paths_logs["path_features"] = os.path.join(paths_logs["path_train"], "features")
     paths_logs["path_predictions"] = os.path.join(paths_logs["path_train"], "predictions")
     paths_logs["path_events"] = os.path.join(paths_logs["path_train"], "events")
     paths_logs["path_checkpoints"] = os.path.join(paths_logs["path_train"], "checkpoints")
     paths_logs["path_process"] = os.path.join(paths_logs["path_run"], "process")
     paths_logs["path_modeFilter"] = os.path.join(paths_logs["path_process"], "mode-filter")
+    paths_logs["path_features"] = os.path.join(paths_logs["path_process"], "features")
     return paths_logs
 
 def get_metrics(classWeights, device, computePeriod, n_classes, idxToClass, agg):

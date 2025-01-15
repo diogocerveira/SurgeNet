@@ -52,38 +52,21 @@ class Spaceinator(nn.Module):
   def __init__(self, n_classes, path_model=None, fx_modelType=None, preweights=None, nodesToExtract={}):
     super().__init__()
 
-    fxWeights = self._get_preweights(preweights)
-    if path_model:
-      self.spaceModel = self._get_model("resnet50_custom", fxWeights, torch.load(path_model, weights_only=False))  # to implement my own in model.py
+    spaceWeights = self._get_preweights(preweights)
+    self.spaceModel = self._get_model("resnet50_custom", spaceWeights, torch.load(path_model, weights_only=False))  # to implement my own in model.py
     # fx_stateDict = torch.load(path_model, weights_only=False)
     self.featureLayer = fxs.get_graph_node_names(self.model)[0][-2]  # last is fc converted to identity so -2 for flattemed feature vectors
     print(self.featureLayer)  # get the last layer
     self.nodesToExtract = [self.featureLayer]
     self.featureSize = 2048 # default for resnet50
     self.features = None
-  
-    # fx = Spaceinator(fx_model, writer, nodesToExtract, mode=mode)
-    # fx.load(featureLayer, path_feature)  # updates features attribute
-    # featureSize = Spaceinator.featureSize
-        
-    # if model:
-    #   assert type(model) == resnet.ResNet or type(model) == torch.nn.modules.container.Sequential, "FeatureExtractor only accepting resnets for now"
-    # # print(type(model))
-    #   model.fc = nn.Identity() # 'remove' last classifier layer
-
-      # self.nodesToExtract = nodesToExtract
-      # self.features = {}
-      # self.featureSize = None
-    # self.featureLayer = fxs.get_graph_node_names(self.model)[0][-2]  # last is fc converted to identity so -2 for flattemed feature vectors
-    # self.featureLayer = '8'
     # train_nodes, eval_nodes = fx.get_graph_node_names(self.model)
-    # print(train_nodes == eval_nodes)
-    # print(train_nodes)
-      # print(list(model.children()))
+    # print(train_nodes == eval_nodes, end='\t'); print(train_nodes)
+    # print(list(model.children()))
   def forward(self, x):
     return self.spaceModel(x)
   def get_featureSize(self, x):
-
+    pass
   
   def _get_preweights(self, weights):
     if weights == "default":
@@ -93,7 +76,7 @@ class Spaceinator(nn.Module):
     else:
       raise ValueError("Invalid preweight choice!")
   
-  def _get_model(self, fx_modelType, preweigths, state_dict):
+  def _get_model(self, spaceModelType, preweigths, state_dict):
     if fx_modelType == "resnet50":
       return resnet50(weights=preweigths)
     elif fx_modelType == "resnet50_custom":

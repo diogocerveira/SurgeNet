@@ -2,35 +2,31 @@
 seed: 53  # 5 --> 3 or 3 --> 5
 device: None
 path_root: .
-run: #LDSS-24110400
-action: train # process (sample, modeFitler)
-                # train (spatial, temporal)
-                # eval (aprfc, phaseTiming, phaseChart)
+run: #LDSS-24110400 # if not provided, creates new run
+actions: 
+- train        # train (spatial, temporal, full)
+# - process      # process (sample, modeFitler, extractFeatures)
+# - eval         # eval (aprfc, phaseTiming, phaseChart)
 
 # Data
-datakey: local  # match with datasetName (local for LDSS, external for CIFAR10)
-datasetName: LDSS
+datakey: LDSS-local
 preprocessing: basic  # basic, augmentation
-extradata: # for local dataset (extend __getitem__() return beyond datapoint and label)
-  id: True
-  video: False
+extradata: # for local dataset (extends __getitem__() return beyond datapoint and label)
+  sampleId: True
+  videoId: False
   timestamp: False
 
 # Model
-modelkey: temporal # spatial, temporal
+modelkey: temporal # spatial, temporal, full
 fx_weights: default
 fx_model: logs/LDSS-24110400/train/checkpoints/LDSS-20241104-00-fold6-0.837800.pth
-fx_batchSize: 128  # training feature extractor
-n_stages: 2
+n_stages: 3
 n_filters: 64  # number of convolution filters == number of channels inside a stage
-filterTime: 3  # size in time
+filterTimeframe: 3  # size in time (# of frames)
 n_resBlocks: 2  # inside the stage
 
-# Process
-processkey: modeFilter  # (sample, modeFilter)
 
 # Train
-trainkey: spatial # (full, spatial, temporal)  # spatial extract features, temporal loads them
 train_point: start # (start, resume)
 train_out:
   predictions: True
@@ -52,11 +48,22 @@ path_resume: null  # to continue training from a checkpoint model
 checkpointFrequency: 5 # epoch frequency to save a checkpoint
 skipFolds: []  # 0 for fold 1...
 
+# Process
+process_in: 
+processkeys:
+  modeFilter: True
+process_out:
+
 # Eval
+eval_in: pundle
+path_model:
+path_prediction:
 evalkeys:
-  acpref1coma: False
+  aprfc: False
   phaseTiming: False
   phaseChart: False
+eval_out:
+  pundle: True
 agg: macro  # accuracy is locked to micro (see utils.py)
 updateFreq: 1  # updates metrics with new data every batch
 computeFreq: 100  # computes the metrics
