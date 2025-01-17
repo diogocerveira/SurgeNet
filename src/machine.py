@@ -49,16 +49,17 @@ class Spaceinator(nn.Module):
               _features: train and _features features in runtime
               load: load presaved features and forward them
   '''
-  def __init__(self, n_classes, path_model=None, fx_modelType=None, preweights=None, nodesToExtract={}):
+  def __init__(self, n_classes, path_spaceModel=None, spaceModelType=None, spacePreweights=None, nodesToExtract={}):
     super().__init__()
 
-    spaceWeights = self._get_preweights(preweights)
-    self.spaceModel = self._get_model("resnet50_custom", spaceWeights, torch.load(path_model, weights_only=False))  # to implement my own in model.py
+    spaceWeights = self._get_preweights(spacePreweights)
+    self.spaceModel = self._get_model(spaceModelType, spaceWeights, torch.load(path_spaceModel, weights_only=False))  # to implement my own in model.py
     # fx_stateDict = torch.load(path_model, weights_only=False)
-    self.featureLayer = fxs.get_graph_node_names(self.model)[0][-2]  # last is fc converted to identity so -2 for flattemed feature vectors
+    self.featureLayer = fxs.get_graph_node_names(self.spaceModel)[0][-2]  # last is fc converted to identity so -2 for flattemed feature vectors
     print(self.featureLayer)  # get the last layer
     self.nodesToExtract = [self.featureLayer]
-    self.featureSize = 2048 # default for resnet50
+    if spaceModelType == "resnet50-custom":
+      self.featureSize = 2048 # default for resnet50
     self.features = None
     # train_nodes, eval_nodes = fx.get_graph_node_names(self.model)
     # print(train_nodes == eval_nodes, end='\t'); print(train_nodes)
@@ -76,11 +77,11 @@ class Spaceinator(nn.Module):
     else:
       raise ValueError("Invalid preweight choice!")
   
-  def _get_model(self, spaceModelType, preweigths, state_dict):
-    if fx_modelType == "resnet50":
-      return resnet50(weights=preweigths)
-    elif fx_modelType == "resnet50_custom":
-      model = resnet50(weights=preweigths)
+  def _get_model(self, spaceArch, spaceWeights, state_dict):
+    if spaceArch == "resnet50":
+      return resnet50(weights=spaceWeights)
+    elif spaceArch == "resnet50_custom":
+      model = resnet50(weights=spaceWeights)
       model.fc = nn.Identity()
       model.load_state_dict(state_dict, strict=False)
       return model
@@ -126,9 +127,9 @@ class Spaceinator(nn.Module):
     print("\nE.g. Feature: ", example_feature.squeeze(-1).squeeze(-1))
     print("Features Size: ", self.featureSize, '\n')
 
-  def export_features(self, dataloader, path_to, device="cpu"):
+  def export_features(self, dataloader, path_to, fold, device="cpu"):
     # _features features maps to external file
-    assert os.path.isdir(path_to), "Invalid features _features path!"
+    assert os.path.isdir(path_to), "Invalid features export path!"
     out_features = defaultdict(Spaceinator.getdd)  # default: ddict of features (at multiple nodes/layers) for each frame
     self.model.eval().to(device) 
     with torch.no_grad():
@@ -143,8 +144,8 @@ class Spaceinator(nn.Module):
             out_features[im_id][layer] = fs.cpu() if fs.size(0) > 1 else fs.unsqueeze(0).cpu()
             # print(list(out_features.items()))
             # break
-    print(os.path.join(path_to, f"fmaps_fold{path_to[-1]}.pt"))
-    torch.save(out_features, os.path.join(path_to, f"fmaps_fold{path_to[-1]}.pt"))
+    print(os.path.join(path_to, f"fmaps_{fold + 1}.pt"))
+    torch.save(out_features, os.path.join(path_to, f"fmaps_{fold + 1}.pt"))
   
   @staticmethod
   def getdd(): # torch.save() can't pickle whatever if nested defaultdict uses lambda (dedicated function instead) 
@@ -170,7 +171,7 @@ class Timeinator(nn.Module):
         x = block(x)
       x = F.softmax(self.conv_out(x), dim=1)  # get predictions from logits
       x_acm = torch.cat((x_acm, x.unsqueeze(0)), dim=0)
-    return x # x_accm for more in depth (returning last state guess)
+    return x.squeeze(0).permute(1, 0) # x_accm for more in depth (returning last state guess)
 
 class _TCBlock(nn.Module):
   # Dilated Residual Block of Layers
@@ -240,7 +241,7 @@ class Refiner(nn.Module):
     return x
 """
 
-def model_save(path_models, modelState, datasetName, date, test_score, path_model=None, title='', fold=''):
+def save_model(path_models, modelState, datasetName, date, test_score, path_model=None, title='', fold=''):
   if path_model:
     torch.save(modelState, path_model)
   else:

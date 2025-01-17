@@ -57,7 +57,7 @@ class Showcaser:
 class SurgeryStillsDataset(Dataset):
   ''' Custom dataset of frames from sampled surgery videos
   '''
-  def __init__(self, datakey, path_samples, path_labels, path_annots, extradata, transform=None, updateLabels=False):
+  def __init__(self, dataScope, path_samples, path_labels, path_annots, extradata, transform=None, update_labels=False):
     '''
       Args:
         path_labels (str): path to csv with annotations
@@ -65,12 +65,11 @@ class SurgeryStillsDataset(Dataset):
         path_annots (str): path to raw annotations (to extract classes)
         transform (callable, optional): transform a sample
     '''
-    self.datasetId = datakey.split('_')[0]
-    self.dataScope = datakey.split('_')[1]
+    self.dataScope = dataScope
     self.path_samples = path_samples
     self.path_labels = path_labels
     self.path_annots = path_annots
-    if updateLabels:
+    if update_labels:
       self.update_labels_csv()
     self.labels = self._get_labels(path_labels) # frame_id, video, frame_label
     # print(self.labels.index)
@@ -82,8 +81,8 @@ class SurgeryStillsDataset(Dataset):
     # self.labels = self.filter_valid_frames(self.labels) # Useful when using short version of the dataset with the full labels.csv
     # print("self_labels\n", self.labels)
 
-    self.videoNames = self.labels["video_id"].unique()  # Extract unique video identifiers
-    self.videoToGroup = {video_id: idx for idx, video_id in enumerate(self.videoNames)}
+    self.videoNames = self.labels["videoId"].unique()  # Extract unique video identifiers
+    self.videoToGroup = {videoId: idx for idx, videoId in enumerate(self.videoNames)}
     
     self.n_classes = len(self.labels["class"].unique())
   def __len__(self):
@@ -103,7 +102,7 @@ class SurgeryStillsDataset(Dataset):
     
     if isinstance(idx, list):  # For batch processing
       # print(self.labels.iloc[idx[0], 0].split('_')[0])
-      path_imgs = [os.path.join(self.path_samples, self.labels.loc[i, "video_id"], self.labels.loc[i, "frame"] + ".png") for i in idx]
+      path_imgs = [os.path.join(self.path_samples, self.labels.loc[i, "videoId"], self.labels.loc[i, "frame"] + ".png") for i in idx]
       
       if self.extradata["id"]:
         extra.append([self.labels.loc[i, "frame"] for i in idx]) 
@@ -120,7 +119,7 @@ class SurgeryStillsDataset(Dataset):
       labels = torch.tensor(labels)  # Convert list of labels to tensor
 
     else:  # For single index (using same return variables for these have only one element)
-      path_imgs = os.path.join(self.path_samples, self.labels.loc[idx, "video_id"], self.labels.loc[idx, "frame"] + ".png")
+      path_imgs = os.path.join(self.path_samples, self.labels.loc[idx, "videoId"], self.labels.loc[idx, "frame"] + ".png")
 
       if self.extradata["id"]:
         extra.append(self.labels.loc[idx, "frame"]) 
@@ -143,8 +142,8 @@ class SurgeryStillsDataset(Dataset):
       labels = pd.read_csv(path_labels)
       # print(df.columns)
       labels.reset_index(drop=True, inplace=True) # Create a new integer index and drop the old index
-      # (Optional) Create a new column for video_id based on the frame column
-      labels['video_id'] = labels['frame'].str.split('_', expand=True)[0]
+      # (Optional) Create a new column for videoId based on the frame column
+      labels['videoId'] = labels['frame'].str.split('_', expand=True)[0]
       # print(df.columns)
       # self.write_labels_csv(df, "deg.csv")
       return labels
@@ -209,7 +208,7 @@ class SurgeryStillsDataset(Dataset):
         idx = slice(None)  # This is equivalent to selecting all rows
     elif isinstance(idx, tuple):
         idx = slice(*idx)  # Convert tuple to slice
-    return [self.videoToGroup[video_id] for video_id in self.labels["video_id"][idx]]
+    return [self.videoToGroup[videoId] for videoId in self.labels["videoId"][idx]]
   
   """ DISABLED - NOT WORKING
   def filter_valid_frames(self, labels):
@@ -227,7 +226,7 @@ class SurgeryStillsDataset(Dataset):
     ''' Extract video IDs (check for overlap in sets) - specific to each labels.csv implementation
         List of idxs [[tr_i, va_i, te_i], ...] --> List of videos [[vidsx, vidsy, vidsz], ...]
     '''
-    # Load the CSV and extract video_id
+    # Load the CSV and extract videoId
     # AFFECTed THE ORIGINAL
     # df = self.labels
     # df.drop(["frame", "class"], axis=1, inplace=True)  # Optional: Drop unnecessary columns if not needed
@@ -237,7 +236,7 @@ class SurgeryStillsDataset(Dataset):
     for idxs in listOfIdxs: # for each fold indexs
       vidsList = []
       for i, split in enumerate(idxs):  # for each split  (train, valid, test)
-        vidsInSplit = self.labels.loc[split, 'video_id'].unique()  # Get unique videoNames for this subset
+        vidsInSplit = self.labels.loc[split, 'videoId'].unique()  # Get unique videoNames for this subset
         vidsInSplit = [v[:4] for v in vidsInSplit]
         # print(f"split {i}\n", vidsInSplit, '\n')
         vidsList.append(vidsInSplit)
@@ -302,15 +301,15 @@ class Cataloguer():
       Pipeline: [sample] -> [label] -> [preprocess] -> [batch]
       Out - split and batched dataset to a Teacher
   '''
-  def __init__(self, path_dataset, datakey, preprocessing=None, extradata={}, updateLabels=False):
-    self.datasetId = os.path.basename(os.path.normpath(path_dataset)) # normpath handles paths ending with '/'
-    self.extradata = extradata
+  def __init__(self, path_dataset, DATA):
+   
     self.path_samples = os.path.join(path_dataset, "samples")
     self.path_labels = os.path.join(path_dataset, "labels.csv")
     self.path_annots = os.path.join(path_dataset, "annotations")
-    self.dataset = self._get_dataset(datakey, preprocessing, extradata, updateLabels)
+    self.dataset = self._get_dataset(DATA["datasetId"], DATA["preprocessing"],
+        DATA["return_extradata"], DATA["update_labels"])
 
-    print(f"[{preprocessing}] Preprocessing")
+    print(f"[{DATA['preprocessing']}] Preprocessing")
    
     self.labelToClass = self._get_labelToClass()   # gets dict for getting class name from int value
     self.n_classes = self.dataset.n_classes
@@ -419,9 +418,9 @@ class Cataloguer():
       df = self.dataset.labels.iloc[idx].copy()
       # print(df.columns)
       df["timestamp"] = df["frame"].str.split('_', expand=True)[1].astype(int)  # Ensure numeric sorting    
-      df = df.sort_values(by=["video_id", "timestamp"])
+      df = df.sort_values(by=["videoId", "timestamp"])
       # print(df)
-      for vid, group in df.groupby("video_id"):
+      for vid, group in df.groupby("videoId"):
         try:
           # print(self.features[list(self.features.keys())[-1]])
           # Accumulate features, labels and frame_nmes as tensors for each video
@@ -450,13 +449,13 @@ class Cataloguer():
 
     return loader # trainloader, validloader, testloader
 
-  def _get_dataset(self, datakey, preprocessing=None, extradata={}, updateLabels=False):
+  def _get_dataset(self, datasetId, preprocessing=None, extradata={}, update_labels=False):
     ''' Get the Dataset objects according to the dataScope'''
     transform = self._get_preprocessing(preprocessing);
-    dataScope = datakey.split('_')[1]
+    dataScope = datasetId.split('-')[1]
     if dataScope == "local":
-      dataset = SurgeryStillsDataset(dataScope,
-        self.path_samples, self.path_labels, self.path_annots, extradata, transform, updateLabels)    
+      dataset = SurgeryStillsDataset(dataScope, self.path_samples, self.path_labels,
+          self.path_annots, extradata, transform, update_labels)    
     elif dataScope == "external":
       train_dataset = datasets.CIFAR10(root=f"./data/{dataScope}", train=True, download=True, transform=preprocessing)
       test_dataset = datasets.CIFAR10(root=f"./data/{dataScope}", train=False, download=True, transform=preprocessing)

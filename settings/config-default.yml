@@ -1,75 +1,77 @@
-# General
-seed: 53  # 5 --> 3 or 3 --> 5
-device: None
-path_root: .
-run: #LDSS-24110400 # if not provided, creates new run
-actions: 
-- train        # train (spatial, temporal, full)
-# - process      # process (sample, modeFitler, extractFeatures)
-# - eval         # eval (aprfc, phaseTiming, phaseChart)
+GENERAL:
+  seed: 53  # 5 --> 3 or 3 --> 5
+  device: None
+  path_root: .
+  load_run:  # if empty creates new run, else loads it (YYMM-DD-HH)
+  actions:
+  - train        # train (spatial, temporal, full)
+  - process      # process (sample-n-label, mode-filter, extractFeatures)
+  - eval         # eval (aprfc, phaseTiming, phaseChart)
 
-# Data
-datakey: LDSS-local
-preprocessing: basic  # basic, augmentation
-extradata: # for local dataset (extends __getitem__() return beyond datapoint and label)
-  sampleId: True
-  videoId: False
-  timestamp: False
+DATA:
+  datasetId: LDSS-local  # (ldss-local, cifar10-ext)
+  preprocessing: basic  # basic, augmentation
+  return_extradata: # for local dataset (extends __getitem__() return beyond datapoint and label)
+    sampleId: True
+    videoId: False
+    timestamp: False
+  update_labels: False
 
-# Model
-modelkey: temporal # spatial, temporal, full
-fx_weights: default
-fx_model: logs/LDSS-24110400/train/checkpoints/LDSS-20241104-00-fold6-0.837800.pth
-n_stages: 3
-n_filters: 64  # number of convolution filters == number of channels inside a stage
-filterTimeframe: 3  # size in time (# of frames)
-n_resBlocks: 2  # inside the stage
+MODEL:  # for models created/trained in the run 
+  domain: temporal # spatial, temporal, full
+# spatial
+  spaceWeights: default # sfx = spatial feature extraction
+  spaceArch: resnet50-custom
+  path_spaceModel: logs/LDSS-24110400/train/checkpoints/LDSS-20241104-00-fold6-0.837800.pth # if empty, uses new untrained one
+# temporal
+  n_stages: 3
+  n_filters: 64  # number of convolution filters == number of channels inside a stage
+  tf_filter: 3  # size in time (timeframe, # of frames)
+  n_resBlocks: 2  # inside the stage
 
+TRAIN:
+  train_point: start # (start, resume)
+  path_resumeModel: null  # to continue training from a checkpoint model if train-point == resume
+  save_checkpoints: True
+  checkpointRate: 5 # epoch frequency to save a checkpoint
+  save_betterModel: True
+  log_events: True
+  criterion: weighted-cross-entropy
+  train_metric: accuracy
+  valid_metric: accuracy
+  k_folds: 7 # match with datasetName (7 for LDSS, 5 for CIFAR10, 1 for None?)
+  skipFolds: []  # 0 for fold 1... after a break (e.g. crash) allows to skip folds and restart from a checkpoint
+  HYPER:  # traditional hyperparameters
+    n_epochs: 50
+    batchSize: 128
+    learningRate: 0.0005  # learning rate
+    momentum: 0.9
+    gamma: 0.1
+    stepSize: 30  # optimizer scheduler (to change mid train)
+ 
+PROCESS:  # Process
+  sample_n_label: True
+  path_videos:
+  apply_modeFilter: True
+  path_bundle: True
+  export_modedPreds: True  # if apply-mode-filter == True
+  fx_spatial: False
 
-# Train
-train_point: start # (start, resume)
-train_out:
-  predictions: True
-  checkpoints: True
-  events: True
-  bestModel: True
-k_folds: 7 # match with datasetName (7 for LDSS, 5 for CIFAR10)
-n_epochs: 50
-batchSize: 128
-criterion: crossEntropy
-train_metric: accuracy
-valid_metric: accuracy
-hyperparameters:
-  learningRate: 0.0005
-  momentum: 0.9
-  gamma: 0.1
-  stepSize: 30  # optimizer scheduler (to change mid train)
-path_resume: null  # to continue training from a checkpoint model
-checkpointFrequency: 5 # epoch frequency to save a checkpoint
-skipFolds: []  # 0 for fold 1...
-
-# Process
-process_in: 
-processkeys:
-  modeFilter: True
-process_out:
-
-# Eval
-eval_in: pundle
-path_model:
-path_prediction:
-evalkeys:
+EVAL:  # Eval
+  eval_from: predictions  # model
+  path_model:  # if eval-from == model and no training done
+  path_preds:
   aprfc: False
   phaseTiming: False
   phaseChart: False
-eval_out:
-  pundle: True
-agg: macro  # accuracy is locked to micro (see utils.py)
-updateFreq: 1  # updates metrics with new data every batch
-computeFreq: 100  # computes the metrics
-test_metrics:
-  accuracy: True
-  precision: True
-  recall: True
-  f1score: True
-  confusionMatrix: True
+  export_testBundle: True
+# metrics
+  test_metrics:
+    accuracy: True
+    precision: True
+    recall: True
+    f1score: True
+    confusionMatrix: True
+  agg: macro  # overall, accuracy is locked to micro (see utils.py)
+  updateRate: 1  # updates metrics with new data every batch
+  computeRate: 100  # computes the metrics
