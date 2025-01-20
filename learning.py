@@ -30,43 +30,47 @@ def learning(**the):
   DEVICE = "cuda" if torch.cuda.is_available() else "cpu" # where to save torch tensors (e.g. during training)
   Ptk = utils.Pathtaker(the["GENERAL"]["path_root"], the["DATA"]["datasetId"], RUN)
   
-  if the["PROCESS"]["sample_n_label"] and "process" in the["GENERAL"]["actions"]:  # video to labelled (csv file) image frames
-    pass
-  
   # catalogue.py (dataset, data handling)
   Ctl = catalogue.Cataloguer(Ptk.path_dataset, the["DATA"])
-  
+  if "process" in the["GENERAL"]["actions"]:
+    if the["PROCESS"]["sample"]:  # video to image frames
+      Ctl.sample(the["DATA"]["path_rawVideos"], Ptk.path_samples, samplerate=the["PROCESS"]["samplerate"], filter_annotated=the["DATA"]["filter_annotated"])
+    if the["PROCESS"]["label"]:  # label (csv file) image frames
+      Ctl.label(Ptk.path_samples, Ptk.path_labels)
+
+  Ctl.build_dataset(the["DATA"]["datasetId"], the["DATA"]["preprocessing"], the["DATA"]["return_extradata"])
   # teaching.py (metrics, train validation, test)
   Tch = teaching.Teacher(the["TRAIN"], the["EVAL"], Ctl, DEVICE)
 
-  print(f"\Logs location: {Ptk.logs} | Device: {DEVICE}")
-  print(f"Dataset: {the['DATA']['datasetId']} | {Ctl.n_classes} classes"); print(Ctl.labelToClass)
-  print(f"{Ctl.datasetSize} datapoints | Batch size of {the['TRAIN']['batchSize']} | {the['TRAIN']['k_folds']} folds | {the['TRAIN']['HYPER']['n_epochs']} epochs\n")
-  highScore = 0.0 
+  print(f"[run] {the['DATA']['datasetId']}-{RUN} | [device] {DEVICE}")
+  print(f"[dataset] {the['DATA']['datasetId']} | {Ctl.N_CLASSES} classes")
+  print(f"[preprocessing] {Ctl.preprocessing}\t| {'Balanced' if Ctl.BALANCED else 'Unbalanced'}"); print(Ctl.labelToClass)
+  print(f"{Ctl.DATASET_SIZE} datapoints | Batch size of {the['TRAIN']['HYPER']['batchSize']} | {the['TRAIN']['k_folds']} folds | {the['TRAIN']['HYPER']['n_epochs']} epochs\n")
+  highScore = 0.0
 
-  # Index split of the dataset (virtual) 
+  # Index split of the dataset (virtual)
   for fold, splits in enumerate(Ctl.split(the["TRAIN"]["k_folds"])):
     # iterating folds (trio tuples of idxs [0] and videoIds [1])
     ((train_idxs, valid_idxs, test_idxs), (train_videoIds, valid_videoIds, test_videoIds)) = splits
     if fold in the["TRAIN"]["skipFolds"]: continue
     print(f"Fold {fold + 1} split:\ttrain {train_videoIds}\n\t\tvalid {valid_videoIds}\n\t\ttest {test_videoIds}")
-    logInfo = f"{the['datasetId'].split('_')[0]}_{DATE}_{fold + 1}"  # model name for logging/saving
-    writer = SummaryWriter(os.path.join(Ptk.path_events, fold + 1)) # object for logging stats
+    logInfo = f"{the['DATA']['datasetId'].split('-')[0]}-{DATE}-{fold + 1}"  # model name for logging/saving
+    writer = SummaryWriter(os.path.join(Ptk.path_events, str(fold + 1))) # object for logging stats
 
     # Create the model
-    spaceinator = machine.Spatinator(Ctl.n_classes, the["MODEL"]["spaceModel"], the["MODEL"]["spaceWeights"])
-    timeinator = machine.Timeinator(spaceinator.featureSize, Ctl.n_classes, the["MODEL"])
+    spaceinator = machine.Spaceinator(Ctl.N_CLASSES, the["MODEL"]["path_spaceModel"], the["MODEL"]["spaceArch"], the["MODEL"]["spaceWeights"])
+    timeinator = machine.Timeinator(spaceinator.FEATURE_SIZE, Ctl.N_CLASSES, the["MODEL"])
     if the["MODEL"]["domain"] == "spatial":
-      model = machine.SurgeNet(Ctl.n_classes, [spaceinator])
+      model = machine.SurgeNet(Ctl.N_CLASSES, [spaceinator])
       batchMode = "images"
     if the["MODEL"]["domain"] == "temporal":
       spaceinator.load(Ptk.path_features)  # loads into Cataloguer dataset
       batchMode = "features"
       # Get actual data from the split indexs, collate and batch it to a dataloader trio
-      model = machine.SurgeNet(Ctl.n_classes, [timeinator])
+      model = machine.SurgeNet(Ctl.N_CLASSES, [timeinator])
     if the["MODEL"]["domain"] == "full":
       batchMode = "images"
-      model = machine.SurgeNet(Ctl.n_classes, [spaceinator, timeinator])
+      model = machine.SurgeNet(Ctl.N_CLASSES, [spaceinator, timeinator])
     trainloader, validloader, testloader = Ctl.batch(
         the["batchSize"], batch_mode=batchMode, train_idx=train_idxs, valid_idx=valid_idxs, test_idx=test_idxs)
     
@@ -123,7 +127,7 @@ def learning(**the):
           except Exception as e:
             print(f"No predictions (test_bundle) provided for processing: {e}")
       
-      Tch.evaluate(test_bundle, the["EVAL"], fold + 1, writer, DATE, Ctl.n_classes, Ctl.labelToClass,
+      Tch.evaluate(test_bundle, the["EVAL"], fold + 1, writer, DATE, Ctl.N_CLASSES, Ctl.labelToClass,
           the["DATA"]["extradata"], Ptk.path_eval, Ptk.path_aprfc, Ptk.path_phaseCharts, the["TEST"]["path_preds"])
 
     writer.close()

@@ -9,25 +9,36 @@ GENERAL:
   - eval         # eval (aprfc, phaseTiming, phaseChart)
 
 DATA:
-  datasetId: LDSS-local  # (ldss-local, cifar10-ext)
+  datasetId: LDSSlite-local  # (ldss-local, cifar10-ext)
   preprocessing: basic  # basic, augmentation
   return_extradata: # for local dataset (extends __getitem__() return beyond datapoint and label)
     sampleId: True
     videoId: False
     timestamp: False
-  update_labels: False
+  path_rawVideos: 
+
+PROCESS:  # Process
+  sample: False
+  label: True
+  update_labels: True
+  samplerate: 1 # Hz
+  filter_annotated: True
+  apply_modeFilter: True
+  path_bundle: True
+  export_modedPreds: True  # if apply-mode-filter == True
+  fx_spatial: False
 
 MODEL:  # for models created/trained in the run 
   domain: temporal # spatial, temporal, full
 # spatial
   spaceWeights: default # sfx = spatial feature extraction
-  spaceArch: resnet50-custom
-  path_spaceModel: logs/LDSS-24110400/train/checkpoints/LDSS-20241104-00-fold6-0.837800.pth # if empty, uses new untrained one
+  spaceArch: resnet50
+  path_spaceModel: #logs/LDSS-24110400/train/checkpoints/LDSS-20241104-00-fold6-0.837800.pth # if empty, uses new untrained one
 # temporal
   n_stages: 3
   n_filters: 64  # number of convolution filters == number of channels inside a stage
   tf_filter: 3  # size in time (timeframe, # of frames)
-  n_resBlocks: 2  # inside the stage
+  n_blocks: 2  # inside the stage
 
 TRAIN:
   train_point: start # (start, resume)
@@ -36,7 +47,7 @@ TRAIN:
   checkpointRate: 5 # epoch frequency to save a checkpoint
   save_betterModel: True
   log_events: True
-  criterion: weighted-cross-entropy
+  criterionId: weighted-cross-entropy
   train_metric: accuracy
   valid_metric: accuracy
   k_folds: 7 # match with datasetName (7 for LDSS, 5 for CIFAR10, 1 for None?)
@@ -49,13 +60,6 @@ TRAIN:
     gamma: 0.1
     stepSize: 30  # optimizer scheduler (to change mid train)
  
-PROCESS:  # Process
-  sample_n_label: True
-  path_videos:
-  apply_modeFilter: True
-  path_bundle: True
-  export_modedPreds: True  # if apply-mode-filter == True
-  fx_spatial: False
 
 EVAL:  # Eval
   eval_from: predictions  # model

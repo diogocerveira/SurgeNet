@@ -22,8 +22,8 @@ class Teacher():
       Pipeline: (train -> validate) x n_epochs -> test
   '''
   def __init__(self, TRAIN, EVAL, Ctl, DEVICE):
-    train_metric, valid_metric, test_metrics = self._get_metrics(TRAIN, EVAL, Ctl.dataset.n_classes, Ctl.labelToClass, DEVICE)
-    criterion = self._get_criterion(TRAIN["CRITERION_ID"], Ctl.CLASS_WEIGHTS)
+    train_metric, valid_metric, test_metrics = self._get_metrics(TRAIN, EVAL, Ctl.dataset.N_CLASSES, Ctl.labelToClass, DEVICE)
+    criterion = self._get_criterion(TRAIN["criterionId"], Ctl.classWeights, DEVICE)
     self.trainer = Trainer(train_metric, criterion, TRAIN["HYPER"], DEVICE)
     self.validater = Validater(valid_metric, criterion, DEVICE)
     self.tester = Tester(test_metrics, DEVICE)
@@ -77,9 +77,9 @@ class Teacher():
       
     return betterState
 
-  def evaluate(self, test_bundle, EVAL, fold, writer, date, n_classes, labelToClass, path_eval=None, path_aprfc=None, path_phaseCharts=None):
+  def evaluate(self, test_bundle, EVAL, fold, writer, date, N_CLASSES, labelToClass, path_eval=None, path_aprfc=None, path_phaseCharts=None):
     # print(predictions[0], targets[0], imageIds[0])
-    # torch.nn.functional.one_hot(tensor, n_classes=-1)
+    # torch.nn.functional.one_hot(tensor, N_CLASSES=-1)
     if EVAL["export_testBundle"]:
       path_to = os.path.join(path_eval, f"predictions_fold{fold}")
       with open(path_to, 'wb') as f: # Save the DataFrame
@@ -88,14 +88,14 @@ class Teacher():
     if EVAL["aprfc"]:
       self.tester._aprfc(writer, path_aprfc, fold, test_bundle)
     if EVAL["phaseTiming"]:
-      outText = self.tester._phase_lengths(test_bundle, n_classes, labelToClass)
+      outText = self.tester._phase_lengths(test_bundle, N_CLASSES, labelToClass)
       self.tester._aprfc(writer, path_aprfc, fold, test_bundle)
       # print(list(final_bundle.groupby("Video")))
-      outText = self.tester._phase_lengths(test_bundle, n_classes, labelToClass, test_bundle)
+      outText = self.tester._phase_lengths(test_bundle, N_CLASSES, labelToClass, test_bundle)
     if EVAL["phaseChart"]:
       self.tester._phase_graph(test_bundle, path_phaseCharts, fold, date, outText, test_bundle)
 
-  def evaluate2(self, model, testloader, _eval_, extradata=None, path_to=None):
+  def evaluate2(self, model, testloader, EVAL, extradata=None, path_to=None):
     # _, ext = os.path.splitext(path_from)
     # if ext == ".pkl": # pickle file for results
     #   with open(path_from, 'rb') as f:  # Load the DataFrame
@@ -108,13 +108,13 @@ class Teacher():
     print(f"Testing took {t2 - t1:.2f} seconds")
     # self.tester.test_metrics.display()
     # print(sampleNames[0], preds[0], targets[0])
-    # torch.nn.functional.one_hot(tensor, n_classes=-1)
+    # torch.nn.functional.one_hot(tensor, N_CLASSES=-1)
     test_bundle = self._get_bundle(preds, targets, extradata)
     if path_to:
       with open(path_to, 'wb') as f: # Save the DataFrame
         pickle.dump(test_bundle, f)
 
-    self._do_tests(test_bundle, _eval_)
+    self._do_tests(test_bundle, EVAL)
  
 
   def _do_tests(self, test_bundle, testkey):
@@ -130,15 +130,17 @@ class Teacher():
         action(test_bundle)
 
 
-  def _get_metrics(_train_, _eval_, n_classes, labelToClass, DEVICE):
-    train_metric = RunningMetric(_train_["train_metric"], n_classes, DEVICE, _eval_["agg"], _eval_["compute-rate"], _eval_["update-rate"])
-    valid_metric = RunningMetric(_train_["valid_metric"], n_classes, DEVICE, _eval_["agg"], _eval_["compute-rate"] // 2, _eval_["update-rate"])
-    test_metrics = MetricBunch(_eval_["test_metrics"], n_classes, labelToClass, _eval_["agg"], _eval_["compute-rate"], DEVICE)
+  def _get_metrics(self, TRAIN, EVAL, N_CLASSES, labelToClass, DEVICE):
+    train_metric = RunningMetric(TRAIN["train_metric"], N_CLASSES, DEVICE, EVAL["agg"], EVAL["computeRate"], EVAL["updateRate"])
+    valid_metric = RunningMetric(TRAIN["valid_metric"], N_CLASSES, DEVICE, EVAL["agg"], EVAL["computeRate"] // 2, EVAL["updateRate"])
+    test_metrics = MetricBunch(EVAL["test_metrics"], N_CLASSES, labelToClass, EVAL["agg"], EVAL["computeRate"], DEVICE)
     return train_metric, valid_metric, test_metrics
 
-  def _get_criterion(CRITERION_ID, CLASS_WEIGHTS):
+  def _get_criterion(self, CRITERION_ID, classWeights, DEVICE):
     if CRITERION_ID == "cross-entropy":
-      return nn.CrossEntropyLoss(weight=CLASS_WEIGHTS.to("cuda"))
+      return nn.CrossEntropyLoss()
+    elif CRITERION_ID == "weighted-cross-entropy":
+      return nn.CrossEntropyLoss(weight=classWeights.to(DEVICE))
     else:
       raise ValueError("Invalid criterion chosen (crossEntropy, )")
 
@@ -148,9 +150,9 @@ class Trainer():
   def __init__(self, metric, criterion, HYPER, DEVICE):
     self.train_metric = metric
     self.criterion = criterion
-    self.learningRate = HYPER["learning-rate"]
+    self.learningRate = HYPER["learningRate"]
     self.MOMENTUM = HYPER["momentum"]
-    self.STEP_SIZE = HYPER["step-size"]
+    self.STEP_SIZE = HYPER["stepSize"]
     self.GAMMA = HYPER["gamma"]
     self.DEVICE = DEVICE
     
@@ -279,16 +281,16 @@ class Tester():
     writer.add_image(f"confusion_matrix/test", tensor_cf, fold)
     writer.close()
     
-  def _phase_lengths_i2(self, df, n_classes, labelToClass, samplerate=1):
+  def _phase_lengths_i2(self, df, N_CLASSES, labelToClass, samplerate=1):
     outText = []
     lp, lt = len(df["Preds"]), len(df["Targets"])
-    # n_classes = (max(df["Targets"]) + 1)  # assuming regular int encoding
-    # n_classes = len(preds[0]) # assuming one hot encoding
+    # N_CLASSES = (max(df["Targets"]) + 1)  # assuming regular int encoding
+    # N_CLASSES = len(preds[0]) # assuming one hot encoding
     assert lp == lt, "Targets and Preds Size Incompatibility"
     videos = df["Video"].unique()
-    phases_preds_sum = np.zeros(n_classes)
-    phases_gt_sum = np.zeros(n_classes)
-    phases_diff_sum = np.zeros(n_classes)
+    phases_preds_sum = np.zeros(N_CLASSES)
+    phases_gt_sum = np.zeros(N_CLASSES)
+    phases_diff_sum = np.zeros(N_CLASSES)
 
     for idx, video in enumerate(videos):
       print()
@@ -297,11 +299,11 @@ class Tester():
       classes_video = pd.Series(df_filtered["Targets"].unique())
       # pd.set_option("display.max_rows", 100)
       # print(df_filtered["Targets"].iloc[:100])
-      print(classes_video.reindex(range(n_classes), fill_value=-1).values)
+      print(classes_video.reindex(range(N_CLASSES), fill_value=-1).values)
       # Reset for each video
       
-      phases_preds_video = df_filtered["Preds"].value_counts().reindex(range(n_classes), fill_value=0) # Targets video counts
-      phases_gt_video = df_filtered["Targets"].value_counts().reindex(range(n_classes), fill_value=0) # Targets video counts
+      phases_preds_video = df_filtered["Preds"].value_counts().reindex(range(N_CLASSES), fill_value=0) # Targets video counts
+      phases_gt_video = df_filtered["Targets"].value_counts().reindex(range(N_CLASSES), fill_value=0) # Targets video counts
       # ensures every class is accounted for in cumulative count, even with no occurrences
       phases_preds_sum += phases_preds_video.values
       phases_gt_sum += phases_gt_video.values
@@ -315,7 +317,7 @@ class Tester():
       mix = list(zip(phases_preds_video / (60 * samplerate), phases_gt_video / (60 * samplerate), phases_diff_sum))
       ot = f"\nVideo {video} Phase Report\n" + f"{'':<12} |   T Preds    |    T Targets     ||  Diff\n" + '\n'.join(
             f"{labelToClass[i]:<12} | {mix[i][0]:<8.2f}min | {mix[i][1]:<8.2f}min || {(mix[i][0] - mix[i][1]):<8.2f}min"
-            for i in range(n_classes)
+            for i in range(N_CLASSES)
         )
       outText.append(ot)
       print(ot)
@@ -327,15 +329,15 @@ class Tester():
     
     otavg = "\n\nOverall Average Phase Report\n" + f"{'':<12} | T Avg Preds  |  T Avg Targets   || Total AE\n" + '\n'.join(
             f"{labelToClass[i]:<12} | {mix[i][0]:<8.2f}min | {mix[i][1]:<8.2f}min || {(mix[i][2]):<8.2f}min"
-            for i in range(n_classes)
+            for i in range(N_CLASSES)
       )
     print(otavg)
     outText.append(otavg)
   # phase_metric([1, 1, 2, 3, 3, 4, 0, 5], [0, 0, 0, 2, 3, 4, 5, 1])
     return outText
 
-  def _phase_lengths(self, df, n_classes, labelToClass, samplerate=1):
-    return self._phase_lengths_i2(df, n_classes, labelToClass, samplerate=1)
+  def _phase_lengths(self, df, N_CLASSES, labelToClass, samplerate=1):
+    return self._phase_lengths_i2(df, N_CLASSES, labelToClass, samplerate=1)
 
   def _phase_graph(self, df, path_out, fold, date, outText, path_phaseCharts):
       # df = pd.DataFrame({
@@ -443,17 +445,17 @@ class StillMetric:
   ''' For now uses torcheval metrics
       Performs metric update and computation based on a frequency provided
   '''
-  def __init__(self, metricName, n_classes, DEVICE, agg="micro"):
+  def __init__(self, metricName, N_CLASSES, DEVICE, agg="micro"):
     if metricName == "accuracy":
-      self.metric = MulticlassAccuracy(average=agg, num_classes=n_classes, DEVICE=DEVICE)
+      self.metric = MulticlassAccuracy(average="micro", num_classes=N_CLASSES, device=DEVICE)
     elif metricName == "precision":
-      self.metric =  MulticlassPrecision(average=agg, num_classes=n_classes, DEVICE=DEVICE)
+      self.metric =  MulticlassPrecision(average=agg, num_classes=N_CLASSES, device=DEVICE)
     elif metricName == "recall":
-      self.metric = MulticlassRecall(average=agg, num_classes=n_classes, DEVICE=DEVICE)
+      self.metric = MulticlassRecall(average=agg, num_classes=N_CLASSES, device=DEVICE)
     elif metricName == "f1score":
-      self.metric = MulticlassF1Score(average=agg, num_classes=n_classes, DEVICE=DEVICE)
+      self.metric = MulticlassF1Score(average=agg, num_classes=N_CLASSES, device=DEVICE)
     elif metricName == "confusionMatrix":
-      self.metric = MulticlassConfusionMatrix(num_classes=n_classes, DEVICE=DEVICE)
+      self.metric = MulticlassConfusionMatrix(num_classes=N_CLASSES, device=DEVICE)
     else:
       raise ValueError("Invalid Metric Name")
   def reset(self):
@@ -464,8 +466,8 @@ class StillMetric:
 class RunningMetric(StillMetric):
   ''' Extends StillMetric to updates on the run
   '''
-  def __init__(self, metricName, n_classes, DEVICE, agg, computeRate, updateFreq=1):
-    super().__init__(metricName, n_classes, DEVICE, agg)
+  def __init__(self, metricName, N_CLASSES, DEVICE, agg, computeRate, updateFreq=1):
+    super().__init__(metricName, N_CLASSES, DEVICE, agg)
     self.computeRate = computeRate  # num of batches between computations
     self.updateFreq = updateFreq  # num of batches between updates
     
@@ -485,21 +487,21 @@ class MetricBunch:
   ''' Gets a bunch of still metrics at cheap price
       Accuracy locked at agg==micro for now
   '''
-  def __init__(self, metricSwitches, n_classes, labelToClass, agg, computeRate, DEVICE):  # metricSwitches is a boolean dict switch for getting metrics
+  def __init__(self, metricSwitches, N_CLASSES, labelToClass, agg, computeRate, DEVICE):  # metricSwitches is a boolean dict switch for getting metrics
     self.metricSwitches = metricSwitches
     self.labelToClass = labelToClass
     self.agg = agg
     
     if self.metricSwitches["accuracy"]:
-      self.accuracy = RunningMetric("accuracy", n_classes, DEVICE, "micro", computeRate)
+      self.accuracy = RunningMetric("accuracy", N_CLASSES, DEVICE, "micro", computeRate)
     if self.metricSwitches["precision"]:
-      self.precision = RunningMetric("precision", n_classes, DEVICE, agg, computeRate)
+      self.precision = RunningMetric("precision", N_CLASSES, DEVICE, agg, computeRate)
     if self.metricSwitches["recall"]:
-      self.recall = RunningMetric("recall", n_classes, DEVICE, agg, computeRate)
+      self.recall = RunningMetric("recall", N_CLASSES, DEVICE, agg, computeRate)
     if self.metricSwitches["f1score"]:
-      self.f1score = RunningMetric("f1score", n_classes, DEVICE, agg, computeRate)
+      self.f1score = RunningMetric("f1score", N_CLASSES, DEVICE, agg, computeRate)
     if self.metricSwitches["confusionMatrix"]:
-      self.confusionMatrix = RunningMetric("confusionMatrix", n_classes, DEVICE, agg, computeRate)
+      self.confusionMatrix = RunningMetric("confusionMatrix", N_CLASSES, DEVICE, agg, computeRate)
 
   def reset(self):
     if self.accuracy: self.accuracy.reset()

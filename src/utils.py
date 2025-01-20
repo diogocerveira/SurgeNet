@@ -95,7 +95,7 @@ class Pathtaker():
     ''' Get dictionary with paths to everything related to a run'''
     paths_logs = {}
     paths_logs["path_logs"] = os.path.join(self.path_root, "logs")
-    paths_logs["path_run"] = os.path.join(paths_logs["path_logs"], f"{datasetId.split('_')[0]}_{date}")
+    paths_logs["path_run"] = os.path.join(paths_logs["path_logs"], f"{datasetId.split('-')[0]}-{date}")
     paths_logs["path_runInfo"] = os.path.join(paths_logs["path_run"], "run-info.yml")
     paths_logs["path_eval"] = os.path.join(paths_logs["path_run"], "eval")
     paths_logs["path_aprfc"] = os.path.join(paths_logs["path_eval"], "aprfc")

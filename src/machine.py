@@ -16,11 +16,11 @@ from torch.utils.data import DataLoader
 
 class SurgeNet(nn.Module):
   ''' Receives [batch_size, in_channels, in_length] 1st guesses
-      Outputs [output_stage_id, batch_size, n_classes, in_length] further guesses
+      Outputs [output_stage_id, batch_size, N_CLASSES, in_length] further guesses
   '''
-  def __init__(self, n_classes, spatinator, tempinator):
+  def __init__(self, N_CLASSES, spatinator, tempinator):
     super().__init__()
-    self.n_classes = n_classes
+    self.N_CLASSES = N_CLASSES
     self.Spaceinator = spatinator
     self.Timeinator = tempinator
   def forward(self, x):
@@ -49,17 +49,21 @@ class Spaceinator(nn.Module):
               _features: train and _features features in runtime
               load: load presaved features and forward them
   '''
-  def __init__(self, n_classes, path_spaceModel=None, spaceModelType=None, spacePreweights=None, nodesToExtract={}):
+  def __init__(self, N_CLASSES, path_spaceModel=None, SPACE_ARCH=None, SPACE_WEIGHTS=None, nodesToExtract={}):
     super().__init__()
 
-    spaceWeights = self._get_preweights(spacePreweights)
-    self.spaceModel = self._get_model(spaceModelType, spaceWeights, torch.load(path_spaceModel, weights_only=False))  # to implement my own in model.py
+    SPACE_WEIGHTS = self._get_preweights(SPACE_WEIGHTS)
+    if path_spaceModel:
+      STATE_DICT = torch.load(path_spaceModel, weights_only=False)
+    else:
+      STATE_DICT = None
+    self.spaceModel = self._get_model(SPACE_ARCH, SPACE_WEIGHTS, STATE_DICT)  # to implement my own in model.py
     # fx_stateDict = torch.load(path_model, weights_only=False)
-    self.featureLayer = fxs.get_graph_node_names(self.spaceModel)[0][-2]  # last is fc converted to identity so -2 for flattemed feature vectors
-    print(self.featureLayer)  # get the last layer
-    self.nodesToExtract = [self.featureLayer]
-    if spaceModelType == "resnet50-custom":
-      self.featureSize = 2048 # default for resnet50
+    self.FEATURE_LAYER = fxs.get_graph_node_names(self.spaceModel)[0][-2]  # last is fc converted to identity so -2 for flattemed feature vectors
+    print(self.FEATURE_LAYER)  # get the last layer
+    self.nodesToExtract = [self.FEATURE_LAYER]
+    if SPACE_ARCH == "resnet50" or SPACE_ARCH == "resnet50-custom":
+      self.FEATURE_SIZE = 2048 # default for resnet50
     self.features = None
     # train_nodes, eval_nodes = fx.get_graph_node_names(self.model)
     # print(train_nodes == eval_nodes, end='\t'); print(train_nodes)
@@ -77,13 +81,13 @@ class Spaceinator(nn.Module):
     else:
       raise ValueError("Invalid preweight choice!")
   
-  def _get_model(self, spaceArch, spaceWeights, state_dict):
-    if spaceArch == "resnet50":
-      return resnet50(weights=spaceWeights)
-    elif spaceArch == "resnet50_custom":
-      model = resnet50(weights=spaceWeights)
+  def _get_model(self, SPACE_ARCH, SPACE_WEIGHTS, STATE_DICT):
+    if SPACE_ARCH == "resnet50":
+      return resnet50(weights=SPACE_WEIGHTS)
+    elif SPACE_ARCH == "resnet50-custom" and STATE_DICT:
+      model = resnet50(weights=SPACE_WEIGHTS)
       model.fc = nn.Identity()
-      model.load_state_dict(state_dict, strict=False)
+      model.load_state_dict(STATE_DICT, strict=False)
       return model
     else:
       raise ValueError("Invalid fx_modelType choice!")
@@ -105,12 +109,11 @@ class Spaceinator(nn.Module):
     elif features.dim() == 1:  # If it's a 1D tensor (features)
       writer.add_image(f"{layer}/{im_id}", features.unsqueeze(0).unsqueeze(0), fold)  # Add row col dims
   
-  # def classify(self, n_classes):
-    # self.model = get_resnet50(n_classes, model_weights=modelPreWeights, extract_features=False)  # Keeps last classifier layer
+  # def classify(self, N_CLASSES):
+    # self.model = get_resnet50(N_CLASSES, model_weights=modelPreWeights, extract_features=False)  # Keeps last classifier layer
 
   def load(self, path_from, layer=None):
-    layer = self.featureLayer
-    
+    layer = self.FEATURE_LAYER
     # print(layer, path_from)
     features = torch.load(os.path.join(path_from, os.listdir(path_from)[0]), weights_only=False, map_location="cpu") # single item on the dir [0]
     # print(features.keys())
@@ -123,9 +126,9 @@ class Spaceinator(nn.Module):
       # break
     example_feature = random_f[layer] # defaultdict of defaultdicts
     self.features = features
-    self.featureSize = example_feature.size(0) # assuming every value has the same dim
+    self.FEATURE_SIZE = example_feature.size(0) # assuming every value has the same dim
     print("\nE.g. Feature: ", example_feature.squeeze(-1).squeeze(-1))
-    print("Features Size: ", self.featureSize, '\n')
+    print("Features Size: ", self.FEATURE_SIZE, '\n')
 
   def export_features(self, dataloader, path_to, fold, device="cpu"):
     # _features features maps to external file
@@ -153,20 +156,23 @@ class Spaceinator(nn.Module):
 
 class Timeinator(nn.Module):
   ''' Receives [batch_size, in_channels, in_length] feature tensors
-      Outputs [batch_size, n_classes, in_length] further guesses
+      Outputs [batch_size, N_CLASSES, in_length] further guesses
   '''
-  def __init__(self, featureSize, n_classes, n_stages, n_blocks, n_filters, filterSize):
+  def __init__(self, FEATURE_SIZE, N_CLASSES, MODEL):
     super().__init__()
-    self.n_stages = n_stages
-    self.n_blocks = n_blocks
-    self.conv1x1_in = nn.Conv1d(featureSize, n_filters, kernel_size=1)
-    self.blocks = nn.ModuleList([copy.deepcopy(_TCBlock(n_filters, n_filters, filterSize, 2**b)) for b in range(n_blocks)])
-    self.conv_out = nn.Conv1d(n_filters, n_classes, kernel_size=1)
+
+    self.N_STAGES = MODEL["n_stages"]
+    N_BLOCKS = MODEL["n_blocks"]
+    N_FILTERS = MODEL["n_filters"]
+    TF_FILTER = MODEL["tf_filter"]
+    self.conv1x1_in = nn.Conv1d(FEATURE_SIZE, N_FILTERS, kernel_size=1)
+    self.blocks = nn.ModuleList([copy.deepcopy(_TCBlock(N_FILTERS, N_FILTERS, TF_FILTER, 2**b)) for b in range(N_BLOCKS)])
+    self.conv_out = nn.Conv1d(N_FILTERS, N_CLASSES, kernel_size=1)
 
   def forward(self, x):
     x = self.conv1x1_in(x)
     x_acm = x.unsqueeze(0)  # add dimension for accumulation stage results
-    for _ in range(self.n_stages):
+    for _ in range(self.N_STAGES):
       for block in self.blocks:
         x = block(x)
       x = F.softmax(self.conv_out(x), dim=1)  # get predictions from logits
@@ -192,28 +198,28 @@ class _TCBlock(nn.Module):
 """
 class Guesser(nn.Module):
   ''' Receives [batch_size, in_channels, in_length] feature tensors
-      Outputs [batch_size, n_classes, in_length] 1st guesses
+      Outputs [batch_size, N_CLASSES, in_length] 1st guesses
   '''
-  def __init__(self, featureSize, n_classes, n_blocks, n_filters, filterSize):
+  def __init__(self, FEATURE_SIZE, N_CLASSES, N_BLOCKS, N_FILTERS, filterSize):
     super().__init__()
-    self.n_blocks = n_blocks
-    self.conv1x1_in = nn.Conv1d(featureSize, n_filters, kernel_size=1) # adapts fv channel dimension
+    self.N_BLOCKS = N_BLOCKS
+    self.conv1x1_in = nn.Conv1d(FEATURE_SIZE, N_FILTERS, kernel_size=1) # adapts fv channel dimension
     
     ## ALternative Guesser: Using different blocks from Predictor
     # self.dconv1 = nn.ModuleList((
-    #   nn.Conv1d(n_filters, n_filters, filterSize, padding=2**(n_blocks - 1 - b), dilation=2**(n_blocks - 1 - b))
-    #             for b in range(n_blocks) ))
+    #   nn.Conv1d(N_FILTERS, N_FILTERS, filterSize, padding=2**(N_BLOCKS - 1 - b), dilation=2**(N_BLOCKS - 1 - b))
+    #             for b in range(N_BLOCKS) ))
     # self.dconv2 = nn.ModuleList((
-    #   nn.Conv1d(n_filters, n_filters, filterSize, padding=2**b, dilation=2**b)
-    #             for b in range(n_blocks )))
+    #   nn.Conv1d(N_FILTERS, N_FILTERS, filterSize, padding=2**b, dilation=2**b)
+    #             for b in range(N_BLOCKS )))
     # self.conv_fusion = nn.ModuleList((  # merge two previous
-    #   nn.Conv1d(2 * n_filters, n_filters, kernel_size=1) 
-    #             for _ in range(n_blocks) ))
+    #   nn.Conv1d(2 * N_FILTERS, N_FILTERS, kernel_size=1) 
+    #             for _ in range(N_BLOCKS) ))
     
     ## Same Guesser: Same blocks as improver
-    self.blocks = nn.ModuleList([copy.deepcopy(_TCBlock(n_filters, n_filters, filterSize, 2**b)) for b in range(n_blocks)])
+    self.blocks = nn.ModuleList([copy.deepcopy(_TCBlock(N_FILTERS, N_FILTERS, filterSize, 2**b)) for b in range(N_BLOCKS)])
     # self.dropout = nn.Dropout()
-    self.conv_out = nn.Conv1d(n_filters, n_classes, kernel_size=1)
+    self.conv_out = nn.Conv1d(N_FILTERS, N_CLASSES, kernel_size=1)
 
   def forward(self, x):
     x = self.conv1x1_in(x)
@@ -223,15 +229,15 @@ class Guesser(nn.Module):
     return x
 
 class Refiner(nn.Module):
-  ''' Receives [batch_size, n_classes, in_length] 1st guesses
-      Outputs [batch_size, n_classes, in_length] further guesses
+  ''' Receives [batch_size, N_CLASSES, in_length] 1st guesses
+      Outputs [batch_size, N_CLASSES, in_length] further guesses
   '''
-  def __init__(self, n_classes, n_stages, n_blocks, n_filters, filterSize):
+  def __init__(self, N_CLASSES, N_STAGES, N_BLOCKS, N_FILTERS, filterSize):
     super().__init__()
-    self.n_stages = n_stages
-    self.conv1x1_in = nn.Conv1d(n_classes, n_filters, kernel_size=1)
-    self.blocks = nn.ModuleList([copy.deepcopy(_TCBlock(n_filters, n_filters, filterSize, 2**b)) for b in range(n_blocks)])
-    self.conv_out = nn.Conv1d(n_filters, n_classes, kernel_size=1)
+    self.N_STAGES = N_STAGES
+    self.conv1x1_in = nn.Conv1d(N_CLASSES, N_FILTERS, kernel_size=1)
+    self.blocks = nn.ModuleList([copy.deepcopy(_TCBlock(N_FILTERS, N_FILTERS, filterSize, 2**b)) for b in range(N_BLOCKS)])
+    self.conv_out = nn.Conv1d(N_FILTERS, N_CLASSES, kernel_size=1)
   
   def forward(self, x):
     x = self.conv1x1_in(x)
@@ -270,11 +276,11 @@ def load_checkpoint(model, optimizer, path_checkpoint):
   print(f"Checkpoint loaded: Epoch {epoch}, Loss {loss}")
   return model, optimizer, epoch, loss
 
-def get_model(modelkey, n_classes, Spaceinator, guesser, refiner):
+def get_model(modelkey, N_CLASSES, Spaceinator, guesser, refiner):
   if modelkey == "spatial":
-    model = SurgeNet(n_classes, Spaceinator)
+    model = SurgeNet(N_CLASSES, Spaceinator)
   elif modelkey == "temporal":
-    model = SurgeNet(n_classes, Spaceinator, guesser, refiner)
+    model = SurgeNet(N_CLASSES, Spaceinator, guesser, refiner)
   else:
     raise ValueError("Invalid modelkey!")
   return model
