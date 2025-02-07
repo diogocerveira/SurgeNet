@@ -14,7 +14,6 @@ from torcheval.metrics import MulticlassAccuracy
 import argparse
 import yaml
 import random
-import torchvision.models.feature_extraction as fxs
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader
 import pickle
@@ -37,14 +36,14 @@ def learning(**the):
       Ctl.sample(the["DATA"]["path_rawVideos"], Ptk.path_samples, samplerate=the["PROCESS"]["samplerate"], filter_annotated=the["DATA"]["filter_annotated"])
     if the["PROCESS"]["label"]:  # label (csv file) image frames
       Ctl.label(Ptk.path_samples, Ptk.path_labels)
-
   Ctl.build_dataset(the["DATA"]["datasetId"], the["DATA"]["preprocessing"], the["DATA"]["return_extradata"])
+  
   # teaching.py (metrics, train validation, test)
   Tch = teaching.Teacher(the["TRAIN"], the["EVAL"], Ctl, DEVICE)
 
-  print(f"[run] {the['DATA']['datasetId']}-{RUN} | [device] {DEVICE}")
+  print(f"\n[run] {the['DATA']['datasetId']}-{RUN} | [device] {DEVICE}")
   print(f"[dataset] {the['DATA']['datasetId']} | {Ctl.N_CLASSES} classes")
-  print(f"[preprocessing] {Ctl.preprocessing}\t| {'Balanced' if Ctl.BALANCED else 'Unbalanced'}"); print(Ctl.labelToClass)
+  print(f"[preprocessing] {Ctl.preprocessing}\t | {'Balanced' if Ctl.BALANCED else 'Unbalanced'}"); print(Ctl.labelToClass)
   print(f"{Ctl.DATASET_SIZE} datapoints | Batch size of {the['TRAIN']['HYPER']['batchSize']} | {the['TRAIN']['k_folds']} folds | {the['TRAIN']['HYPER']['n_epochs']} epochs\n")
   highScore = 0.0
 
@@ -55,35 +54,38 @@ def learning(**the):
     if fold in the["TRAIN"]["skipFolds"]: continue
     print(f"Fold {fold + 1} split:\ttrain {train_videoIds}\n\t\tvalid {valid_videoIds}\n\t\ttest {test_videoIds}")
     logInfo = f"{the['DATA']['datasetId'].split('-')[0]}-{DATE}-{fold + 1}"  # model name for logging/saving
-    writer = SummaryWriter(os.path.join(Ptk.path_events, str(fold + 1))) # object for logging stats
+    writer = SummaryWriter(os.path.join(Ptk.path_events, logInfo)) # object for logging stats
 
     # Create the model
-    spaceinator = machine.Spaceinator(Ctl.N_CLASSES, the["MODEL"]["path_spaceModel"], the["MODEL"]["spaceArch"], the["MODEL"]["spaceWeights"])
-    timeinator = machine.Timeinator(spaceinator.FEATURE_SIZE, Ctl.N_CLASSES, the["MODEL"])
+    spaceinator = machine.Spaceinator(the["MODEL"], DEVICE, N_CLASSES=Ctl.N_CLASSES)
+    timeinator = machine.Timeinator(the["MODEL"], spaceinator.FEATURE_SIZE, Ctl.N_CLASSES)
     if the["MODEL"]["domain"] == "spatial":
       model = machine.SurgeNet(Ctl.N_CLASSES, [spaceinator])
       batchMode = "images"
-    if the["MODEL"]["domain"] == "temporal":
+    elif the["MODEL"]["domain"] == "temporal":
       spaceinator.load(Ptk.path_features)  # loads into Cataloguer dataset
       batchMode = "features"
       # Get actual data from the split indexs, collate and batch it to a dataloader trio
       model = machine.SurgeNet(Ctl.N_CLASSES, [timeinator])
-    if the["MODEL"]["domain"] == "full":
+    elif the["MODEL"]["domain"] == "full":
       batchMode = "images"
       model = machine.SurgeNet(Ctl.N_CLASSES, [spaceinator, timeinator])
+    else:
+      raise ValueError("Invalid domain choice!")
     trainloader, validloader, testloader = Ctl.batch(
-        the["batchSize"], batch_mode=batchMode, train_idx=train_idxs, valid_idx=valid_idxs, test_idx=test_idxs)
+        the["TRAIN"]["HYPER"]["batchSize"], batchMode, train_idx=train_idxs, valid_idx=valid_idxs, test_idx=test_idxs)
     
+
     # Feature extraction
-    if "fx_spatial" in the["PROCESS"] and "process" in the["GENERAL"]["actions"]:
+    if the["PROCESS"]["fx_spatial"] and "process" in the["GENERAL"]["actions"]:
       t1 = time.time()
-      spaceinator.export_features(DataLoader(Ctl.dataset, batch_size=the["batchSize"]), Ptk.path_features, fold, DEVICE)
+      spaceinator.export_features(DataLoader(Ctl.dataset, batch_size=the["TRAIN"]["HYPER"]["batchSize"]), Ptk.path_features, fold, DEVICE)
       t2 = time.time()
       print(f"Exporting features took {(t2 - t1) // 3600} hours and {(((t2 - t1) % 3600) / 60):.1f} minutes!")
 
     # Training
     if "train" in the["GENERAL"]["actions"]:
-      betterState = Tch.teach(model, trainloader, validloader, the["n_epochs"], fold, the["path_resume"],
+      betterState, valid_minLoss = Tch.teach(model, trainloader, validloader, the["TRAIN"]["HYPER"]["n_epochs"], logInfo,
           Ptk.path_checkpoints, writer)
       if the["TRAIN"]["save_betterModel"]:
         machine.save_model(Ptk.path_models, betterState, logInfo, DATE, 0.0, title="fold", fold=fold + 1)

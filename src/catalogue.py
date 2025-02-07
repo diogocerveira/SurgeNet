@@ -24,12 +24,6 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
-## SETUP ##
-seed = 53
-torch.manual_seed(seed)
-np.random.seed(seed)
-random.seed(seed)
-## SETUP ##
 
 class Showcaser:
   def __init__(self):
@@ -70,7 +64,7 @@ class SurgeryStillsDataset(Dataset):
     self.path_samples = path_samples
     self.path_labels = path_labels
     self.path_annots = path_annots
-    self.labels = self._get_labels(path_labels) # frame_id, video, frame_label
+    self.labels = self._get_labels(path_labels) # frameId, video, frame_label
     # print(self.labels.index)
     self.extradata = extradata
     # print(type(extradata))
@@ -85,53 +79,67 @@ class SurgeryStillsDataset(Dataset):
     
     self.N_CLASSES = len(self.labels["class"].unique())
   def __len__(self):
-    return len(self.labels)
+    length = 0
+    # count number of files (images) in the samples folder directories (sampled video folders)
+    for video in self.videoNames:
+      length += len(os.listdir(os.path.join(self.path_samples, video)))
+    if length != len(self.labels):
+      raise ValueError("Number of files in samples folder and labels.csv do not match!") 
+    return length
 
   def __getitem__(self, idx):
-    ''' Converts idx to a list if it is a tensor (useful for batch processing) '''
-    # print(f"Sending an idx of type {type(idx)}")
-    if torch.is_tensor(idx):
-      idx = idx.tolist()
-    elif isinstance(idx, np.ndarray):
-      idx = idx.tolist()
-    elif isinstance(idx, slice):
-      idx = list(range(*idx.indices(len(self.labels)))) # Convert slice to list
-
-    extra = []    
-    if isinstance(idx, list):  # For batch processing
-      # print(self.labels.iloc[idx[0], 0].split('_')[0])
-      path_imgs = [os.path.join(self.path_samples, self.labels.loc[i, "videoId"], self.labels.loc[i, "frame"] + ".png") for i in idx]
-      if self.extradata["id"]:
-        extra.append([self.labels.loc[i, "frame"] for i in idx]) 
-      if self.extradata["timestamp"]:
-        extra.append([[self.labels.loc[i, "frame"] for i in idx].split('_')[1] for i in idx]) 
-      if self.extradata["video"]:
-        extra.append([[self.labels.loc[i, "frame"] for i in idx].split('_')[0] for i in idx])
-
-      imgs = [iio.imread(p) for p in path_imgs]
-      labels = self.labels.loc[idx, "class"].tolist()
-      if self.transform:
-        imgs = [self.transform(img) for img in imgs]
-      imgs = torch.stack(imgs)  # Stack list of tensors into a single tensor
-      labels = torch.tensor(labels)  # Convert list of labels to tensor
-
-    else:  # For single index (using same return variables for these have only one element)
-      path_imgs = os.path.join(self.path_samples, self.labels.loc[idx, "videoId"], self.labels.loc[idx, "frame"] + ".png")
-
-      if self.extradata["id"]:
-        extra.append(self.labels.loc[idx, "frame"]) 
-      if self.extradata["timestamp"]:
-        extra.append(self.labels.loc[idx, "frame"].split('_')[1]) 
-      if self.extradata["video"]:
-        extra.append(self.labels.loc[idx, "frame"].split('_')[0])
-
-      imgs = iio.imread(path_imgs)
-      labels = self.labels.loc[idx, "class"]
-      if self.transform:
-          imgs = self.transform(imgs)
-      labels = torch.tensor(labels)  # Single label as tensor
-    return imgs, labels, *extra
+    """Retrieve a single item from the dataset based on an index"""
+    path_img = os.path.join(self.path_samples, self.labels.loc[idx, "videoId"],
+        self.labels.loc[idx, "frameId"] + ".png")
+    # Read images and labels
+    img = iio.imread(path_img)
+    label = self.labels.loc[idx, "class"]
+    if self.transform:
+      img = self.transform(img) # for now basic preprocessing assures that the image is a tensor
+    else:
+      img = torch.tensor(img)
+    labels = torch.tensor(label)
+    # Return as tuple, unpacking extras if available
+    return (img, labels, torch.tensor(idx))
   
+  def __getitems__(self, idxs):
+    """Retrieve items from the dataset based on index or list of indices."""
+    # Normalize the input index to a list
+    if isinstance(idxs, slice):  # Convert slice to list
+      idxs = list(range(*idxs.indices(len(self.labels))))
+    elif torch.is_tensor(idxs) or isinstance(idxs, np.ndarray):
+      idxs = idxs.tolist()
+    # each idx is a int tensor
+    path_imgs = [os.path.join(self.path_samples, self.labels.loc[i.item(), "videoId"],
+      self.labels.loc[i.item(), "frameId"] + ".png") for i in idxs]
+  
+    # Read images and labels
+    imgs = [iio.imread(p) for p in path_imgs]
+    labels = self.labels.loc[idxs, "class"].tolist()
+    if self.transform:
+      imgs = [self.transform(img) for img in imgs]
+    else:
+      imgs = [torch.tensor(img) for img in imgs]
+    imgs = torch.stack(imgs)
+    labels = torch.tensor(labels)
+    idxs = torch.tensor(idxs)
+    return list(zip(imgs, labels, idxs))
+
+  def get_extras(self, idxs):
+    if len(idxs) == 0:
+      idxs = [idxs]
+    extras = {key: [] for key in self.extradata if self.extradata[key]}  # Initialize extra data
+    for i in idxs:
+      frameId = self.labels.loc[i, "frameId"]
+      if self.extradata["frameId"]:
+        extras["frameId"].append(frameId)
+      if self.extradata["timestamp"]:
+        extras["timestamp"].append(frameId.split('_')[1])
+      if self.extradata["videoId"]:
+        extras["videoId"].append(frameId.split('_')[0])
+    extras = [extras[key] for key in extras]  # Convert lists to tensors
+    return extras
+    
   def _get_labels(self, path_labels):
     try:
       # print(path_labels, "\n\n", flush=True)
@@ -139,7 +147,7 @@ class SurgeryStillsDataset(Dataset):
       # print(df.columns)
       labels.reset_index(drop=True, inplace=True) # Create a new integer index and drop the old index
       # (Optional) Create a new column for videoId based on the frame column
-      labels['videoId'] = labels['frame'].str.split('_', expand=True)[0]
+      labels['videoId'] = labels['frameId'].str.split('_', expand=True)[0]
       # print(df.columns)
       # self.write_labels_csv(df, "deg.csv")
       return labels
@@ -198,9 +206,9 @@ class SurgeryStillsDataset(Dataset):
     valid_labels = labels[labels["frame"].apply(self.is_valid_frame)]
     return valid_labels.reset_index(drop=True)
 
-  def is_valid_frame(self, frame_id):
+  def is_valid_frame(self, frameId):
       ''' Checks if the frame exists in the dataset '''
-      frame_path = os.path.join(self.path_samples, frame_id.split('_')[0], f"{frame_id}.png")  # Adjust if necessary
+      frame_path = os.path.join(self.path_samples, frameId.split('_')[0], f"{frameId}.png")  # Adjust if necessary
       # if os.path.exists(frame_path): print("frame_path", frame_path)
       return os.path.exists(frame_path)
   """
@@ -297,8 +305,32 @@ class Cataloguer():
     self.classWeights = None
     self.BALANCED = None
     self.features = None
-    self.FEATURE_LAYER = None
 
+  def build_dataset(self, datasetId, preprocessing=None, extradata={}, update_labels=False):
+    ''' Get the Dataset objects according to the DATA_SCOPE'''
+    transform = self._get_preprocessing(preprocessing);
+    DATA_SCOPE = datasetId.split('-')[1]
+    if DATA_SCOPE == "local":
+      dataset = SurgeryStillsDataset(DATA_SCOPE, self.path_samples, self.path_labels,
+          self.path_annots, extradata, transform)    
+    elif DATA_SCOPE == "external":
+      train_dataset = datasets.CIFAR10(root=f"./data/{DATA_SCOPE}", train=True, download=True, transform=preprocessing)
+      test_dataset = datasets.CIFAR10(root=f"./data/{DATA_SCOPE}", train=False, download=True, transform=preprocessing)
+      dataset = (train_dataset, test_dataset)
+    else:
+      raise ValueError("Invalid DATA_SCOPE!")
+    
+    self.dataset = dataset
+    self.labelToClass = self._get_labelToClass()   # gets dict for getting class name from int value
+    self.N_CLASSES = dataset.N_CLASSES
+    self.DATASET_SIZE = self._get_datasetSize()
+    self.classWeights = self._get_classWeights()
+     # check if the class distribution is balanced
+    if all([self.classWeights[i] == self.classWeights[i + 1] for i in range(len(self.classWeights) - 1)]):
+      self.BALANCED = True
+    else:
+      self.BALANCED = False
+      
   def update_features(self, features, FEATURE_LAYER):
     self.features = features
     self.FEATURE_LAYER = FEATURE_LAYER
@@ -342,8 +374,6 @@ class Cataloguer():
 
     # print(f"Train idxs: {train_idx}\nValid idxs: {valid_idx}\nTest idxs: {test_idx}")
     # return train_idx, valid_idx, test_idx
-
-  
   def batch(self, batchSize, batchMode, train_idx=None, valid_idx=None, test_idx=None):
     ''' helper for loading data, features or stopping when fx_mode == 'export'
     '''
@@ -357,23 +387,26 @@ class Cataloguer():
   def _batch_images(self, batchSize, train_idx=None, valid_idx=None, test_idx=None):
     loaders = {}
     if self.dataset.DATA_SCOPE == "local":
-      if train_idx:
-        loaders["trainloader"] = DataLoader(dataset=self.dataset, batch_size=batchSize, sampler=torch.utils.data.SubsetRandomSampler(train_idx))
-      if valid_idx:
+      if train_idx is not None and np.any(train_idx):
+        loaders["trainloader"] = DataLoader(dataset=self.dataset, batch_size=batchSize, sampler=torch.utils.data.SubsetRandomSampler(torch.tensor(train_idx)))
+      if valid_idx is not None and np.any(valid_idx):
         loaders["validloader"] = DataLoader(dataset=self.dataset, batch_size=batchSize, sampler=torch.utils.data.SubsetRandomSampler(valid_idx))
-      if test_idx.any():
+      if test_idx is not None and np.any(test_idx):
         loaders["testloader"] = DataLoader(dataset=self.dataset, batch_size=batchSize, sampler=torch.utils.data.SubsetRandomSampler(test_idx))
     elif self.dataset.DATA_SCOPE == "external":
       # test_idx actually carries the test part of the dataset when using CIFAR-10
-      if train_idx:
+      if train_idx is not None and np.any(train_idx):
         loaders["trainloader"] = DataLoader(dataset=self.dataset[0], batch_size=batchSize, sampler=torch.utils.data.SubsetRandomSampler(train_idx))
-      if valid_idx:
+      if valid_idx is not None and np.any(valid_idx):
         loaders["validloader"] = DataLoader(dataset=self.dataset[0], batch_size=batchSize, sampler=torch.utils.data.SubsetRandomSampler(valid_idx))
-      if test_idx:
+      if test_idx is not None and np.any(test_idx):
         loaders["testloader"] = DataLoader(dataset=test_idx, batch_size=batchSize, shuffle=True)
       # print(next(trainloader).shape)
-    return loaders
+    return loaders.values()
   
+  def _collate_images(batch):
+    pass
+
   def _collate_features(batch):
     # Pad features to the same length
     maxLen = max(feat.size(-1) for feat, _, _ in batch)
@@ -427,31 +460,6 @@ class Cataloguer():
     # assert 1 == 0
 
     return loader # trainloader, validloader, testloader
-
-  def build_dataset(self, datasetId, preprocessing=None, extradata={}, update_labels=False):
-    ''' Get the Dataset objects according to the DATA_SCOPE'''
-    transform = self._get_preprocessing(preprocessing);
-    DATA_SCOPE = datasetId.split('-')[1]
-    if DATA_SCOPE == "local":
-      dataset = SurgeryStillsDataset(DATA_SCOPE, self.path_samples, self.path_labels,
-          self.path_annots, extradata, transform)    
-    elif DATA_SCOPE == "external":
-      train_dataset = datasets.CIFAR10(root=f"./data/{DATA_SCOPE}", train=True, download=True, transform=preprocessing)
-      test_dataset = datasets.CIFAR10(root=f"./data/{DATA_SCOPE}", train=False, download=True, transform=preprocessing)
-      dataset = (train_dataset, test_dataset)
-    else:
-      raise ValueError("Invalid DATA_SCOPE!")
-    
-    self.dataset = dataset
-    self.labelToClass = self._get_labelToClass()   # gets dict for getting class name from int value
-    self.N_CLASSES = dataset.N_CLASSES
-    self.DATASET_SIZE = self._get_datasetSize()
-    self.classWeights = self._get_classWeights()
-     # check if the class distribution is balanced
-    if all([self.classWeights[i] == self.classWeights[i + 1] for i in range(len(self.classWeights) - 1)]):
-      self.BALANCED = True
-    else:
-      self.BALANCED = False
   
   def _get_datasetSize(self):
     if self.dataset.DATA_SCOPE == "local":
@@ -527,10 +535,10 @@ class Cataloguer():
   def sample(self, path_videos, path_to, samplerate=1, filter_annotated=True):
     ''' Sample rawdata videos into image frames while saving the annotations in its splitset csv''' 
     # Generator function to yield frames and their corresponding data
-    def generate_frames(frames_chosen, video_id, path_frames):
+    def generate_frames(frames_chosen, videoId, path_frames):
       for ts, frame_img in frames_chosen:
-        frame_id = f"{video_id}-{ts}"  # remember basename is the file name itself
-        path_frame = os.path.join(path_frames, f"{frame_id}.png")
+        frameId = f"{videoId}-{ts}"  # remember basename is the file name itself
+        path_frame = os.path.join(path_frames, f"{frameId}.png")
         yield (path_frame, frame_img)
 
     print(f"\n{os.path.splitext(path_videos)[0]} for {len(os.listdir(path_videos))} videos!")
@@ -560,7 +568,7 @@ class Cataloguer():
       print(f"Time taken for getting frames: {end_time - start_time} seconds")  
       frames = generate_frames(framesChosen, videoId, path_to) # process frames one by one
       for path_frame, frameImg in frames:  # Batch write frames and annotations
-        # print(f"Writing {frame_id} to {path_frame}")
+        # print(f"Writing {frameId} to {path_frame}")
         # start_time = time.time()
         iio.imwrite(path_frame, frameImg, format="png")
         # end_time = time.time()
@@ -588,6 +596,7 @@ class Cataloguer():
         if l.isdigit():
           return (l, protoclass[protoclass.find(l) + 3:])
 
+    open(path_to, 'w', newline='')  # recreate the file if it doesn't exist
     for sampledVideoId in os.listdir(path_from):
       # Check if video is annotated and if yes proccess annotations
       path_annot = os.path.join(self.path_annots, f"{sampledVideoId}.json")  # splitext[0] gets before .
@@ -603,16 +612,16 @@ class Cataloguer():
         classes = [parse_class(p)[0] for p in protoclasses]
         ts_n_classes = list(zip(timestamps, classes))
         # print("ts_n_classes: ", ts_n_classes)
-        samplesId = os.listdir(os.path.join(path_from, sampledVideoId))
-        samplesClass = [get_class(int(os.path.splitext(sampleId.split('_')[1])[0]), ts_n_classes) for sampleId in samplesId]
-        # print(f"Samples ID: {samplesId}, Samples Class: {samplesClass}")
+        framesId = [os.path.splitext(f)[0] for f in os.listdir(os.path.join(path_from, sampledVideoId))]
+        framesClass = [get_class(int(os.path.splitext(frameId.split('_')[1])[0]), ts_n_classes) for frameId in framesId]
+        # print(f"Samples ID: {framesId}, Samples Class: {framesClass}")
         # Prepare CSV file
         with open(path_to, 'a', newline='') as file_csv:  # newline='' maximizes compatibility with other os
-          fieldNames = ['frame', 'class']
+          fieldNames = ['frameId', 'class']
           writer = csv.DictWriter(file_csv, fieldnames=fieldNames)
           if os.stat(path_to).st_size == 0: # Check if the file is empty to write the header
             writer.writeheader()
           # Batch write frames and annotations
-          for sampleId, sampleClass in zip(samplesId, samplesClass):
-            writer.writerow({'frame': sampleId, 'class': sampleClass})
+          for frameId, sampleClass in zip(framesId, framesClass):
+            writer.writerow({'frameId': frameId, 'class': sampleClass})
     

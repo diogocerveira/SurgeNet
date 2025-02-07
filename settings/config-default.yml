@@ -12,28 +12,29 @@ DATA:
   datasetId: LDSSlite-local  # (ldss-local, cifar10-ext)
   preprocessing: basic  # basic, augmentation
   return_extradata: # for local dataset (extends __getitem__() return beyond datapoint and label)
-    sampleId: True
+    frameId: True
     videoId: False
     timestamp: False
   path_rawVideos: 
 
 PROCESS:  # Process
   sample: False
-  label: True
-  update_labels: True
+  label: False
+  update_labels: False
   samplerate: 1 # Hz
   filter_annotated: True
   apply_modeFilter: True
   path_bundle: True
   export_modedPreds: True  # if apply-mode-filter == True
-  fx_spatial: False
+  fx_spatial: True
 
 MODEL:  # for models created/trained in the run 
-  domain: temporal # spatial, temporal, full
+  domain: spatial # spatial, temporal, full
 # spatial
   spaceWeights: default # sfx = spatial feature extraction
   spaceArch: resnet50
-  path_spaceModel: #logs/LDSS-24110400/train/checkpoints/LDSS-20241104-00-fold6-0.837800.pth # if empty, uses new untrained one
+  n_classes: 6  # normally get from dataset itself
+  path_spaceModel: #C:/Users/DC/Documents/Programming/python/ucl/ML_SurgeNet/logs/LDSS/run_20241104-00/checkpoints/LDSS-20241104-00-fold6-0.837800.pth # if empty, uses new untrained one
 # temporal
   n_stages: 3
   n_filters: 64  # number of convolution filters == number of channels inside a stage
@@ -42,7 +43,7 @@ MODEL:  # for models created/trained in the run
 
 TRAIN:
   train_point: start # (start, resume)
-  path_resumeModel: null  # to continue training from a checkpoint model if train-point == resume
+  path_resumeModel: None  # to continue training from a checkpoint model if train-point == resume
   save_checkpoints: True
   checkpointRate: 5 # epoch frequency to save a checkpoint
   save_betterModel: True

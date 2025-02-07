@@ -18,22 +18,19 @@ class SurgeNet(nn.Module):
   ''' Receives [batch_size, in_channels, in_length] 1st guesses
       Outputs [output_stage_id, batch_size, N_CLASSES, in_length] further guesses
   '''
-  def __init__(self, N_CLASSES, spatinator, tempinator):
+  def __init__(self, N_CLASSES, inators):
     super().__init__()
     self.N_CLASSES = N_CLASSES
-    self.Spaceinator = spatinator
-    self.Timeinator = tempinator
-  def forward(self, x):
-    # print("In Shape: ", x.shape)
-    x = self.Spaceinator(x)  # running offline the features are fed as data
-    # print("FEX Shape: ", x.shape)
-    x = self.Timeinator(x)
-    return x
+    self.inators = inators  # separate model list composing the overall model
+    self.model = nn.Sequential(*inators)
     
-  
+  def forward(self, x):
+    print("Input shape: ", x.shape)
+    x = self.model(x)
+    print("Output shape: ", x.shape)
+    return x
   def classify(self, x):
     return False
-
   def dry_run(self, layer, in_shape=[2, 3, 244, 244]):
     rnd_in = torch.randn(*in_shape)
     with torch.no_grad():
@@ -49,53 +46,54 @@ class Spaceinator(nn.Module):
               _features: train and _features features in runtime
               load: load presaved features and forward them
   '''
-  def __init__(self, N_CLASSES, path_spaceModel=None, SPACE_ARCH=None, SPACE_WEIGHTS=None, nodesToExtract={}):
+  def __init__(self, MODEL, DEVICE, N_CLASSES=None):
     super().__init__()
-
-    SPACE_WEIGHTS = self._get_preweights(SPACE_WEIGHTS)
-    if path_spaceModel:
-      STATE_DICT = torch.load(path_spaceModel, weights_only=False)
-    else:
-      STATE_DICT = None
-    self.spaceModel = self._get_model(SPACE_ARCH, SPACE_WEIGHTS, STATE_DICT)  # to implement my own in model.py
-    # fx_stateDict = torch.load(path_model, weights_only=False)
-    self.FEATURE_LAYER = fxs.get_graph_node_names(self.spaceModel)[0][-2]  # last is fc converted to identity so -2 for flattemed feature vectors
-    print(self.FEATURE_LAYER)  # get the last layer
-    self.nodesToExtract = [self.FEATURE_LAYER]
-    if SPACE_ARCH == "resnet50" or SPACE_ARCH == "resnet50-custom":
-      self.FEATURE_SIZE = 2048 # default for resnet50
+    self.classifier = True if N_CLASSES else False
+    self.N_CLASSES = N_CLASSES
+    SPACE_ARCH = MODEL["spaceArch"]
+    SPACE_WEIGHTS = self._get_preweights(MODEL["spaceWeights"])
+    path_spaceModel = MODEL["path_spaceModel"]
+    STATE_DICT = torch.load(path_spaceModel, weights_only=False, map_location=DEVICE) if path_spaceModel else None
+    self.FEATURE_SIZE = 2048 if (SPACE_ARCH == "resnet50" or SPACE_ARCH == "resnet50-custom") else None # default for resnet50
     self.features = None
-    # train_nodes, eval_nodes = fx.get_graph_node_names(self.model)
+
+    self.spaceModel = self._get_model(SPACE_ARCH, SPACE_WEIGHTS, STATE_DICT, N_CLASSES)  # to implement my own in model.py    
+    # print(self.spaceModel)
+    # print(self.spaceModel.parameters())
+    self.FEATURE_NODE = fxs.get_graph_node_names(self.spaceModel)[0][-2] # -2 is the flatten node (virtual layer)
+    # train_nodes, eval_nodes = fx.get_graph_node_names(self.spaceModel)
     # print(train_nodes == eval_nodes, end='\t'); print(train_nodes)
-    # print(list(model.children()))
+    # print(list(self.spaceModel.children()))
+    print("Feature size: ", self.FEATURE_SIZE, "\tnode: ", self.FEATURE_NODE)
+
   def forward(self, x):
-    return self.spaceModel(x)
+    x = self.spaceModel(x)
+    print("After Spaceinator Shape: ", x.shape)
+    return x
   def get_featureSize(self, x):
     pass
-  
+  def _get_model(self, SPACE_ARCH, SPACE_WEIGHTS, STATE_DICT, N_CLASSES):
+    if SPACE_ARCH == "resnet50":
+      model = resnet50(weights=SPACE_WEIGHTS)
+      model.fc = nn.Linear(self.FEATURE_SIZE, N_CLASSES)
+    elif SPACE_ARCH == "resnet50-custom" and STATE_DICT:
+      model = resnet50(weights=SPACE_WEIGHTS)
+      if self.classifer:
+        model.fc = nn.Linear(self.FEATURE_SIZE, N_CLASSES)
+      else: # no classification layer
+        model.fc = nn.Identity()
+      model.load_state_dict(STATE_DICT, strict=False)
+    else:
+      raise ValueError("Invalid space architecture &/or path to fx_model choice!")
+    return model
+
   def _get_preweights(self, weights):
     if weights == "default":
       return ResNet50_Weights.DEFAULT # https://pytorch.org/vision/main/models/generated/torchvision.models.resnet50.html#torchvision.models.ResNet50_Weights
-    elif weights == None:
+    elif not weights:
       return None
     else:
       raise ValueError("Invalid preweight choice!")
-  
-  def _get_model(self, SPACE_ARCH, SPACE_WEIGHTS, STATE_DICT):
-    if SPACE_ARCH == "resnet50":
-      return resnet50(weights=SPACE_WEIGHTS)
-    elif SPACE_ARCH == "resnet50-custom" and STATE_DICT:
-      model = resnet50(weights=SPACE_WEIGHTS)
-      model.fc = nn.Identity()
-      model.load_state_dict(STATE_DICT, strict=False)
-      return model
-    else:
-      raise ValueError("Invalid fx_modelType choice!")
-  def _extract(self, images, nodes=None):
-    # Extract features at specified nodes
-    if not nodes:
-      nodes = self.nodesToExtract
-    return fx.create_feature_extractor(self.model, return_nodes=nodes)(images)
   
   def log_features(self, writer, features, layer, im_id, fold):
     # print(features.shape)
@@ -113,7 +111,7 @@ class Spaceinator(nn.Module):
     # self.model = get_resnet50(N_CLASSES, model_weights=modelPreWeights, extract_features=False)  # Keeps last classifier layer
 
   def load(self, path_from, layer=None):
-    layer = self.FEATURE_LAYER
+    layer = self.FEATURE_NODE
     # print(layer, path_from)
     features = torch.load(os.path.join(path_from, os.listdir(path_from)[0]), weights_only=False, map_location="cpu") # single item on the dir [0]
     # print(features.keys())
@@ -130,16 +128,20 @@ class Spaceinator(nn.Module):
     print("\nE.g. Feature: ", example_feature.squeeze(-1).squeeze(-1))
     print("Features Size: ", self.FEATURE_SIZE, '\n')
 
-  def export_features(self, dataloader, path_to, fold, device="cpu"):
+  def _extract(self, images, nodesToExtract):
+    # Extract features at specified nodes
+    return fx.create_feature_extractor(self.model, return_nodes=nodesToExtract)(images)
+
+  def export_features(self, dataloader, path_to, fold, nodesToExtract={}, device="cpu"):
     # _features features maps to external file
     assert os.path.isdir(path_to), "Invalid features export path!"
-    out_features = defaultdict(Spaceinator.getdd)  # default: ddict of features (at multiple nodes/layers) for each frame
+    out_features = defaultdict(self.getdd)  # default: ddict of features (at multiple nodes/layers) for each frame
     self.model.eval().to(device) 
     with torch.no_grad():
       for bi, batch in enumerate(dataloader):
         # print('\n', "batch", bi)
         images, ids = batch[0].to(device), batch[2]
-        features = self._extract(images)
+        features = self._extract(images, nodesToExtract)
         for layer in features:
           # print(features[layer].shape)
           for im_id, fs in zip(ids, features[layer]): # Save features from chosen nodes/layers for each image ID
@@ -158,7 +160,7 @@ class Timeinator(nn.Module):
   ''' Receives [batch_size, in_channels, in_length] feature tensors
       Outputs [batch_size, N_CLASSES, in_length] further guesses
   '''
-  def __init__(self, FEATURE_SIZE, N_CLASSES, MODEL):
+  def __init__(self, MODEL, FEATURE_SIZE, N_CLASSES):
     super().__init__()
 
     self.N_STAGES = MODEL["n_stages"]
@@ -184,7 +186,7 @@ class _TCBlock(nn.Module):
   def __init__(self, in_channels, out_channels, filterSize, dilation):
     super().__init__()
     self.dconv = nn.Conv1d(in_channels, out_channels, kernel_size=filterSize, padding=dilation, dilation=dilation)
-    self.conv1x1 = nn.Conv1d(out_channels, out_channels, kernel_size=1) # filter with time size 1
+    self.conv1x1 = nn.Conv1d(out_channels, out_channels, kernel_size=1) # filter with time frame 1
     self.dropout = nn.Dropout()
   
   def forward(self, x):
@@ -275,15 +277,6 @@ def load_checkpoint(model, optimizer, path_checkpoint):
   loss = checkpoint['loss']
   print(f"Checkpoint loaded: Epoch {epoch}, Loss {loss}")
   return model, optimizer, epoch, loss
-
-def get_model(modelkey, N_CLASSES, Spaceinator, guesser, refiner):
-  if modelkey == "spatial":
-    model = SurgeNet(N_CLASSES, Spaceinator)
-  elif modelkey == "temporal":
-    model = SurgeNet(N_CLASSES, Spaceinator, guesser, refiner)
-  else:
-    raise ValueError("Invalid modelkey!")
-  return model
 
 '''
 class FirstNet(nn.Module):

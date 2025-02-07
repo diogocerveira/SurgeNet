@@ -30,17 +30,17 @@ class Teacher():
 
     self.highScore = -np.inf
     self.bestState = {}
-
     
-  def teach(self, model, trainloader, validloader, n_epochs, logInfo, path_resume, path_checkpoints, writer):
+  def teach(self, model, trainloader, validloader, n_epochs, logInfo, path_checkpoints, writer, path_resume=None):
     ''' Iterate through folds and epochs of model learning with training and validation
         In: Untrained model, data, etc
         Out: Trained model (state_dict)
     '''
-    
+    if not list(model.parameters()):
+      raise ValueError("Model parameters are empty/invalid. Check model initialization.")
     earlyStopper = EarlyStopper()
-    optimizer = optim.SGD(model.parameters(), learningRate=self.trainer.learningRate, MOMENTUM=self.trainer.MOMENTUM)
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=self.trainer.STEP_SIZE, GAMMA=self.trainer.GAMMA) # updates the optimizer by the GAMMA factor after the step_size
+    optimizer = optim.SGD(model.parameters(), lr=self.trainer.learningRate, momentum=self.trainer.MOMENTUM)
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=self.trainer.STEP_SIZE, gamma=self.trainer.GAMMA) # updates the optimizer by the GAMMA factor after the step_size
     # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=50)
 
     betterState, valid_minLoss = {}, np.inf
@@ -52,9 +52,9 @@ class Teacher():
 
     for epoch in range(startEpoch, n_epochs):
       print(f"     Epoch {epoch + 1}")
-      train_loss, train_score = self.trainer.train(model, trainloader, self.criterion, optimizer, epoch)
+      train_loss, train_score = self.trainer.train(model, trainloader, optimizer, epoch)
       # assert 1 == 0
-      valid_loss, valid_score = self.validater.validate(model, validloader, self.criterion, epoch)
+      valid_loss, valid_score = self.validater.validate(model, validloader, epoch)
 
       writer.add_scalar("Loss/train", train_loss, epoch + 1)
       writer.add_scalar("Loss/valid", valid_loss, epoch + 1)
@@ -75,7 +75,7 @@ class Teacher():
         path_checkpoint = os.path.join(path_checkpoints, f"{logInfo}_e{epoch + 1}_cp.pth")
         machine.save_checkpoint(model, optimizer, epoch, valid_loss, path_checkpoint)
       
-    return betterState
+    return betterState, valid_minLoss
 
   def evaluate(self, test_bundle, EVAL, fold, writer, date, N_CLASSES, labelToClass, path_eval=None, path_aprfc=None, path_phaseCharts=None):
     # print(predictions[0], targets[0], imageIds[0])
