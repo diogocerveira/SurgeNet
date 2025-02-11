@@ -533,18 +533,18 @@ class Cataloguer():
       raise ValueError("Invalid preprocessing key")
     return transform
     
-  def sample(self, path_rawVideos, path_to, samplerate=1, filter_annotated=True):
+  def sample(self, path_rawVideos, path_to, samplerate=1, preprocess="LDSS", filter_annotated=True):
     ''' Sample rawdata videos into image frames while saving the annotations in its splitset csv''' 
     # Generator function to yield frames and their corresponding data
     path_videos = os.path.join(path_rawVideos, "videos")
     path_annots = os.path.join(path_rawVideos, "annotations")
-    def generate_frames(frames_chosen, videoId, path_frames):
+    def generate_frames(frames_chosen, videoId, path_frames, processing):
       for ts, frame_img in frames_chosen:
         frameId = f"{videoId}-{ts}"  # remember basename is the file name itself
         path_frame = os.path.join(path_frames, f"{frameId}.png")
-        yield (path_frame, frame_img)
+        yield (path_frame, processing(frame_img))
     print(path_videos)
-    availableVideos = [vid for vid in os.listdir(path_videos) if not vid.startswith('.')]
+    availableVideos = [vid for vid in os.listdir(path_videos) if not vid.startswith(('.', '_'))]
     print(f"\n{os.path.splitext(path_videos)[0]} for {len(availableVideos)} videos!")
     print(f"Sample rate of {samplerate} fps")
     for videoId in availableVideos:
@@ -555,10 +555,9 @@ class Cataloguer():
       nframes = int(metadata["duration"] * fps)
       print(f"\nSampling {videoId} ({nframes} frames at {fps} fps)")
       period = int(fps / samplerate)
-      # Check if video is annotated and if yes proccess annotations
+
       if filter_annotated:
         path_annot = os.path.join(path_annots, f"{os.path.splitext(videoId)[0]}.json")
-
         if not os.path.exists(path_annot):
           continue
       try:
@@ -566,22 +565,30 @@ class Cataloguer():
       except:
         videoId = os.path.splitext(videoId)[0]  # if smaller name only remove ext
       shutil.copy(path_annot, os.path.join(self.path_annots, f"{videoId}.json"))
-      
       path_frames = os.path.join(path_to, videoId)
       os.makedirs(path_frames, exist_ok=True)
-    
+      # Reading frames
       start_time = time.time()
       get_frame = lambda i: iio.imread(path_video, index=i, plugin="pyav") # function for getting an indexed frame in the video
       # generator of sampled frames, converting index to its timestamp (ms)
       framesChosen = ((int(f / fps * 1000), get_frame(f)) for f in range(0, nframes, period))
       # print(frames_chosen[0])
       end_time = time.time()
+      print(f"Reading frames took: {end_time - start_time} sec")
+      # Processing frames
+      start_time = time.time()
+      if processing == "LDSS":
+        processing = lambda frame_img: np.array(Image.fromarray(frame_img).crop((240, 0, 1680, 1080)).resize((224, 224)))
+      else:
+        processing = lambda frame_img: frame_img
+      frames = generate_frames(framesChosen, videoId, path_frames, processing) # process frames one by one
+      end_time = time.time()
       print(f"Processing frames took: {end_time - start_time} sec")  
-      frames = generate_frames(framesChosen, videoId, path_frames) # process frames one by one
+      # Writing frames
       start_time = time.time()
       for path_frame, frameImg in frames:  # Batch write frames and annotations
         # print(f"Writing {frameId} to {path_frame}")
-        iio.imwrite(path_frame, frameImg, format="png")
+        iio.imwrite(path_frame, frameImg, format="jpg")
       end_time = time.time()
       print(f"Frame writing took: {end_time - start_time} sec")
         
