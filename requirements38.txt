@@ -1,0 +1,17 @@
+
+chardet
+imageio
+matplotlib
+numpy
+pandas
+pillow
+scikit-learn
+scipy
+seaborn
+tensorboard
+tensorboard-data-server
+tensorboard-plugin-wit
+torch
+torcheval
+torchvision
+pyyaml

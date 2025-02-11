@@ -4,7 +4,7 @@ import pandas as pd
 import json
 import chardet
 import random
-import imageio as iio
+import imageio.v3 as iio
 import torch
 from torchvision import datasets
 import numpy as np
@@ -15,6 +15,7 @@ from torch.utils.data import DataLoader
 import time
 from torchvision.transforms import v2 as transforms
 import sys
+import shutil
 import torch.nn as nn
 from torcheval.metrics import MulticlassAccuracy, MulticlassPrecision, MulticlassRecall, MulticlassF1Score, MulticlassConfusionMatrix
 from . import utils
@@ -532,18 +533,22 @@ class Cataloguer():
       raise ValueError("Invalid preprocessing key")
     return transform
     
-  def sample(self, path_videos, path_to, samplerate=1, filter_annotated=True):
+  def sample(self, path_rawVideos, path_to, samplerate=1, filter_annotated=True):
     ''' Sample rawdata videos into image frames while saving the annotations in its splitset csv''' 
     # Generator function to yield frames and their corresponding data
+    path_videos = os.path.join(path_rawVideos, "videos")
+    path_annots = os.path.join(path_rawVideos, "annotations")
     def generate_frames(frames_chosen, videoId, path_frames):
       for ts, frame_img in frames_chosen:
         frameId = f"{videoId}-{ts}"  # remember basename is the file name itself
         path_frame = os.path.join(path_frames, f"{frameId}.png")
         yield (path_frame, frame_img)
-
-    print(f"\n{os.path.splitext(path_videos)[0]} for {len(os.listdir(path_videos))} videos!")
-
-    for videoId in os.listdir(path_videos):
+    print(path_videos)
+    availableVideos = [vid for vid in os.listdir(path_videos) if not vid.startswith('.')]
+    print(f"\n{os.path.splitext(path_videos)[0]} for {len(availableVideos)} videos!")
+    print(f"Sample rate of {samplerate} fps")
+    for videoId in availableVideos:
+      #videoId = os.path.splitext(videoId)[0]  # remove extension
       path_video = os.path.join(path_videos, videoId)
       metadata = iio.immeta(path_video, plugin="pyav")  
       fps = metadata["fps"]
@@ -552,12 +557,18 @@ class Cataloguer():
       period = int(fps / samplerate)
       # Check if video is annotated and if yes proccess annotations
       if filter_annotated:
-        path_annot = os.path.join(self.path_annots, f"{videoId}.json")
+        path_annot = os.path.join(path_annots, f"{os.path.splitext(videoId)[0]}.json")
+
         if not os.path.exists(path_annot):
           continue
-      videoId = videoId[:4]  # keep only 1st 4 chars of the video name
-      path_to = os.path.join(path_videos, videoId)
-      os.makedirs(path_to, exist_ok=True)
+      try:
+        videoId = videoId[:4]  # keep only 1st 4 chars of the video name
+      except:
+        videoId = os.path.splitext(videoId)[0]  # if smaller name only remove ext
+      shutil.copy(path_annot, os.path.join(self.path_annots, f"{videoId}.json"))
+      
+      path_frames = os.path.join(path_to, videoId)
+      os.makedirs(path_frames, exist_ok=True)
     
       start_time = time.time()
       get_frame = lambda i: iio.imread(path_video, index=i, plugin="pyav") # function for getting an indexed frame in the video
@@ -565,14 +576,14 @@ class Cataloguer():
       framesChosen = ((int(f / fps * 1000), get_frame(f)) for f in range(0, nframes, period))
       # print(frames_chosen[0])
       end_time = time.time()
-      print(f"Time taken for getting frames: {end_time - start_time} seconds")  
-      frames = generate_frames(framesChosen, videoId, path_to) # process frames one by one
+      print(f"Processing frames took: {end_time - start_time} sec")  
+      frames = generate_frames(framesChosen, videoId, path_frames) # process frames one by one
+      start_time = time.time()
       for path_frame, frameImg in frames:  # Batch write frames and annotations
         # print(f"Writing {frameId} to {path_frame}")
-        # start_time = time.time()
         iio.imwrite(path_frame, frameImg, format="png")
-        # end_time = time.time()
-        # print(f"Time taken for writing frame: {end_time - start_time} seconds")
+      end_time = time.time()
+      print(f"Frame writing took: {end_time - start_time} sec")
         
   def label(self, path_from, path_to):
     ''' Sample rawdata videos into image frames while saving the annotations in its splitset csv'''
