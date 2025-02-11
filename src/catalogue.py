@@ -8,7 +8,7 @@ import imageio.v3 as iio
 import torch
 from torchvision import datasets
 import numpy as np
-import PIL as Image
+from PIL import Image
 from sklearn.model_selection import KFold, GroupKFold, train_test_split
 from torchvision import datasets
 from torch.utils.data import DataLoader
@@ -533,7 +533,7 @@ class Cataloguer():
       raise ValueError("Invalid preprocessing key")
     return transform
     
-  def sample(self, path_rawVideos, path_to, samplerate=1, preprocess="LDSS", filter_annotated=True):
+  def sample(self, path_rawVideos, path_to, samplerate=1, processing="LDSS", filter_annotated=True):
     ''' Sample rawdata videos into image frames while saving the annotations in its splitset csv''' 
     # Generator function to yield frames and their corresponding data
     path_videos = os.path.join(path_rawVideos, "videos")
@@ -541,7 +541,7 @@ class Cataloguer():
     def generate_frames(frames_chosen, videoId, path_frames, processing):
       for ts, frame_img in frames_chosen:
         frameId = f"{videoId}-{ts}"  # remember basename is the file name itself
-        path_frame = os.path.join(path_frames, f"{frameId}.png")
+        path_frame = os.path.join(path_frames, f"{frameId}.jpeg")
         yield (path_frame, processing(frame_img))
     print(path_videos)
     availableVideos = [vid for vid in os.listdir(path_videos) if not vid.startswith(('.', '_'))]
@@ -588,7 +588,7 @@ class Cataloguer():
       start_time = time.time()
       for path_frame, frameImg in frames:  # Batch write frames and annotations
         # print(f"Writing {frameId} to {path_frame}")
-        iio.imwrite(path_frame, frameImg, format="jpg")
+        iio.imwrite(path_frame, frameImg, format="jpeg")
       end_time = time.time()
       print(f"Frame writing took: {end_time - start_time} sec")
         
