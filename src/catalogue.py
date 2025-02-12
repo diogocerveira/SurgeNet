@@ -541,7 +541,7 @@ class Cataloguer():
     def generate_frames(frames_chosen, videoId, path_frames, processing):
       for ts, frame_img in frames_chosen:
         frameId = f"{videoId}-{ts}"  # remember basename is the file name itself
-        path_frame = os.path.join(path_frames, f"{frameId}.jpeg")
+        path_frame = os.path.join(path_frames, f"{frameId}.png")
         yield (path_frame, processing(frame_img))
     print(path_videos)
     availableVideos = [vid for vid in os.listdir(path_videos) if not vid.startswith(('.', '_'))]
@@ -579,6 +579,7 @@ class Cataloguer():
       start_time = time.time()
       if processing == "LDSS":
         processing = lambda frame_img: np.array(Image.fromarray(frame_img).crop((240, 0, 1680, 1080)).resize((224, 224)))
+        print("here")
       else:
         processing = lambda frame_img: frame_img
       frames = generate_frames(framesChosen, videoId, path_frames, processing) # process frames one by one
@@ -588,7 +589,7 @@ class Cataloguer():
       start_time = time.time()
       for path_frame, frameImg in frames:  # Batch write frames and annotations
         # print(f"Writing {frameId} to {path_frame}")
-        iio.imwrite(path_frame, frameImg, format="jpeg")
+        iio.imwrite(path_frame, frameImg, format="png")
       end_time = time.time()
       print(f"Frame writing took: {end_time - start_time} sec")
         

@@ -3,3 +3,5 @@ logs/
 models/
 notes/
 __pycache__/
+.vscode
+surgenet

@@ -19,7 +19,7 @@ DATA:
 
 PROCESS:  # Process
   sample: True
-  path_rawVideos: /media/spaceship/ExternalDr/Data/Leuven_DS_Sacropexy
+  path_rawVideos: C:/Users/DC/Desktop/Programming/python/ucl/Datasets/Leuven_DS_Sacropexy
   label: False
   update_labels: False
   samplerate: 1 # Hz
