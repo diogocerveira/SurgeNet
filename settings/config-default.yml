@@ -18,7 +18,8 @@ DATA:
   path_rawVideos: 
 
 PROCESS:  # Process
-  sample: True
+  sample: False
+  resize: True
   path_rawVideos: /media/spaceship/ExternalDr/Data/Leuven_DS_Sacropexy
   label: False
   update_labels: False

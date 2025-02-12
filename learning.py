@@ -35,6 +35,9 @@ def learning(**the):
     if the["PROCESS"]["sample"]:  # video to image frames
       Ctl.sample(the["PROCESS"]["path_rawVideos"], Ptk.path_samples, samplerate=the["PROCESS"]["samplerate"], processing="LDSS", filter_annotated=the["PROCESS"]["filter_annotated"])
       return True
+    if the["PROCESS"]["resize"]:  # video to image frames
+      Ctl.resize_frames(Ptk.path_samples, Ptk.path_samples, dim_to=(480, 270))
+      return True
     if the["PROCESS"]["label"]:  # label (csv file) image frames
       Ctl.label(Ptk.path_samples, Ptk.path_labels)
   Ctl.build_dataset(the["DATA"]["datasetId"], the["DATA"]["preprocessing"], the["DATA"]["return_extradata"])

@@ -17,6 +17,7 @@ from torchvision.transforms import v2 as transforms
 import sys
 import shutil
 import torch.nn as nn
+from PIL import Image
 from torcheval.metrics import MulticlassAccuracy, MulticlassPrecision, MulticlassRecall, MulticlassF1Score, MulticlassConfusionMatrix
 from . import utils
 import csv
@@ -160,9 +161,9 @@ class SurgeryStillsDataset(Dataset):
   def write_labels_csv(self, df, path_to):
     df.to_csv(path_to, index=False)
   """
-  def detect_encoding(self, file_path):
+  def detect_encoding(self, path_to_frame):
     ''' Extract and return the file encoding'''
-    with open(file_path, 'rb') as f:
+    with open(path_to_frame, 'rb') as f:
         raw_data = f.read()
         result = chardet.detect(raw_data)
         return result['encoding']
@@ -480,9 +481,9 @@ class Cataloguer():
       def get_sigla(string):
         # get the first letter of each word in a string in uppercase
         return "".join([word[0].upper() for word in string.split()])
-      def detect_encoding(file_path):
+      def detect_encoding(path_to_frame):
         ''' Extract and return the file encoding'''
-        with open(file_path, 'rb') as f:
+        with open(path_to_frame, 'rb') as f:
           raw_data = f.read()
           result = chardet.detect(raw_data)
           return result['encoding']
@@ -532,7 +533,39 @@ class Cataloguer():
     else:
       raise ValueError("Invalid preprocessing key")
     return transform
-    
+  
+  import os
+
+
+  def resize_frames(self, path_from, path_to, dim_to=(480, 270), change=0.25):
+    # Ensure the change percentage is between 0 and 100
+    if change < 0 or change > 100:
+      raise ValueError("change percentage must be between 0 and 100")
+    os.makedirs(path_to, exist_ok=True) # Create the output directory if it doesn't exist
+
+    for videoFolder in os.listdir(path_from):
+      print(f"Resizing video {videoFolder}\n")
+      path_from_video = os.path.join(path_from, videoFolder)
+      if os.path.isdir(path_from_video):  # Process only directories
+        path_to_video = os.path.join(path_to, videoFolder) # Make a corresponding output directory for this subfolder
+        os.makedirs(path_to_video, exist_ok=True)
+        for frame in os.listdir(path_from_video):
+          path_from_frame = os.path.join(path_from_video, frame)
+          if path_from_frame.lower().endswith(('png', 'jpg', 'jpeg')):
+            try:
+              with Image.open(path_from_frame) as img:
+                if not dim_to:
+                  width, height = img.size
+                  new_width = int(width * (change / 100))
+                  new_height = int(height * (change / 100))
+                  dim_to = (new_width, new_height)
+                resizedImg = img.resize(dim_to)
+
+                path_to_frame = os.path.join(path_to_video, frame)
+                resizedImg.save(path_to_frame)
+            except Exception as e:
+              print(f"Error processing {path_from_frame}: {e}")
+
   def sample(self, path_rawVideos, path_to, samplerate=1, processing="LDSS", filter_annotated=True):
     ''' Sample rawdata videos into image frames while saving the annotations in its splitset csv''' 
     # Generator function to yield frames and their corresponding data
@@ -595,9 +628,9 @@ class Cataloguer():
   def label(self, path_from, path_to):
     ''' Sample rawdata videos into image frames while saving the annotations in its splitset csv'''
     # Helper functions
-    def detect_encoding(file_path):
+    def detect_encoding(path_to_frame):
       ''' Extract and return the file encoding'''
-      with open(file_path, 'rb') as f:
+      with open(path_to_frame, 'rb') as f:
         raw_data = f.read()
         result = chardet.detect(raw_data)
         return result['encoding']
