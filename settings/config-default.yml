@@ -19,8 +19,10 @@ DATA:
 
 PROCESS:  # Process
   sample: False
+  sampleFormat: "png"
   resize: True
   path_rawVideos: /media/spaceship/ExternalDr/Data/Leuven_DS_Sacropexy
+  path_sample: /media/spaceship/ExternalDr/Data/Leuven_DS_Sacropexy/sampled/png-100
   label: False
   update_labels: False
   samplerate: 1 # Hz
