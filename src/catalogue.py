@@ -155,7 +155,7 @@ class SurgeryStillsDataset(Dataset):
       # self.write_labels_csv(df, "deg.csv")
       return labels
     except:
-      raise ValueError("Invalid path or labels.csv file")
+      raise ValueError("Invalid path_labels or labels.csv file")
   def update_labels(self, path_labels):
     self.labels = self._get_labels(path_labels)
   
@@ -542,7 +542,7 @@ class Cataloguer():
     # Ensure the change percentage is between 0 and 100
     if change < 0 or change > 100:
       raise ValueError("change percentage must be between 0 and 100")
-    os.makedirs(path_to, exist_ok=True) # Create the output directory if it doesn't exist
+    #os.makedirs(path_to, exist_ok=True) # Create the output directory if it doesn't exist
 
     for videoFolder in os.listdir(path_from):
       print(f"Resizing video {videoFolder}\n")
@@ -639,13 +639,14 @@ class Cataloguer():
     # Generator function to yield frames and their corresponding data
     path_videos = os.path.join(path_rawVideos, "videos")
     path_annots = os.path.join(path_rawVideos, "annotations")
-    availableVideos = [vid for vid in os.listdir(path_videos) if not vid.startswith(('.', '_')) and not os.path.isdir(os.path.join(path_videos, vid))]
+    availableVideos = sorted([vid for vid in os.listdir(path_videos) if not vid.startswith(('.', '_')) and not os.path.isdir(os.path.join(path_videos, vid))])
     print(f"\n{os.path.splitext(path_videos)[0]} for {len(availableVideos)} videos!")
     print(f"Sample rate of {samplerate} fps")
-    skip = 6
+    skip = 0
     for videoId in availableVideos:
       if skip > 0:
         skip -= 1
+        print(videoId)
         continue
       #videoId = os.path.splitext(videoId)[0]  # remove extension
       path_video = os.path.join(path_videos, videoId)
@@ -671,15 +672,24 @@ class Cataloguer():
       cap = cv2.VideoCapture(path_video)  # Initialize video capture object
       fps = cap.get(cv2.CAP_PROP_FPS)
       nframes = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-      period = int(fps / samplerate)
+      period = round(fps / samplerate)
       print(f"\ncv2 - Sampling {videoId} ({nframes} frames at {fps} fps), period of {period} frames")
+      # Get the first frame to determine the size
+      ret, firstFrame = cap.read()
+      if ret:
+        factor = 1 / 4
+        height, width = firstFrame.shape[:2]  # Get the original dimensions of the frame
+        newWidth = int(width * factor)
+        newHeight = int(height * factor)
+        print(f"Pre-resizing video {videoId} to {newWidth}x{newHeight} (factor of {factor})")
       for i in range(0, nframes, period):
         cap.set(cv2.CAP_PROP_POS_FRAMES, i) # Set the current frame position
         ret, frameImg = cap.read()
         if ret:
           frameId = f"{videoId}-{int(i / fps * 1000)}"  # remember basename is the file name itself / converting index to its timestamp (ms)
           path_frame = os.path.join(path_frames, f"{frameId}.{sampleFormat}")
-          cv2.imwrite(path_frame, frameImg)
+          resizedFrameImg = cv2.resize(frameImg, (newWidth, newHeight))
+          cv2.imwrite(path_frame, resizedFrameImg)
       cap.release()  # Release the video capture object after processing
       print(f"Frame writing took: {time.time() - start_time} sec")
         
