@@ -17,9 +17,11 @@ from torchvision.transforms import v2 as transforms
 import sys
 import shutil
 import torch.nn as nn
+from PIL import Image
 from torcheval.metrics import MulticlassAccuracy, MulticlassPrecision, MulticlassRecall, MulticlassF1Score, MulticlassConfusionMatrix
 from . import utils
 import csv
+import cv2
 
 import matplotlib
 matplotlib.use('Agg')
@@ -153,16 +155,16 @@ class SurgeryStillsDataset(Dataset):
       # self.write_labels_csv(df, "deg.csv")
       return labels
     except:
-      raise ValueError("Invalid path or labels.csv file")
+      raise ValueError("Invalid path_labels or labels.csv file")
   def update_labels(self, path_labels):
     self.labels = self._get_labels(path_labels)
   
   def write_labels_csv(self, df, path_to):
     df.to_csv(path_to, index=False)
   """
-  def detect_encoding(self, file_path):
+  def detect_encoding(self, path_to_frame):
     ''' Extract and return the file encoding'''
-    with open(file_path, 'rb') as f:
+    with open(path_to_frame, 'rb') as f:
         raw_data = f.read()
         result = chardet.detect(raw_data)
         return result['encoding']
@@ -480,9 +482,9 @@ class Cataloguer():
       def get_sigla(string):
         # get the first letter of each word in a string in uppercase
         return "".join([word[0].upper() for word in string.split()])
-      def detect_encoding(file_path):
+      def detect_encoding(path_to_frame):
         ''' Extract and return the file encoding'''
-        with open(file_path, 'rb') as f:
+        with open(path_to_frame, 'rb') as f:
           raw_data = f.read()
           result = chardet.detect(raw_data)
           return result['encoding']
@@ -532,19 +534,51 @@ class Cataloguer():
     else:
       raise ValueError("Invalid preprocessing key")
     return transform
-    
-  def sample(self, path_rawVideos, path_to, samplerate=1, processing="LDSS", filter_annotated=True):
+  
+  import os
+
+
+  def resize_frames(self, path_from, path_to, dim_to=(480, 270), change=0.25):
+    # Ensure the change percentage is between 0 and 100
+    if change < 0 or change > 100:
+      raise ValueError("change percentage must be between 0 and 100")
+    #os.makedirs(path_to, exist_ok=True) # Create the output directory if it doesn't exist
+
+    for videoFolder in os.listdir(path_from):
+      print(f"Resizing video {videoFolder}\n")
+      path_from_video = os.path.join(path_from, videoFolder)
+      if os.path.isdir(path_from_video):  # Process only directories
+        path_to_video = os.path.join(path_to, videoFolder) # Make a corresponding output directory for this subfolder
+        os.makedirs(path_to_video, exist_ok=True)
+        for frame in os.listdir(path_from_video):
+          path_from_frame = os.path.join(path_from_video, frame)
+          if path_from_frame.lower().endswith(('png', 'jpg', 'jpeg')):
+            try:
+              with Image.open(path_from_frame) as img:
+                if not dim_to:
+                  width, height = img.size
+                  new_width = int(width * (change / 100))
+                  new_height = int(height * (change / 100))
+                  dim_to = (new_width, new_height)
+                resizedImg = img.resize(dim_to)
+
+                path_to_frame = os.path.join(path_to_video, frame)
+                resizedImg.save(path_to_frame)
+            except Exception as e:
+              print(f"Error processing {path_from_frame}: {e}")
+
+  def sampleOG(self, path_rawVideos, path_to, samplerate=1, processing="LDSS", filter_annotated=True):
     ''' Sample rawdata videos into image frames while saving the annotations in its splitset csv''' 
     # Generator function to yield frames and their corresponding data
     path_videos = os.path.join(path_rawVideos, "videos")
     path_annots = os.path.join(path_rawVideos, "annotations")
-    def generate_frames(frames_chosen, videoId, path_frames, processing):
-      for ts, frame_img in frames_chosen:
-        frameId = f"{videoId}-{ts}"  # remember basename is the file name itself
+    def generate_frames(frames_chosen, videoId, path_frames, processing, fps):
+      for i, frame_img in frames_chosen:
+        frameId = f"{videoId}-{int(i / fps * 1000)}"  # remember basename is the file name itself / converting index to its timestamp (ms)
         path_frame = os.path.join(path_frames, f"{frameId}.png")
-        yield (path_frame, processing(frame_img))
+        yield (path_frame, frame_img)
     print(path_videos)
-    availableVideos = [vid for vid in os.listdir(path_videos) if not vid.startswith(('.', '_'))]
+    availableVideos = [vid for vid in os.listdir(path_videos) if not vid.startswith(('.', '_')) and not os.path.isdir(os.path.join(path_videos, vid))]
     print(f"\n{os.path.splitext(path_videos)[0]} for {len(availableVideos)} videos!")
     print(f"Sample rate of {samplerate} fps")
     for videoId in availableVideos:
@@ -555,7 +589,7 @@ class Cataloguer():
       nframes = int(metadata["duration"] * fps)
       print(f"\nSampling {videoId} ({nframes} frames at {fps} fps)")
       period = int(fps / samplerate)
-
+      # print(f"FPS: {fps}, Nframes: {nframes}, Period: {period}")
       if filter_annotated:
         path_annot = os.path.join(path_annots, f"{os.path.splitext(videoId)[0]}.json")
         if not os.path.exists(path_annot):
@@ -570,35 +604,101 @@ class Cataloguer():
       # Reading frames
       start_time = time.time()
       get_frame = lambda i: iio.imread(path_video, index=i, plugin="pyav") # function for getting an indexed frame in the video
-      # generator of sampled frames, converting index to its timestamp (ms)
-      framesChosen = ((int(f / fps * 1000), get_frame(f)) for f in range(0, nframes, period))
-      # print(frames_chosen[0])
-      end_time = time.time()
-      print(f"Reading frames took: {end_time - start_time} sec")
-      # Processing frames
+      # generator of sampled frames, 
+      framesPart = nframes // 8
+      framesChosen1 = ((f, get_frame(f)) for f in range(0, framesPart, period))
+      framesChosen2 = ((f, get_frame(f)) for f in range(1 * (framesPart), 2 * (framesPart), period))
+      framesChosen3 = ((f, get_frame(f)) for f in range(2 * (framesPart), 3 * (framesPart), period))
+      framesChosen4 = ((f, get_frame(f)) for f in range(3 * (framesPart), 4 * (framesPart), period))
+      framesChosen5 = ((f, get_frame(f)) for f in range(4 * (framesPart), 5 * (framesPart), period))
+      framesChosen6 = ((f, get_frame(f)) for f in range(5 * (framesPart), 6 * (framesPart), period))
+      framesChosen7 = ((f, get_frame(f)) for f in range(6 * (framesPart), 7 * (framesPart), period))
+      framesChosen8 = ((f, get_frame(f)) for f in range(7 * (framesPart), nframes, period))
+      for framesChosen in [framesChosen1, framesChosen2, framesChosen3, framesChosen4, framesChosen5, framesChosen6, framesChosen7, framesChosen8]:
+        #print(frames_chosen[0])
+        end_time = time.time()
+        print(f"Reading frames took: {end_time - start_time} sec")
+        # Processing frames
+        start_time = time.time()
+        if processing == "LDSS":
+          processing = lambda frame_img: np.array(Image.fromarray(frame_img).crop((240, 0, 1680, 1080)).resize((224, 224)))
+        else:
+          processing = lambda frame_img: frame_img
+        frames = generate_frames(framesChosen, videoId, path_frames, processing, fps) # process frames one by one
+        end_time = time.time()
+        print(f"Processing frames took: {end_time - start_time} sec")  
+        start_time = time.time()
+        for _ in range(framesPart):
+          path_frame, frameImg = next(frames)
+          iio.imwrite(path_frame, frameImg, format="png")
+        end_time = time.time()
+        print(f"Frame writing took: {end_time - start_time} sec")
+
+  def sample(self, path_rawVideos, path_to, samplerate=1, sampleFormat="png", processing="LDSS", filter_annotated=True):
+    ''' Sample rawdata videos into image frames while saving the annotations in its splitset csv''' 
+    # Generator function to yield frames and their corresponding data
+    path_videos = os.path.join(path_rawVideos, "videos")
+    path_annots = os.path.join(path_rawVideos, "annotations")
+    availableVideos = sorted([vid for vid in os.listdir(path_videos) if not vid.startswith(('.', '_')) and not os.path.isdir(os.path.join(path_videos, vid))])
+    print(f"\n{os.path.splitext(path_videos)[0]} for {len(availableVideos)} videos!")
+    print(f"Sample rate of {samplerate} fps")
+    skip = 0
+    for videoId in availableVideos:
+      if skip > 0:
+        skip -= 1
+        print(videoId)
+        continue
+      #videoId = os.path.splitext(videoId)[0]  # remove extension
+      path_video = os.path.join(path_videos, videoId)
+      #metadata = iio.immeta(path_video, plugin="pyav")  
+      #fps = metadata["fps"]
+      #nframes = int(metadata["duration"] * fps)
+      #print(f"\niio - Sampling {videoId} ({nframes} frames at {fps} fps), period of {int(fps / samplerate)}")
+      
+      # print(f"FPS: {fps}, Nframes: {nframes}, Period: {period}")
+      if filter_annotated:
+        path_annot = os.path.join(path_annots, f"{os.path.splitext(videoId)[0]}.json")
+        if not os.path.exists(path_annot):
+          continue
+      try:
+        videoId = videoId[:4]  # keep only 1st 4 chars of the video name
+      except:
+        videoId = os.path.splitext(videoId)[0]  # if smaller name only remove ext
+      shutil.copy(path_annot, os.path.join(self.path_annots, f"{videoId}.json"))
+      path_frames = os.path.join(path_to, videoId)
+      os.makedirs(path_frames, exist_ok=True)
+      
       start_time = time.time()
-      if processing == "LDSS":
-        processing = lambda frame_img: np.array(Image.fromarray(frame_img).crop((240, 0, 1680, 1080)).resize((224, 224)))
-        print("here")
-      else:
-        processing = lambda frame_img: frame_img
-      frames = generate_frames(framesChosen, videoId, path_frames, processing) # process frames one by one
-      end_time = time.time()
-      print(f"Processing frames took: {end_time - start_time} sec")  
-      # Writing frames
-      start_time = time.time()
-      for path_frame, frameImg in frames:  # Batch write frames and annotations
-        # print(f"Writing {frameId} to {path_frame}")
-        iio.imwrite(path_frame, frameImg, format="png")
-      end_time = time.time()
-      print(f"Frame writing took: {end_time - start_time} sec")
+      cap = cv2.VideoCapture(path_video)  # Initialize video capture object
+      fps = cap.get(cv2.CAP_PROP_FPS)
+      nframes = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+      period = round(fps / samplerate)
+      print(f"\ncv2 - Sampling {videoId} ({nframes} frames at {fps} fps), period of {period} frames")
+      # Get the first frame to determine the size
+      ret, firstFrame = cap.read()
+      if ret:
+        factor = 1 / 4
+        height, width = firstFrame.shape[:2]  # Get the original dimensions of the frame
+        newWidth = int(width * factor)
+        newHeight = int(height * factor)
+        print(f"Pre-resizing video {videoId} to {newWidth}x{newHeight} (factor of {factor})")
+      for i in range(0, nframes, period):
+        cap.set(cv2.CAP_PROP_POS_FRAMES, i) # Set the current frame position
+        ret, frameImg = cap.read()
+        if ret:
+          frameId = f"{videoId}-{int(i / fps * 1000)}"  # remember basename is the file name itself / converting index to its timestamp (ms)
+          path_frame = os.path.join(path_frames, f"{frameId}.{sampleFormat}")
+          resizedFrameImg = cv2.resize(frameImg, (newWidth, newHeight))
+          cv2.imwrite(path_frame, resizedFrameImg)
+      cap.release()  # Release the video capture object after processing
+      print(f"Frame writing took: {time.time() - start_time} sec")
         
   def label(self, path_from, path_to):
     ''' Sample rawdata videos into image frames while saving the annotations in its splitset csv'''
     # Helper functions
-    def detect_encoding(file_path):
+    def detect_encoding(path_to_frame):
       ''' Extract and return the file encoding'''
-      with open(file_path, 'rb') as f:
+      with open(path_to_frame, 'rb') as f:
         raw_data = f.read()
         result = chardet.detect(raw_data)
         return result['encoding']

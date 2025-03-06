@@ -33,8 +33,11 @@ def learning(**the):
   Ctl = catalogue.Cataloguer(Ptk.path_dataset, the["DATA"])
   if "process" in the["GENERAL"]["actions"]:
     if the["PROCESS"]["sample"]:  # video to image frames
-      Ctl.sample(the["PROCESS"]["path_rawVideos"], Ptk.path_samples, samplerate=the["PROCESS"]["samplerate"], processing="LDSS", filter_annotated=the["PROCESS"]["filter_annotated"])
+      Ctl.sample(the["PROCESS"]["path_rawVideos"], the["PROCESS"]["path_sample"], samplerate=the["PROCESS"]["samplerate"], sampleFormat=the["PROCESS"]["sampleFormat"], processing="", filter_annotated=the["PROCESS"]["filter_annotated"])
       return True
+    if the["PROCESS"]["resize"]:  # video to image frames
+      #Ctl.resize_frames(the["PROCESS"]["path_sample"], f"{the['PROCESS']['path_sample'][:-4]}-025", dim_to=(480, 270))
+      Ctl.resize_frames(the["PROCESS"]["path_sample"], "/home/spaceship/Desktop/Diogo/surgenet/data/LDSS-local/png-025", dim_to=(480, 270))
     if the["PROCESS"]["label"]:  # label (csv file) image frames
       Ctl.label(Ptk.path_samples, Ptk.path_labels)
   Ctl.build_dataset(the["DATA"]["datasetId"], the["DATA"]["preprocessing"], the["DATA"]["return_extradata"])
