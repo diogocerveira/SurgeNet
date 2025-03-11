@@ -49,7 +49,7 @@ def choose_in_path(path):
         if stop == 'y':
           return path
         continue
-
+ 
 class Pathtaker():
   ''' Handles paths to the local everywhere
   '''

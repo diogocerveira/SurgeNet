@@ -30,17 +30,16 @@ def learning(**the):
   Ptk = utils.Pathtaker(the["GENERAL"]["path_root"], the["DATA"]["datasetId"], RUN)
   
   # catalogue.py (dataset, data handling)
-  Ctl = catalogue.Cataloguer(Ptk.path_dataset, the["DATA"])
+  Ctl = catalogue.Cataloguer(the["DATA"], Ptk)
   if "process" in the["GENERAL"]["actions"]:
     if the["PROCESS"]["sample"]:  # video to image frames
       Ctl.sample(the["PROCESS"]["path_rawVideos"], the["PROCESS"]["path_sample"], samplerate=the["PROCESS"]["samplerate"], sampleFormat=the["PROCESS"]["sampleFormat"], processing="", filter_annotated=the["PROCESS"]["filter_annotated"])
-      return True
     if the["PROCESS"]["resize"]:  # video to image frames
       #Ctl.resize_frames(the["PROCESS"]["path_sample"], f"{the['PROCESS']['path_sample'][:-4]}-025", dim_to=(480, 270))
       Ctl.resize_frames(the["PROCESS"]["path_sample"], "/home/spaceship/Desktop/Diogo/surgenet/data/LDSS-local/png-025", dim_to=(480, 270))
     if the["PROCESS"]["label"]:  # label (csv file) image frames
       Ctl.label(Ptk.path_samples, Ptk.path_labels)
-  Ctl.build_dataset(the["DATA"]["datasetId"], the["DATA"]["preprocessing"], the["DATA"]["return_extradata"])
+  Ctl.build_dataset(the["DATA"]["datasetId"], the["DATA"]["preprocessing"], the["DATA"]["recycle_itemIds"])
   
   # teaching.py (metrics, train validation, test)
   Tch = teaching.Teacher(the["TRAIN"], the["EVAL"], Ctl, DEVICE)
@@ -55,7 +54,8 @@ def learning(**the):
   for fold, splits in enumerate(Ctl.split(the["TRAIN"]["k_folds"])):
     # iterating folds (trio tuples of idxs [0] and videoIds [1])
     ((train_idxs, valid_idxs, test_idxs), (train_videoIds, valid_videoIds, test_videoIds)) = splits
-    if fold in the["TRAIN"]["skipFolds"]: continue
+    if fold in the["TRAIN"]["skipFolds"]:
+      continue
     print(f"Fold {fold + 1} split:\ttrain {train_videoIds}\n\t\tvalid {valid_videoIds}\n\t\ttest {test_videoIds}")
     logInfo = f"{the['DATA']['datasetId'].split('-')[0]}-{DATE}-{fold + 1}"  # model name for logging/saving
     writer = SummaryWriter(os.path.join(Ptk.path_events, logInfo)) # object for logging stats
@@ -79,21 +79,21 @@ def learning(**the):
     trainloader, validloader, testloader = Ctl.batch(
         the["TRAIN"]["HYPER"]["batchSize"], batchMode, train_idx=train_idxs, valid_idx=valid_idxs, test_idx=test_idxs)
     
-
-    # Feature extraction
+    # PROCESS - Feature extraction
     if the["PROCESS"]["fx_spatial"] and "process" in the["GENERAL"]["actions"]:
       t1 = time.time()
-      spaceinator.export_features(DataLoader(Ctl.dataset, batch_size=the["TRAIN"]["HYPER"]["batchSize"]), Ptk.path_features, fold, DEVICE)
+      spaceinator.export_features(DataLoader(Ctl.dataset, batch_size=the["TRAIN"]["HYPER"]["batchSize"]), Ptk.path_features, fold, ["flatten"], DEVICE)
       t2 = time.time()
       print(f"Exporting features took {(t2 - t1) // 3600} hours and {(((t2 - t1) % 3600) / 60):.1f} minutes!")
 
-    # Training
+    # TRAIN
     if "train" in the["GENERAL"]["actions"]:
       betterState, valid_minLoss = Tch.teach(model, trainloader, validloader, the["TRAIN"]["HYPER"]["n_epochs"], logInfo,
           Ptk.path_checkpoints, writer)
       if the["TRAIN"]["save_betterModel"]:
         machine.save_model(Ptk.path_models, betterState, logInfo, DATE, 0.0, title="fold", fold=fold + 1)
-      
+    
+    # EVALUATE 
     if "eval" in the["GENERAL"]["actions"]:
       if the["EVAL"]["eval_from"] == "predictions":
         ## path_pred = utils.choose_in_path(Ptk.path_predictions)
@@ -114,7 +114,7 @@ def learning(**the):
       else:
         raise ValueError("Invalid evalFrom choice!")
       
-      # FILTERING
+      # PROCESS - Filterting
       if the["PROCESS"]["modeFilter"] and "process" in the["actions"]:
         if the["PROCESS"]["path_bundle"]:
           ## path_bundle = utils.choose_in_path(Ptk.path_modeFilter)

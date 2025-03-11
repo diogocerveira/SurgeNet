@@ -52,22 +52,22 @@ class Spaceinator(nn.Module):
     self.N_CLASSES = N_CLASSES
     SPACE_ARCH = MODEL["spaceArch"]
     SPACE_WEIGHTS = self._get_preweights(MODEL["spaceWeights"])
-    path_spaceModel = MODEL["path_spaceModel"]
-    STATE_DICT = torch.load(path_spaceModel, weights_only=False, map_location=DEVICE) if path_spaceModel else None
+    path_model = MODEL["path_spaceModel"]
+    STATE_DICT = torch.load(path_model, weights_only=False, map_location=DEVICE) if path_model else None
     self.FEATURE_SIZE = 2048 if (SPACE_ARCH == "resnet50" or SPACE_ARCH == "resnet50-custom") else None # default for resnet50
     self.features = None
 
-    self.spaceModel = self._get_model(SPACE_ARCH, SPACE_WEIGHTS, STATE_DICT, N_CLASSES)  # to implement my own in model.py    
-    # print(self.spaceModel)
-    # print(self.spaceModel.parameters())
-    self.FEATURE_NODE = fxs.get_graph_node_names(self.spaceModel)[0][-2] # -2 is the flatten node (virtual layer)
-    # train_nodes, eval_nodes = fx.get_graph_node_names(self.spaceModel)
+    self.model = self._get_model(SPACE_ARCH, SPACE_WEIGHTS, STATE_DICT, N_CLASSES)  # to implement my own in model.py    
+    # print(self.model)
+    # print(self.model.parameters())
+    self.FEATURE_NODE = fxs.get_graph_node_names(self.model)[0][-2] # -2 is the flatten node (virtual layer)
+    train_nodes, eval_nodes = fx.get_graph_node_names(self.model)
     # print(train_nodes == eval_nodes, end='\t'); print(train_nodes)
-    # print(list(self.spaceModel.children()))
+    # print(list(self.model.children()))
     print("Feature size: ", self.FEATURE_SIZE, "\tnode: ", self.FEATURE_NODE)
 
   def forward(self, x):
-    x = self.spaceModel(x)
+    x = self.model(x)
     print("After Spaceinator Shape: ", x.shape)
     return x
   def get_featureSize(self, x):
@@ -75,10 +75,13 @@ class Spaceinator(nn.Module):
   def _get_model(self, SPACE_ARCH, SPACE_WEIGHTS, STATE_DICT, N_CLASSES):
     if SPACE_ARCH == "resnet50":
       model = resnet50(weights=SPACE_WEIGHTS)
-      model.fc = nn.Linear(self.FEATURE_SIZE, N_CLASSES)
+      if self.classifier:
+        model.fc = nn.Linear(self.FEATURE_SIZE, N_CLASSES)
+      else: # no classification layer
+        model.fc = nn.Identity()
     elif SPACE_ARCH == "resnet50-custom" and STATE_DICT:
       model = resnet50(weights=SPACE_WEIGHTS)
-      if self.classifer:
+      if self.classifier:
         model.fc = nn.Linear(self.FEATURE_SIZE, N_CLASSES)
       else: # no classification layer
         model.fc = nn.Identity()
@@ -132,9 +135,10 @@ class Spaceinator(nn.Module):
     # Extract features at specified nodes
     return fx.create_feature_extractor(self.model, return_nodes=nodesToExtract)(images)
 
-  def export_features(self, dataloader, path_to, fold, nodesToExtract={}, device="cpu"):
+  def export_features(self, dataloader, path_to, fold, nodesToExtract, device="cpu"):
     # _features features maps to external file
     assert os.path.isdir(path_to), "Invalid features export path!"
+    self.model.fc = nn.Identity()  # Remove classification layer
     out_features = defaultdict(self.getdd)  # default: ddict of features (at multiple nodes/layers) for each frame
     self.model.eval().to(device) 
     with torch.no_grad():
@@ -143,7 +147,7 @@ class Spaceinator(nn.Module):
         images, ids = batch[0].to(device), batch[2]
         features = self._extract(images, nodesToExtract)
         for layer in features:
-          # print(features[layer].shape)
+          print(features[layer].shape)
           for im_id, fs in zip(ids, features[layer]): # Save features from chosen nodes/layers for each image ID
             # out_features[im_id][layer] = fs.cpu()
             out_features[im_id][layer] = fs.cpu() if fs.size(0) > 1 else fs.unsqueeze(0).cpu()
