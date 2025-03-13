@@ -28,7 +28,7 @@ def learning(**the):
   RUN = DATE if "train" in the["GENERAL"]["actions"] else the["GENERAL"]["load_run"]  # if training create new run, else load existing
   DEVICE = "cuda" if torch.cuda.is_available() else "cpu" # where to save torch tensors (e.g. during training)
   Ptk = utils.Pathtaker(the["GENERAL"]["path_root"], the["DATA"]["datasetId"], RUN)
-  
+
   # catalogue.py (dataset, data handling)
   Ctl = catalogue.Cataloguer(the["DATA"], Ptk)
   if "process" in the["GENERAL"]["actions"]:
