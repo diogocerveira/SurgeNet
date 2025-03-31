@@ -1,49 +1,19 @@
-GENERAL:
-  seed: 53  # 5 --> 3 or 3 --> 5
-  device: None
-  path_root: .
-  load_run: LDSS-2501-2912 # if empty creates new run, else loads it (YYMM-DD-HH)
-  actions:
-  - train        # train (spatial, temporal, full)
-  # - process      # process (sample-n-label, mode-filter, extractFeatures)
-  # - eval         # eval (aprfc, phaseTiming, phaseChart)
 
+seed: 53  # 5 --> 3 or 3 --> 5
+device:
+path_root: . #/batataclan
+id_classroom: LDSSi-2503-1 # if empty creates new learning environment, else loads it (dataset-YYMM-DDHH)
+actions:
+# - train        # train (spatial, temporal, full)
+- process      # process (sample-n-label, mode-filter, extractFeatures)
+# - eval         # eval (aprfc, phaseTiming, phaseChart)
+
+# DATA and TRAIN properties define an unique classroom
 DATA:
-  datasetId: LDSS-local  # (ldss-local, cifar10-ext)
+  id_dataset: LDSSi-local  # (ldss-local, cifar10-ext)
   preprocessing: basic  # basic, augmentation
-  recycle_itemIds: True  # for local dataset (__getitem__() return the inputed frameIds to be used to fetch associated frame properties e.g. file path)
+  recycle_itemIds: True  # for local dataset (__getitem__() returns the inputed frameIds to be used to fetch associated frame properties e.g. file path)
   datatype: png
-
-PROCESS:  # Process
-  sample: False
-
-  samplerate: 1 # Hz
-  sampleFormat: png
-  filter_annotated: True
-  resize: False
-  path_rawVideos: /media/spaceship/ExternalDr/Data/Leuven_DS_Sacropexy
-  path_sample: /media/spaceship/ExternalDr/Data/Leuven_DS_Sacropexy/samples/png-025
-
-  label: False
-
-  apply_modeFilter: False
-  path_bundle: True
-  export_modedPreds: True  # if apply-mode-filter == True
-  
-  fx_spatial: False
-
-MODEL:  # for models created/trained in the run 
-  domain: spatial # spatial, temporal, full
-# spatial
-  spaceWeights: default # sfx = spatial feature extraction
-  spaceArch: resnet50
-  n_classes: 6  # normally get from dataset itself
-  path_spaceModel: #C:/Users/DC/Documents/Programming/python/ucl/ML_SurgeNet/logs/LDSS/run_20241104-00/checkpoints/LDSS-20241104-00-fold6-0.837800.pth # if empty, uses new untrained one
-# temporal
-  n_stages: 3
-  n_filters: 64  # number of convolution filters == number of channels inside a stage
-  tf_filter: 3  # size in time (timeframe, # of frames)
-  n_blocks: 2  # inside the stage
 
 TRAIN:
   train_point: start # (start, resume)
@@ -64,6 +34,40 @@ TRAIN:
     momentum: 0.9
     gamma: 0.1
     stepSize: 30  # optimizer scheduler (to change mid train)
+
+PROCESS:  # Process
+  sample: False
+
+  samplerate: 1 # Hz
+  sampleFormat: png
+  filter_annotated: True
+  resize: False
+  path_rawVideos: /media/spaceship/ExternalDr/Data/Leuven_DS_Sacropexy
+  path_sample: /media/spaceship/ExternalDr/Data/Leuven_DS_Sacropexy/samples/png-025
+
+  label: True
+  labelType: time-to-next-phase # time-to-next-phase, phase-label, time-to-video-end, time-since-video-start
+
+  apply_modeFilter: False
+  path_bundle: True
+  export_modedPreds: True  # if apply-mode-filter == True
+  
+  fx_spatial: False
+
+MODEL:  # for models created/trained in the run 
+  domain: spatial # spatial, temporal, full
+# spatial
+  spaceWeights: default # sfx = spatial feature extraction
+  spaceArch: resnet50
+  n_classes: 6  # normally get from dataset itself
+  path_spaceModel: #C:/Users/DC/Documents/Programming/python/ucl/ML_SurgeNet/logs/LDSS/run_20241104-00/checkpoints/LDSS-20241104-00-fold6-0.837800.pth # if empty, uses new untrained one
+# temporal
+  n_stages: 3
+  n_filters: 64  # number of convolution filters == number of channels inside a stage
+  tf_filter: 3  # size in time (timeframe, # of frames)
+  n_blocks: 2  # inside the stage
+
+
  
 
 EVAL:  # Eval

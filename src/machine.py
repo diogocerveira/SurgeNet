@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torchvision.models import resnet50, ResNet50_Weights, resnet
+from torchvision.models import resnet50, ResNet50_Weights
 import os
 from collections import defaultdict, OrderedDict
 import torchvision.models.feature_extraction as fx
@@ -9,20 +9,31 @@ from copy import deepcopy
 from torch.utils.tensorboard import SummaryWriter
 import copy
 import torchvision.models.feature_extraction as fxs
-from . import catalogue
-import matplotlib.pyplot as plt
-import time
-from torch.utils.data import DataLoader
 
-class SurgeNet(nn.Module):
+class PhaseNet(nn.Module):
   ''' Receives [batch_size, in_channels, in_length] 1st guesses
       Outputs [output_stage_id, batch_size, N_CLASSES, in_length] further guesses
   '''
-  def __init__(self, N_CLASSES, inators):
+  def __init__(self, modelDomain, spaceinator, timeinator, N_CLASSES):
     super().__init__()
-    self.N_CLASSES = N_CLASSES
     self.inators = inators  # separate model list composing the overall model
+    
+    if modelDomain == "spatial":
+      self.inators = [spaceinator]
+      batchMode = "images"
+    elif modelDomain == "temporal":
+      spaceinator.load(Clr.path_features)  # loads into Cataloguer dataset
+      batchMode = "features"
+      # Get actual data from the split indexs, collate and batch it to a dataloader trio
+      self.inators = [timeinator]
+    elif modelDomain == "full":
+      batchMode = "images"
+      self.inators = [spaceinator, timeinator]
+    else:
+      raise ValueError("Invalid domain choice!")
+    
     self.model = nn.Sequential(*inators)
+
     
   def forward(self, x):
     print("Input shape: ", x.shape)

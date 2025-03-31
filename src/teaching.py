@@ -1,11 +1,10 @@
 import torch.nn as nn
 from torcheval.metrics import MulticlassAccuracy, MulticlassPrecision, MulticlassRecall, MulticlassF1Score, MulticlassConfusionMatrix
-from src import utils, machine
+from src import machine
 import torch
 import numpy as np
 import torch.optim as optim
 import os
-from torch.utils.tensorboard import SummaryWriter
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pickle
