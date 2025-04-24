@@ -14,41 +14,31 @@ class PhaseNet(nn.Module):
   ''' Receives [batch_size, in_channels, in_length] 1st guesses
       Outputs [output_stage_id, batch_size, N_CLASSES, in_length] further guesses
   '''
-  def __init__(self, modelDomain, spaceinator, timeinator, N_CLASSES):
+  def __init__(self, modelDomain, spaceinator, timeinator, classroomId, fold):
     super().__init__()
-    self.inators = inators  # separate model list composing the overall model
-    
+    self.valid_score = 0.0
+
+    # the modular approach allows to have modules with no conditional on the forward pass
     if modelDomain == "spatial":
-      self.inators = [spaceinator]
-      batchMode = "images"
+      inators = [spaceinator]
+      inputType = "images"
     elif modelDomain == "temporal":
-      spaceinator.load(Clr.path_features)  # loads into Cataloguer dataset
-      batchMode = "features"
-      # Get actual data from the split indexs, collate and batch it to a dataloader trio
-      self.inators = [timeinator]
+      inators = [timeinator]
+      inputType = "features"
     elif modelDomain == "full":
-      batchMode = "images"
-      self.inators = [spaceinator, timeinator]
+      inators = [spaceinator, timeinator]
+      inputType = "images"
     else:
       raise ValueError("Invalid domain choice!")
-    
     self.model = nn.Sequential(*inators)
+    self.inputType = inputType
+    self.id = f"{modelDomain}phase-{classroomId}_f{fold}" # model name for logging/saving
 
-    
-  def forward(self, x):
-    print("Input shape: ", x.shape)
-    x = self.model(x)
-    print("Output shape: ", x.shape)
-    return x
-  def classify(self, x):
-    return False
-  def dry_run(self, layer, in_shape=[2, 3, 244, 244]):
-    rnd_in = torch.randn(*in_shape)
-    with torch.no_grad():
-      out = layer(rnd_in)
-    print(out.shape)
-    return out
-
+  def forward(self, x_batch):
+    # print("Input shape: ", x_batch.shape)
+    x_batch = self.model(x_batch)
+    # print("Output shape: ", x_batch.shape)
+    return x_batch
 
 class Spaceinator(nn.Module):
   ''' 2D Convolutional network object, able to be trained for feature extraction,
@@ -57,58 +47,78 @@ class Spaceinator(nn.Module):
               _features: train and _features features in runtime
               load: load presaved features and forward them
   '''
-  def __init__(self, MODEL, DEVICE, N_CLASSES=None):
+  def __init__(self, MODEL):
     super().__init__()
-    self.classifier = True if N_CLASSES else False
-    self.N_CLASSES = N_CLASSES
-    SPACE_ARCH = MODEL["spaceArch"]
-    SPACE_WEIGHTS = self._get_preweights(MODEL["spaceWeights"])
-    path_model = MODEL["path_spaceModel"]
-    STATE_DICT = torch.load(path_model, weights_only=False, map_location=DEVICE) if path_model else None
-    self.FEATURE_SIZE = 2048 if (SPACE_ARCH == "resnet50" or SPACE_ARCH == "resnet50-custom") else None # default for resnet50
-    self.features = None
-
-    self.model = self._get_model(SPACE_ARCH, SPACE_WEIGHTS, STATE_DICT, N_CLASSES)  # to implement my own in model.py    
+    self.domain = MODEL["domain"]
+    self.n_classes = MODEL["n_classes"]
+    arch = MODEL["spaceArch"]
+    preweights = self._get_preweights(MODEL["spacePreweights"])
+    transferMode = MODEL["spaceTransferLearning"]
+    self.model = self._get_model(arch, preweights, transferMode, MODEL["path_spaceModel"])  # to implement my own in model.py 
+    self.featureSize = self.model.fc.in_features 
+    self.featureNode = fxs.get_graph_node_names(self.model)[0][-2] # -2 is the flatten node (virtual layer)
+    
+    self.path_features = MODEL["path_spaceFeatures"]  # train_nodes, eval_nodes = fx.get_graph_node_names(self.model)
     # print(self.model)
     # print(self.model.parameters())
-    self.FEATURE_NODE = fxs.get_graph_node_names(self.model)[0][-2] # -2 is the flatten node (virtual layer)
-    train_nodes, eval_nodes = fx.get_graph_node_names(self.model)
     # print(train_nodes == eval_nodes, end='\t'); print(train_nodes)
-    # print(list(self.model.children()))
-    print("Feature size: ", self.FEATURE_SIZE, "\tnode: ", self.FEATURE_NODE)
-
+    
   def forward(self, x):
     x = self.model(x)
-    print("After Spaceinator Shape: ", x.shape)
+    # print("After Spaceinator Shape: ", x.shape)
     return x
-  def get_featureSize(self, x):
-    pass
-  def _get_model(self, SPACE_ARCH, SPACE_WEIGHTS, STATE_DICT, N_CLASSES):
-    if SPACE_ARCH == "resnet50":
-      model = resnet50(weights=SPACE_WEIGHTS)
-      if self.classifier:
-        model.fc = nn.Linear(self.FEATURE_SIZE, N_CLASSES)
-      else: # no classification layer
-        model.fc = nn.Identity()
-    elif SPACE_ARCH == "resnet50-custom" and STATE_DICT:
-      model = resnet50(weights=SPACE_WEIGHTS)
-      if self.classifier:
-        model.fc = nn.Linear(self.FEATURE_SIZE, N_CLASSES)
-      else: # no classification layer
-        model.fc = nn.Identity()
-      model.load_state_dict(STATE_DICT, strict=False)
+  
+  def _get_model(self, arch, preweights, transferMode, path_model):
+    # Choose model architecture - backbones
+    if arch == "resnet50":
+      model = resnet50(weights=preweights)
+    elif arch == "resnet100":
+      pass
     else:
-      raise ValueError("Invalid space architecture &/or path to fx_model choice!")
-    return model
+      raise ValueError("Invalid space architecture choice!")
+    
+    # transfer learning mode
+    n_features = model.fc.in_features  # 2048 for resnet50
+    if transferMode == "fixed-fx":
+      for param in model.parameters():  # freeze all layers
+        param.requires_grad = False
+        # parameters of newly constructed modules have requires_grad=True by default
+      # remove final layer if passing features to another model (not learning them)
+      if self.domain == "spatial":
+        model.fc = nn.Linear(n_features, self.n_classes)
+      elif self.domain == "temporal" or self.domain == "full":
+        model.fc = nn.Identity()  # Remove classification layer, assumed already trained or not the end of the network
+    elif transferMode == "finetuning":  
+      model.fc = nn.Linear(n_features, self.n_classes)
+    else:
+      raise ValueError("Invalid transfer learning mode!")
+    
+    # If provided with a model state, load it
+    stateDict = None
+    if path_model and os.path.isfile(path_model):
+      try:
+        print(f"    Loading state from 'path_spaceModel' to {arch} in {transferMode} mode.")
+        stateDict = torch.load(path_model, weights_only=False, map_location="cpu")
+      except Exception as e:
+        print(f"     Error loading model from {path_model}: {e}")
+    else:
+      print(f"    No 'path_spaceModel' found. Using pretrained {arch} in {transferMode} mode.")
+    if stateDict:  # Load saved model if provided
+      model.load_state_dict(stateDict, strict=False)
 
-  def _get_preweights(self, weights):
-    if weights == "default":
+    return model
+  
+  def _get_preweights(self, preweights):
+    if preweights == "default":
       return ResNet50_Weights.DEFAULT # https://pytorch.org/vision/main/models/generated/torchvision.models.resnet50.html#torchvision.models.ResNet50_Weights
-    elif not weights:
+    elif not preweights:
       return None
     else:
       raise ValueError("Invalid preweight choice!")
-  
+  def get_featureSize(self, x):
+    # to implement
+    pass
+
   def log_features(self, writer, features, layer, im_id, fold):
     # print(features.shape)
     if features.dim() == 4:  # If it's a 4D tensor (N, C, H, W)
@@ -125,7 +135,7 @@ class Spaceinator(nn.Module):
     # self.model = get_resnet50(N_CLASSES, model_weights=modelPreWeights, extract_features=False)  # Keeps last classifier layer
 
   def load(self, path_from, layer=None):
-    layer = self.FEATURE_NODE
+    layer = self.featureNode
     # print(layer, path_from)
     features = torch.load(os.path.join(path_from, os.listdir(path_from)[0]), weights_only=False, map_location="cpu") # single item on the dir [0]
     # print(features.keys())
@@ -138,53 +148,53 @@ class Spaceinator(nn.Module):
       # break
     example_feature = random_f[layer] # defaultdict of defaultdicts
     self.features = features
-    self.FEATURE_SIZE = example_feature.size(0) # assuming every value has the same dim
+    self.featureSize = example_feature.size(0) # assuming every value has the same dim
     print("\nE.g. Feature: ", example_feature.squeeze(-1).squeeze(-1))
-    print("Features Size: ", self.FEATURE_SIZE, '\n')
+    print("Features Size: ", self.featureSize, '\n')
 
   def _extract(self, images, nodesToExtract):
     # Extract features at specified nodes
     return fx.create_feature_extractor(self.model, return_nodes=nodesToExtract)(images)
 
-  def export_features(self, dataloader, path_to, fold, nodesToExtract, device="cpu"):
+  def export_features(self, dataloader, path_export, nodesToExtract, device):
     # _features features maps to external file
-    assert os.path.isdir(path_to), "Invalid features export path!"
     self.model.fc = nn.Identity()  # Remove classification layer
-    out_features = defaultdict(self.getdd)  # default: ddict of features (at multiple nodes/layers) for each frame
+    out_features = defaultdict(dict)  # default: ddict of features (at multiple nodes/layers) for each frame
     self.model.eval().to(device) 
     with torch.no_grad():
-      for bi, batch in enumerate(dataloader):
-        # print('\n', "batch", bi)
-        images, ids = batch[0].to(device), batch[2]
+      for batch, data in enumerate(dataloader):
+        images, ids = data[0].to(device), [int(id) for id in data[2]]
         features = self._extract(images, nodesToExtract)
         for layer in features:
-          print(features[layer].shape)
-          for im_id, fs in zip(ids, features[layer]): # Save features from chosen nodes/layers for each image ID
-            # out_features[im_id][layer] = fs.cpu()
-            out_features[im_id][layer] = fs.cpu() if fs.size(0) > 1 else fs.unsqueeze(0).cpu()
+          print(f"{layer}: {features[layer].shape}")
+          for imageId, ftrs in zip(ids, features[layer]): # Save features from chosen nodes/layers for each image ID
+            out_features[imageId][layer] = ftrs.unsqueeze(0).to(device)
             # print(list(out_features.items()))
             # break
-    print(os.path.join(path_to, f"fmaps_{fold + 1}.pt"))
-    torch.save(out_features, os.path.join(path_to, f"fmaps_{fold + 1}.pt"))
+    # { "image_id": {layer: feature, ... }, ... }
+    torch.save(out_features, path_export)
+    # print(out_features)
+    print(f"* Exported space features as {os.path.basename(path_export)} *\n")
   
   @staticmethod
-  def getdd(): # torch.save() can't pickle whatever if nested defaultdict uses lambda (dedicated function instead) 
+  def get_defaultDict(): # torch.save() can't pickle whatever if nested defaultdict uses lambda (dedicated function instead) 
     return defaultdict(None)
 
 class Timeinator(nn.Module):
   ''' Receives [batch_size, in_channels, in_length] feature tensors
       Outputs [batch_size, N_CLASSES, in_length] further guesses
   '''
-  def __init__(self, MODEL, FEATURE_SIZE, N_CLASSES):
+  def __init__(self, MODEL, featureSize):
     super().__init__()
 
     self.N_STAGES = MODEL["n_stages"]
     N_BLOCKS = MODEL["n_blocks"]
     N_FILTERS = MODEL["n_filters"]
     TF_FILTER = MODEL["tf_filter"]
-    self.conv1x1_in = nn.Conv1d(FEATURE_SIZE, N_FILTERS, kernel_size=1)
+    self.conv1x1_in = nn.Conv1d(featureSize, N_FILTERS, kernel_size=1)
     self.blocks = nn.ModuleList([copy.deepcopy(_TCBlock(N_FILTERS, N_FILTERS, TF_FILTER, 2**b)) for b in range(N_BLOCKS)])
-    self.conv_out = nn.Conv1d(N_FILTERS, N_CLASSES, kernel_size=1)
+    self.conv_out = nn.Conv1d(N_FILTERS, 6, kernel_size=1)
+    self.featureSize = 6
 
   def forward(self, x):
     x = self.conv1x1_in(x)
@@ -196,31 +206,46 @@ class Timeinator(nn.Module):
       x_acm = torch.cat((x_acm, x.unsqueeze(0)), dim=0)
     return x.squeeze(0).permute(1, 0) # x_accm for more in depth (returning last state guess)
 
+class _TCStage(nn.Module):
+  def __init__(self, in_channels, out_channels, filterSize, dilation):
+    super().__init__()
+    self.dconv = nn.Conv1d(in_channels, out_channels, kernel_size=filterSize, padding=dilation, dilation=dilation)
+    self.conv1x1 = nn.Conv1d(out_channels, out_channels, kernel_size=1)
+
 class _TCBlock(nn.Module):
   # Dilated Residual Block of Layers
   def __init__(self, in_channels, out_channels, filterSize, dilation):
     super().__init__()
     self.dconv = nn.Conv1d(in_channels, out_channels, kernel_size=filterSize, padding=dilation, dilation=dilation)
-    self.conv1x1 = nn.Conv1d(out_channels, out_channels, kernel_size=1) # filter with time frame 1
+    self.conv1x1 = nn.Conv1d(out_channels, out_channels, kernel_size=1) # filter with time frame 1: mix learned features
     self.dropout = nn.Dropout()
   
   def forward(self, x):
-    res = self.conv1x1(x) # residual
-    x = F.relu(self.dconv(x))
-    x = self.conv1x1(x)
-    x = self.dropout(x)
-    return x + res
+    # x becomes the residual
+    out = F.relu(self.dconv(x))
+    out = self.conv1x1(x)
+    out = self.dropout(x)
+    return out + x
 
+class Classifier(nn.Module):
+  def __init__(self, FEATURE_SIZE, N_CLASSES):
+    super().__init__()
+    self.fc = nn.Linear(FEATURE_SIZE, N_CLASSES) # 2048 for resnet50
+    self.softmax = nn.Softmax(dim=1) # dim 0 is batch position and dim 1 is the logits
+    self.model = nn.Sequential(self.fc, self.softmax)
+
+  def forward(self, x):
+    return self.model(x)
 
 """
 class Guesser(nn.Module):
   ''' Receives [batch_size, in_channels, in_length] feature tensors
       Outputs [batch_size, N_CLASSES, in_length] 1st guesses
   '''
-  def __init__(self, FEATURE_SIZE, N_CLASSES, N_BLOCKS, N_FILTERS, filterSize):
+  def __init__(self, featureSize, N_CLASSES, N_BLOCKS, N_FILTERS, filterSize):
     super().__init__()
     self.N_BLOCKS = N_BLOCKS
-    self.conv1x1_in = nn.Conv1d(FEATURE_SIZE, N_FILTERS, kernel_size=1) # adapts fv channel dimension
+    self.conv1x1_in = nn.Conv1d(featureSize, N_FILTERS, kernel_size=1) # adapts fv channel dimension
     
     ## ALternative Guesser: Using different blocks from Predictor
     # self.dconv1 = nn.ModuleList((
@@ -263,35 +288,6 @@ class Refiner(nn.Module):
     x = self.conv_out(x)
     return x
 """
-
-def save_model(path_models, modelState, datasetName, date, test_score, path_model=None, title='', fold=''):
-  if path_model:
-    torch.save(modelState, path_model)
-  else:
-    # print(path_models, datasetName, date, test_score)
-    model_name = f"{datasetName}-{date}-{title}{fold}-{test_score:4f}.pth"
-    path_model = os.path.join(path_models, model_name)
-    torch.save(modelState, path_model)
-
-def save_checkpoint(model, optimizer, epoch, loss, path_checkpoint):
-  checkpoint = {
-    'epoch': epoch, # Current epoch
-    'model_state_dict': model.state_dict(), # Model weights
-    'optimizer_state_dict': optimizer.state_dict(), # Optimizer state
-    'valid_loss': loss  # Current loss value
-  }
-  torch.save(checkpoint, path_checkpoint)
-  # print(f"Checkpoint saved at {path_checkpoint}")
-
-def load_checkpoint(model, optimizer, path_checkpoint):
-  print(f"Retrieving checkpoint for model of type {model}")
-  checkpoint = torch.load(path_checkpoint)
-  model.load_state_dict(checkpoint['model_state_dict'])
-  optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-  epoch = checkpoint['epoch']
-  loss = checkpoint['loss']
-  print(f"Checkpoint loaded: Epoch {epoch}, Loss {loss}")
-  return model, optimizer, epoch, loss
 
 '''
 class FirstNet(nn.Module):

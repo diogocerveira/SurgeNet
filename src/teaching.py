@@ -30,7 +30,7 @@ class Teacher():
     self.highScore = -np.inf
     self.bestState = {}
     
-  def teach(self, model, trainloader, validloader, n_epochs, logInfo, path_checkpoints, writer, path_resume=None):
+  def teach(self, model, trainloader, validloader, n_epochs, path_states, path_resume=None):
     ''' Iterate through folds and epochs of model learning with training and validation
         In: Untrained model, data, etc
         Out: Trained model (state_dict)
@@ -50,16 +50,16 @@ class Teacher():
       startEpoch = 0
 
     for epoch in range(startEpoch, n_epochs):
-      print(f"     Epoch {epoch + 1}")
+      print(f"-------------- Epoch {epoch + 1} --------------")
       train_loss, train_score = self.trainer.train(model, trainloader, optimizer, epoch)
       # assert 1 == 0
       valid_loss, valid_score = self.validater.validate(model, validloader, epoch)
 
-      writer.add_scalar("Loss/train", train_loss, epoch + 1)
-      writer.add_scalar("Loss/valid", valid_loss, epoch + 1)
-      writer.add_scalar("Acc/train", train_score, epoch + 1)
-      writer.add_scalar("Acc/valid", valid_score, epoch + 1)
-      print(f"\nTrain Loss: {train_loss:4f}\tValid Loss: {valid_loss:4f}")
+      self.writer.add_scalar("Loss/train", train_loss, epoch + 1)
+      self.writer.add_scalar("Loss/valid", valid_loss, epoch + 1)
+      self.writer.add_scalar("Acc/train", train_score, epoch + 1)
+      self.writer.add_scalar("Acc/valid", valid_score, epoch + 1)
+      print(f"Train Loss: {train_loss:4f}\tValid Loss: {valid_loss:4f}")
       scheduler.step()
 
       if earlyStopper.early_stop(valid_loss):
@@ -68,15 +68,16 @@ class Teacher():
       if valid_loss <= valid_minLoss:
         print(f"\n* New best model (valid loss): {valid_minLoss:.4f} --> {valid_loss:.4f} *\n")
         valid_minLoss = valid_loss
+        valid_maxScore = valid_score
         betterState = model.state_dict()
       if ((epoch + 1) % 5) == 0:  # Save checkpoint every 5 epochs
         print(f"\n* Checkpoint reached ({epoch + 1}/{n_epochs}) *\n")
-        path_checkpoint = os.path.join(path_checkpoints, f"{logInfo}_e{epoch + 1}_cp.pth")
-        machine.save_checkpoint(model, optimizer, epoch, valid_loss, path_checkpoint)
-      
-    return betterState, valid_minLoss
+        path_checkpoint = os.path.join(path_states, f"{model.id}_cp{epoch + 1}.pth")
+        self.save_checkpoint(model, optimizer, epoch, valid_loss, path_checkpoint)
+      model.valid_score = valid_score
+    return model, valid_maxScore, betterState
 
-  def evaluate(self, test_bundle, EVAL, fold, writer, date, N_CLASSES, labelToClass, path_eval=None, path_aprfc=None, path_phaseCharts=None):
+  def evaluate(self, test_bundle, EVAL, fold, date, N_CLASSES, labelToClass, path_eval=None, path_aprfc=None, path_phaseCharts=None):
     # print(predictions[0], targets[0], imageIds[0])
     # torch.nn.functional.one_hot(tensor, N_CLASSES=-1)
     if EVAL["export_testBundle"]:
@@ -85,10 +86,10 @@ class Teacher():
         pickle.dump(test_bundle, f)
 
     if EVAL["aprfc"]:
-      self.tester._aprfc(writer, path_aprfc, fold, test_bundle)
+      self.tester._aprfc(self.writer, path_aprfc, fold, test_bundle)
     if EVAL["phaseTiming"]:
       outText = self.tester._phase_lengths(test_bundle, N_CLASSES, labelToClass)
-      self.tester._aprfc(writer, path_aprfc, fold, test_bundle)
+      self.tester._aprfc(self.writer, path_aprfc, fold, test_bundle)
       # print(list(final_bundle.groupby("Video")))
       outText = self.tester._phase_lengths(test_bundle, N_CLASSES, labelToClass, test_bundle)
     if EVAL["phaseChart"]:
@@ -142,6 +143,26 @@ class Teacher():
       return nn.CrossEntropyLoss(weight=classWeights.to(DEVICE))
     else:
       raise ValueError("Invalid criterion chosen (crossEntropy, )")
+    
+  def save_checkpoint(self, model, optimizer, epoch, loss, path_checkpoint):
+    checkpoint = {
+      'epoch': epoch, # Current epoch
+      'model_state_dict': model.state_dict(), # Model preweights
+      'optimizer_state_dict': optimizer.state_dict(), # Optimizer state
+      'valid_loss': loss  # Current loss value
+    }
+    torch.save(checkpoint, path_checkpoint)
+    # print(f"Checkpoint saved at {path_checkpoint}")
+
+  def load_checkpoint(self, model, optimizer, path_checkpoint):
+    print(f"Retrieving checkpoint for model of type {model}")
+    checkpoint = torch.load(path_checkpoint)
+    model.load_state_dict(checkpoint['model_state_dict'])
+    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+    epoch = checkpoint['epoch']
+    loss = checkpoint['loss']
+    print(f"Checkpoint loaded: Epoch {epoch}, Loss {loss}")
+    return model, optimizer, epoch, loss
 
 class Trainer():
   ''' Part of the teacher that knows how to train models based on data
@@ -164,7 +185,7 @@ class Trainer():
     '''
     self.train_metric.reset()  # resets states, typically called between epochs
     runningLoss = 0.0
-    model.train().to(self.DEVICE); print("\tTraining...")
+    model.train().to(self.DEVICE)
     for batch, data in enumerate(trainloader, 0):   # start at batch 0
       inputs, targets = data[0].to(self.DEVICE), data[1].to(self.DEVICE) # data is a list of [inputs, labels]
       # print("inputs: ", inputs.shape, "\ttargets: ", targets.shape, '\n')
@@ -194,7 +215,7 @@ class Validater():
     '''
     self.valid_metric.reset() # Running metric, e.g. accuracy
     runningLoss = 0.0
-    model.eval(), print("\n\tValidating...")
+    model.eval()
     with torch.no_grad(): # don't calculate gradients (for learning only)
       for batch, data in enumerate(validloader, 0):
         inputs, targets = data[0].to(self.DEVICE), data[1].to(self.DEVICE)
@@ -419,9 +440,9 @@ class Tester():
 class EarlyStopper:
   ''' Controls the validation loss progress to keep it going down and improve times
   '''
-  def __init__(self, patience=1, minDelta=0):
+  def __init__(self, patience=3, minDelta=0.05):
     self.patience = patience
-    self.minDelta = minDelta  # difference in decrease, 0 for no margin
+    self.minDelta = minDelta  # percentual difference in decrease, 0 for no margin
     self.valid_minLoss = np.inf
     self.counter = 0
 
@@ -432,7 +453,7 @@ class EarlyStopper:
     if valid_loss < self.valid_minLoss:
       self.valid_minLoss = valid_loss
       self.counter = 0  # reset warning/patience counter if loss decreases betw epochs
-    elif valid_loss - self.valid_minLoss >= self.minDelta:
+    elif ((valid_loss - self.valid_minLoss) / valid_loss) >= self.minDelta:
       self.counter += 1
       if self.counter >= self.patience:
         return True

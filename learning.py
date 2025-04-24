@@ -1,5 +1,4 @@
 import time
-t1 = time.time()
 import os
 import torch
 import numpy as np
@@ -9,87 +8,113 @@ import random
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader
 import pickle
-from src import classroom, dataset, machine, teaching
-t2 = time.time()
+from src import dataset, environment, machine, teaching
 
 def learning(**the):
   ''' Note: trying out "the" instead of "kwargs"/"config" for readability purposes '''
-  # classroom.py (learning environment, paths)
-  Clr = classroom.Classroom(the["path_root"], the["TRAIN"], the["DATA"], the["id_classroom"])
-  print(f"A. [classroom] {Clr.id} ({Clr.status})\n")
-
-  # catalogue.py (dataset, data handling)
-  Dtk = dataset.Cataloguer(the["DATA"], Clr)
+   # classroom.py (learning environment, paths)
+  Csr = environment.Classroom(the["path_root"], the["TRAIN"], the["DATA"], the["MODEL"], id_classroom=the["id_classroom"])
+  print(f"A. [classroom] {Csr.id} ({Csr.status})\n   [model] {Csr.studentId} ({Csr.studentStatus})")
+  print(f"   For {tuple(the['actions'])}\n")
+  # dataset.py (dataset, data handling)
+  Ctl = dataset.Cataloguer(the["DATA"], Csr.path_annots)
   if "process" in the["actions"]:
     if the["PROCESS"]["sample"]:  # video to image frames
-      Dtk.sample(the["PROCESS"]["path_rawVideos"], the["PROCESS"]["path_sample"], samplerate=the["PROCESS"]["samplerate"], sampleFormat=the["PROCESS"]["sampleFormat"], processing="", filter_annotated=the["PROCESS"]["filter_annotated"])
+      Ctl.sample(the["PROCESS"]["path_rawVideos"], the["PROCESS"]["path_sample"], samplerate=the["PROCESS"]["samplerate"], sampleFormat=the["PROCESS"]["sampleFormat"], processing="", filter_annotated=the["PROCESS"]["filter_annotated"])
       print(f"   [sample] {the['PROCESS']['path_sample']} ({the['PROCESS']['samplerate']} fps)")
     if the["PROCESS"]["resize"]:  # video to image frames
-      #Dtk.resize_frames(the["PROCESS"]["path_sample"], f"{the['PROCESS']['path_sample'][:-4]}-025", dim_to=(480, 270))
-      Dtk.resize_frames(the["PROCESS"]["path_sample"], "/home/spaceship/Desktop/Diogo/surgenet/data/LDSS-local/png-025", dim_to=(480, 270))
+      #Ctl.resize_frames(the["PROCESS"]["path_sample"], f"{the['PROCESS']['path_sample'][:-4]}-025", dim_to=(480, 270))
+      Ctl.resize_frames(the["PROCESS"]["path_sample"], "/home/spaceship/Desktop/Diogo/surgenet/data/LDSS-local/png-025", dim_to=(480, 270))
       print(f"   [resize] {the['PROCESS']['path_sample']} ({the['PROCESS']['samplerate']} fps)")
     if the["PROCESS"]["label"]:  # label (csv file) image frames
-      Dtk.label(Clr.path_samples, Clr.path_labels, the["PROCESS"]["labelType"])
-      print(f"   [label] {Clr.path_labels}")
-  Dtk.build_dataset(the["DATA"]["id_dataset"], the["DATA"]["preprocessing"], the["DATA"]["recycle_itemIds"])
-  print(f"B. [dataset] {the['DATA']['id_dataset']} (#{Dtk.DATASET_SIZE})")
-  print(f"   [preprocessing] {Dtk.preprocessing}")
-  print(f"   [classes] #{Dtk.N_CLASSES} ({'Balanced' if Dtk.BALANCED else 'Unbalanced'}) {list(Dtk.labelToClass.values())}\n")
-
+      Ctl.label(Csr.path_samples, Csr.path_labels, the["DATA"]["labelType"])
+      print(f"   [label] {Csr.path_labels}")
+  dset = Ctl.build_dataset(Csr.path_samples, Csr.path_labels) # for now the dataset is still used from inside the cataloguer
+  print(f"B. [dataset] {the['DATA']['id_dataset']} (#{Ctl.DATASET_SIZE})")
+  print(f"   [preprocessing] {Ctl.preprocessing}")
+  print(f"   [classes] #{Ctl.N_CLASSES} ({'Balanced' if Ctl.BALANCED else 'Unbalanced'}) {list(Ctl.labelToClass.values())}\n")
+  
   # teaching.py (metrics, train validation, test)
-  Tch = teaching.Teacher(the["TRAIN"], the["EVAL"], Dtk, the["device"])
+  Tch = teaching.Teacher(the["TRAIN"], the["EVAL"], Ctl, the["device"])
   print(f"C. [training] {the['TRAIN']['train_point']} on [device] {the['device']}")
   print(f"   [folds] #{the['TRAIN']['k_folds']} [epochs] #{the['TRAIN']['HYPER']['n_epochs']} [batches] #{the['TRAIN']['HYPER']['batchSize']}\n")
   highScore = 0.0
+
+  spaceinator = machine.Spaceinator(the["MODEL"])
+  print(f"    Feature size of {spaceinator.featureSize} at node '{spaceinator.featureNode}'\n")
+  timeinator = machine.Timeinator(the["MODEL"], spaceinator.featureSize)
+
   # Index split of the dataset (virtual)
-  for fold, splits in enumerate(Dtk.split(the["TRAIN"]["k_folds"])):
+  for fold, splits in enumerate(Ctl.split(the["TRAIN"]["k_folds"])):
     # iterating folds (trio tuples of idxs [0] and videoIds [1])
     ((train_idxs, valid_idxs, test_idxs), (train_videoIds, valid_videoIds, test_videoIds)) = splits
     if fold in the["TRAIN"]["skipFolds"]:
       continue
-    print(f"  Fold {fold + 1} splits:\n\ttrain {train_videoIds}\n\tvalid {valid_videoIds}\n\ttest {test_videoIds}")
+    print(f"  Fold {fold + 1} splits:\n\ttrain {train_videoIds}\n\tvalid {valid_videoIds}\n\ttest {test_videoIds}\n")
     # Create the model
-    spaceinator = machine.Spaceinator(the["MODEL"], the["device"], N_CLASSES=Dtk.N_CLASSES)
-    timeinator = machine.Timeinator(the["MODEL"], spaceinator.FEATURE_SIZE, Dtk.N_CLASSES)
-    model = machine.PhaseNet(the["MODEL"]["domain"], spaceinator, timeinator, Dtk.N_CLASSES)
-
-    trainloader, validloader, testloader = Dtk.batch(
-        the["TRAIN"]["HYPER"]["batchSize"], batchMode, train_idx=train_idxs, valid_idx=valid_idxs, test_idx=test_idxs)
     
-    modelId = f"{Clr.id}-{fold + 1}"  # model name for logging/saving
-    writer = SummaryWriter(os.path.join(Clr.path_events, modelId)) # object for logging stats
+    model = machine.PhaseNet(the["MODEL"]["domain"], spaceinator, timeinator, Csr.id, fold + 1)
 
+    trainloader, validloader, testloader = Ctl.batch(
+        the["TRAIN"]["HYPER"]["batchSize"], model.inputType, train_idx=train_idxs, valid_idx=valid_idxs, test_idx=test_idxs)
+
+    Tch.writer = SummaryWriter(os.path.join(Csr.path_events, model.id)) # object for logging stats
+
+    # TRAIN
+    if "train" in the["actions"]:
+      trained_model, valid_maxScore, betterState = Tch.teach(model, trainloader, validloader, the["TRAIN"]["HYPER"]["n_epochs"], Csr.path_states, the["TRAIN"]["path_resumeModel"])
+      if the["TRAIN"]["save_betterState"]:
+        path_betterState = os.path.join(Csr.path_states, f"{trained_model.id}-{valid_maxScore:.2f}")
+        torch.save(betterState, path_betterState)
+      if the["TRAIN"]["save_lastState"]:
+        path_lastState = os.path.join(Csr.path_states, f"{trained_model.id}-{trained_model.valid_score:.2f}")
+        torch.save(trained_model.state_dict(), path_lastState)
 
     # PROCESS - Feature extraction
     if the["PROCESS"]["fx_spatial"] and "process" in the["actions"]:
       t1 = time.time()
-      spaceinator.export_features(DataLoader(Dtk.dataset, batch_size=the["TRAIN"]["HYPER"]["batchSize"]), Clr.path_features, fold, ["flatten"], the["device"])
+      if "train" in the["actions"]:
+        spaceinator.load_state_dict(trained_model.state_dict(), strict=False)
+      path_export = os.path.join(Csr.path_features, f"spacefmaps_{model.id.split('_')[1]}.pt")
+      spaceinator.export_features(DataLoader(Ctl.dataset, batch_size=the["TRAIN"]["HYPER"]["batchSize"]), path_export, ["flatten"], the["device"])
       t2 = time.time()
       print(f"Exporting features took {(t2 - t1) // 3600} hours and {(((t2 - t1) % 3600) / 60):.1f} minutes!")
+      # load features
+      try:
+        features = torch.load(path_export, weights_only=False, map_location=the["device"])
+      except Exception as e:
+        print(f"No features provided for processing: {e}\n")
+        break
+      print(features[0]["flatten"], features[0]["flatten"].shape)
 
-    # TRAIN
-    if "train" in the["actions"]:
-      betterState, valid_minLoss = Tch.teach(model, trainloader, validloader, the["TRAIN"]["HYPER"]["n_epochs"], modelId,
-          Clr.path_checkpoints, writer)
-      if the["TRAIN"]["save_betterModel"]:
-        machine.save_model(Clr.path_models, betterState, modelId, CLASSROOM, 0.0, title="fold", fold=fold + 1)
-    
     # EVALUATE 
     if "eval" in the["actions"]:
       if the["EVAL"]["eval_from"] == "predictions":
-        ## path_pred = utils.choose_in_path(Clr.path_predictions)
-        with open(the["path_pred"], 'rb') as f:  # Load the DataFrame
-          test_bundle = pickle.load(f)
-      elif the["TEST"]["eval_from"] == "model":
-        if "train" in the["actions"]: # use model just trained
-          model.load_state_dict(betterState, strict=False)
-        else: # load model from 
-          ## path_model = utils.choose_in_path(Clr.path_models)
-          stateDict = torch.load(the["EVAL"]["path_model"], weights_only=False, map_location=the["device"])
-          model.load_state_dict(stateDict, strict=False)
+        ## path_pred = utils.choose_in_path(Csr.path_predictions)
+        try:
+          with open(the["path_pred"], 'rb') as f:  # Load the DataFrame
+            test_bundle = pickle.load(f)
+        except Exception as e:
+          print(f"No predictions (test_bundle) provided for evaluation: {e}\n")
+          break
+      elif the["EVAL"]["eval_from"] == "model":
+        try:
+          if "train" in the["actions"]: # use model just trained
+            model.load_state_dict(betterState, strict=False)
+          else: # load model from 
+            if the["EVAL"]["path_model"]: # chose before running
+              stateDict = torch.load(the["EVAL"]["path_model"], weights_only=False, map_location=the["device"])
+            else: # choose on runtime
+              pass
+              # path_model = environment.choose_in_path(Csr.path_models)
+              # stateDict = torch.load(path_model, weights_only=False, map_location=the["device"])
+            model.load_state_dict(stateDict, strict=False)
+        except Exception as e:
+          print(f"Error loading model: {e}\n")
+          break
         t1 = time.time()
-        path_export = os.path.join(Clr.path_predictions, f"{modelId}_preds")
-        test_bundle  = Tch.tester.test(model, testloader, extradata=the["DATA"]["return_extradata"], path_export=path_export)
+        path_export = os.path.join(Csr.path_predictions, f"{model.id}_preds")
+        test_bundle  = Tch.tester.test(model, testloader, extradata=the["DATA"]["recycle_itemIds"], path_export=path_export)
         t2 = time.time()
         print(f"Testing took {t2 - t1:.2f} seconds")
       else:
@@ -98,26 +123,28 @@ def learning(**the):
       # PROCESS - Filterting
       if the["PROCESS"]["modeFilter"] and "process" in the["actions"]:
         if the["PROCESS"]["path_bundle"]:
-          ## path_bundle = utils.choose_in_path(Clr.path_modeFilter)
+          ## path_bundle = utils.choose_in_path(Csr.path_modeFilter)
           with open(the["PROCESS"]["path_bundle"], 'rb') as f:
             test_bundle = pickle.load(f)
         else:
           try:
             preds = np.array(test_bundle["Preds"])
-            modePreds = classroom.modeFilter(preds, 10)
-            # torch.save(modePreds, Clr.path_modeFilter)
+            modePreds = environment.modeFilter(preds, 10)
+            # torch.save(modePreds, Csr.path_modeFilter)
             test_bundle["Preds"] = modePreds
             if the["PROCESS"]["export_modedPreds"]:
-              path_modeFilter = os.path.join(Clr.path_modeFilter, os.path.splitext(the["PROCESS"]["path_bundle"])[0] + "_moded")
+              path_modeFilter = os.path.join(Csr.path_modeFilter, os.path.splitext(the["PROCESS"]["path_bundle"])[0] + "_moded")
               with open(path_modeFilter, 'wb') as f:
                 pickle.dump(test_bundle, f)
           except Exception as e:
             print(f"No predictions (test_bundle) provided for processing: {e}")
+            continue
       
-      Tch.evaluate(test_bundle, the["EVAL"], fold + 1, writer, CLASSROOM, Dtk.N_CLASSES, Dtk.labelToClass,
-          the["DATA"]["extradata"], Clr.path_eval, Clr.path_aprfc, Clr.path_phaseCharts, the["TEST"]["path_preds"])
+      Tch.evaluate(test_bundle, the["EVAL"], fold + 1, Csr, Ctl.N_CLASSES, Ctl.labelToClass,
+          the["DATA"]["extradata"], Csr.path_eval, Csr.path_aprfc, Csr.path_phaseCharts, the["TEST"]["path_preds"])
 
-    writer.close()
+    Tch.writer.close()
+    print(f"  [fold] {fold + 1} done\n")
     break # == 1 folc (debug)
  
 if __name__ == "__main__":

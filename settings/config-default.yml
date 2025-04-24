@@ -1,26 +1,27 @@
-
-seed: 53  # 5 --> 3 or 3 --> 5
-device:
 path_root: . #/batataclan
-id_classroom: LDSSi-2503-1 # if empty creates new learning environment, else loads it (dataset-YYMM-DDHH)
+seed: 53  # 5 --> 3 or 3 --> 5  DO NOT CHANGE SEED (it messes up with fold training)
+device:
+id_classroom: #LDSSi-2504-1 # if empty creates new learning environment, else loads it (dataset-YYMM-DDHH)
 actions:
-# - train        # train (spatial, temporal, full)
+- train        # train (spatial, temporal, full)
 - process      # process (sample-n-label, mode-filter, extractFeatures)
 # - eval         # eval (aprfc, phaseTiming, phaseChart)
 
 # DATA and TRAIN properties define an unique classroom
 DATA:
-  id_dataset: LDSSi-local  # (ldss-local, cifar10-ext)
+  id_dataset: TEST-local  # (ldss-local, cifar10-ext)
+  labelType: phase-class # time-to-next-phase, phase-label, time-to-video-end, time-since-video-start
   preprocessing: basic  # basic, augmentation
   recycle_itemIds: True  # for local dataset (__getitem__() returns the inputed frameIds to be used to fetch associated frame properties e.g. file path)
-  datatype: png
+  datatype: png-image #, jpeg-image, feature-dict
 
 TRAIN:
   train_point: start # (start, resume)
-  path_resumeModel: None  # to continue training from a checkpoint model if train-point == resume
+  path_resumeModel:  # to continue training from a checkpoint model if train-point == resume
   save_checkpoints: False
   checkpointRate: 5 # epoch frequency to save a checkpoint
-  save_betterModel: True
+  save_betterState: False
+  save_lastState: True
   log_events: True
   criterionId: weighted-cross-entropy
   train_metric: accuracy
@@ -29,11 +30,11 @@ TRAIN:
   skipFolds: []  # 0 for fold 1... after a break (e.g. crash) allows to skip folds and restart from a checkpoint
   HYPER:  # traditional hyperparameters
     n_epochs: 50
-    batchSize: 128
+    batchSize: 16
     learningRate: 0.0005  # learning rate
     momentum: 0.9
     gamma: 0.1
-    stepSize: 30  # optimizer scheduler (to change mid train)
+    stepSize: 25  # optimizer scheduler (to change mid train)
 
 PROCESS:  # Process
   sample: False
@@ -46,32 +47,35 @@ PROCESS:  # Process
   path_sample: /media/spaceship/ExternalDr/Data/Leuven_DS_Sacropexy/samples/png-025
 
   label: True
-  labelType: time-to-next-phase # time-to-next-phase, phase-label, time-to-video-end, time-since-video-start
 
   apply_modeFilter: False
   path_bundle: True
   export_modedPreds: True  # if apply-mode-filter == True
   
-  fx_spatial: False
+  fx_spatial: True
 
-MODEL:  # for models created/trained in the run 
+MODEL:  # for models created/trained in the run
+  type: phase
   domain: spatial # spatial, temporal, full
 # spatial
-  spaceWeights: default # sfx = spatial feature extraction
+  spaceTransferLearning: fixed-fx # fine-tune | fixed-fx
   spaceArch: resnet50
-  n_classes: 6  # normally get from dataset itself
+  spacePreweights: default # sfx = spatial feature extraction
   path_spaceModel: #C:/Users/DC/Documents/Programming/python/ucl/ML_SurgeNet/logs/LDSS/run_20241104-00/checkpoints/LDSS-20241104-00-fold6-0.837800.pth # if empty, uses new untrained one
+  path_spaceFeatures: 
 # temporal
+  timeArch: tcn # locked for now
   n_stages: 3
   n_filters: 64  # number of convolution filters == number of channels inside a stage
   tf_filter: 3  # size in time (timeframe, # of frames)
   n_blocks: 2  # inside the stage
-
+# classification
+  n_classes: 6  # normally get from dataset itself
 
  
 
 EVAL:  # Eval
-  eval_from: predictions  # model
+  eval_from: model  # model | predictions
   path_model:  # if eval-from == model and no training done
   path_preds:
   aprfc: False
