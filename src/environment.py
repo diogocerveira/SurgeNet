@@ -78,14 +78,30 @@ class Classroom():
       studentStatus = "Matched"
     else:
       studentStatus = "New"
-      id_student = f"{MODEL['domain']}{MODEL['type']}"
+      id_student = f"{MODEL['domain']}{MODEL['type']}1"
+      num = 2
+      while id_student in os.path.listdir(self.path_classroom): # if already student of same type, give it a num id
+        id_student[-1] = num
+        num += 1
 
-    for attrKey, attrValue in self._setup_paths(DATA["id_dataset"], id_student, TRAIN, DATA, MODEL):
-      setattr(self, attrKey, attrValue) # set all paths as attributes
     self.id = id_classroom
     self.status = classroomStatus
     self.studentId = id_student
     self.studentStatus = studentStatus
+
+    for attrKey, attrValue in self._setup_paths(DATA["id_dataset"], id_student, TRAIN, DATA, MODEL):
+      setattr(self, attrKey, attrValue) # set all paths as attributes
+    
+
+    # Update settings dict if a classroom is chosen
+    if self.status == "Chosen":
+      self.TRAIN = TRAIN
+      self.DATA = DATA
+    else:
+      with open(self.path_learningConditions, 'r') as file:
+        loaded_data = yaml.safe_load(file)
+        self.TRAIN = loaded_data["TRAIN"]
+        self.DATA = loaded_data["DATA"]
     
   def match_learningEnvironment(self, TRAIN, DATA):
     path_logs = os.path.join(self.path_root, "logs")
@@ -121,10 +137,10 @@ class Classroom():
         os.makedirs(os.path.dirname(path), exist_ok=True)  # Create only the parent directory
         if not os.path.exists(path):  # Only create the file if it doesn't exist
           open(path, 'w', newline='').close()
-        if os.path.basename(path) == "learning-conditions.yml": # if file is learning-conditions.yml, write the learning conditions
+        if os.path.basename(path) == "learning-conditions.yml" and self.status == "New": # if file is learning-conditions.yml, write the learning conditions
           with open(path, "w") as f:
             yaml.dump({"TRAIN": TRAIN, "DATA": DATA}, f)
-        if os.path.basename(path) == "student-profile.yml": # if file is student-profile.yml, write the model characteristics
+        if os.path.basename(path) == "student-profile.yml" and self.studentStatus == "New": # if file is student-profile.yml, write the model characteristics
           with open(path, "w") as f:
             yaml.dump({"MODEL": MODEL}, f)
       

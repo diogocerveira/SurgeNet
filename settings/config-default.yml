@@ -1,15 +1,15 @@
 path_root: . #/batataclan
 seed: 53  # 5 --> 3 or 3 --> 5  DO NOT CHANGE SEED (it messes up with fold training)
 device:
-id_classroom: TEST-2504-1 #LDSSi-2504-1 # if empty creates new learning environment, else loads it (dataset-YYMM-DDHH)
+id_classroom: LDSS-2504-2 #LDSSi-2504-1 # if empty creates new learning environment, else loads it (dataset-YYMM-DDHH)
 actions:
-# - train        # train (spatial, temporal, full)
+- train        # train (spatial, temporal, full)
 # - process      # process (sample-n-label, mode-filter, extractFeatures)
 - eval         # eval (aprfc, phaseTiming, phaseChart)
 
 # DATA and TRAIN properties define an unique classroom
 DATA:
-  id_dataset: TEST-local  # (ldss-local, cifar10-ext)
+  id_dataset: LDSS-local  # (ldss-local, cifar10-ext)
   labelType: phase-class # time-to-next-phase, phase-label, time-to-video-end, time-since-video-start
   preprocessing: basic  # basic, augmentation
   recycle_itemIds: True  # for local dataset (__getitem__() returns the inputed frameIds to be used to fetch associated frame properties e.g. file path)
@@ -23,14 +23,15 @@ TRAIN:
   save_betterState: False
   save_lastState: True
   log_events: True
-  criterionId: cross-entropy # weighted-cross-entropy
+  criterionId: weighted-cross-entropy # weighted-cross-entropy
   train_metric: accuracy
   valid_metric: accuracy  # guiding and evaluating training
   k_folds: 7 # match with datasetName (7 for LDSS, 5 for CIFAR10, 1 for None?)
   skipFolds: []  # 0 for fold 1... after a break (e.g. crash) allows to skip folds and restart from a checkpoint
   HYPER:  # traditional hyperparameters
-    n_epochs: 10
-    batchSize: 2
+    n_epochs: 25
+    batchSize: 16
+    clipSize: 9  # amount of frames (sec) per clip when temporal training
     learningRate: 0.0005  # learning rate
     momentum: 0.9
     gamma: 0.1
@@ -58,7 +59,7 @@ PROCESS:  # Process
 
 MODEL:  # for models created/trained in the run
   type: phase
-  domain: spatial # spatial, temporal, full
+  domain: temporal # spatial, temporal, full
 # spatial
   spaceTransferLearning: fixed-fx # fine-tune | fixed-fx
   spaceArch: resnet50
@@ -91,4 +92,4 @@ EVAL:  # Eval
     confusionMatrix: True
   agg: macro  # overall, accuracy is locked to micro (see utils.py)
   updateRate: 1  # updates metrics with new data every batch
-  computeRate: 1000  # computes the metrics
+  computeRate: 100  # computes the metrics

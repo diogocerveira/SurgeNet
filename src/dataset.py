@@ -503,14 +503,14 @@ class Cataloguer():
     # print(f"Train idxs: {train_idxs}\nValid idxs: {valid_idxs}\nTest idxs: {test_idxs}")
     # return train_idxs, valid_idxs, test_idxs
 
-  def batch(self, dset, inputType, size_batch, train_idxs=None, valid_idxs=None, test_idxs=None):
+  def batch(self, dset, inputType, size_batch, size_clip=30, train_idxs=None, valid_idxs=None, test_idxs=None):
     ''' helper for loading data, features or stopping when fx_mode == 'export'
     '''
     # print(inputType)
     if inputType == "images":
       return self._batch_images(dset, size_batch, train_idxs, valid_idxs, test_idxs)
     elif inputType == "fmaps":
-      return self._batch_clips(dset, size_batch, train_idxs, valid_idxs, test_idxs)
+      return self._batch_clips(dset, size_batch, size_clip, train_idxs, valid_idxs, test_idxs)
     else:
       raise ValueError("Invalid Batch Mode!")
   def _batch_images(self, dset, size_batch, train_idxs=None, valid_idxs=None, test_idxs=None):
@@ -533,14 +533,14 @@ class Cataloguer():
       # print(next(trainloader).shape)
     return loaders.values()
 
-  def _batch_clips(self, dset, size_batch, train_idxs=None, valid_idxs=None, test_idxs=None):
+  def _batch_clips(self, dset, size_batch, size_clip, train_idxs=None, valid_idxs=None, test_idxs=None):
     assert os.path.exists(dset.path_spaceFeatures), f"No exported space features found in {dset.path_spaceFeatures}!"
     featuresDict = torch.load(dset.path_spaceFeatures, weights_only=False)
     firstKey = next(iter(featuresDict))
     featureLayer = list(featuresDict[firstKey].keys())[-1]  # get the last layer of features
     # for now only allow the last layer of features
     loader = [[], [], []]
-    size_clip = 3
+    # size_clip = 30
     for split, idxs in enumerate([train_idxs, valid_idxs, test_idxs]):
 
       feats = torch.stack([featuresDict[i][featureLayer] for i in idxs]).squeeze(1) # to [n_frames, features_size] 

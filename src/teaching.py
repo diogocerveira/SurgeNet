@@ -64,14 +64,14 @@ class Teacher():
       print(f"Train Loss: {train_loss:4f}\tValid Loss: {valid_loss:4f}")
       scheduler.step()
 
-      if earlyStopper.early_stop(valid_loss):
-        print(f"\n* Stopped early *\n")
-        break
       if valid_loss <= valid_minLoss:
         print(f"\n* New best model (valid loss): {valid_minLoss:.4f} --> {valid_loss:.4f} *\n")
         valid_minLoss = valid_loss
         valid_maxScore = valid_score
         betterState = model.state_dict()
+      if earlyStopper.early_stop(valid_loss):
+        print(f"\n* Stopped early *\n")
+        break
       if ((epoch + 1) % 5) == 0:  # Save checkpoint every 5 epochs
         if self.save_checkpoints:
           print(f"\n* Checkpoint reached ({epoch + 1}/{n_epochs}) *\n")
@@ -92,41 +92,6 @@ class Teacher():
       outText = self.tester._phase_timing(test_bundle, self.N_CLASSES, labelToClass)
       if eval_tests["phaseChart"]:
         self.tester._phase_graph(test_bundle, Csr.path_phaseCharts, modelId, outText)
-
-  def evaluate2(self, model, testloader, EVAL, extradata=None, path_to=None):
-    # _, ext = os.path.splitext(path_from)
-    # if ext == ".pkl": # pickle file for results
-    #   with open(path_from, 'rb') as f:  # Load the DataFrame
-    #     test_bundle = pickle.load(f)
-    # elif ext == ".pth": # torch model to eval
-    # model = torch.load(path_from, weights_only=False)
-    t1 = time.time()
-    preds, targets, extradata = self.tester.test(model, testloader, extradata)
-    t2 = time.time()
-    print(f"Testing took {t2 - t1:.2f} seconds")
-    # self.tester.test_metrics.display()
-    # print(sampleIds[0], preds[0], targets[0])
-    # torch.nn.functional.one_hot(tensor, N_CLASSES=-1)
-    test_bundle = self._get_bundle(preds, targets, extradata)
-    if path_to:
-      with open(path_to, 'wb') as f: # Save the DataFrame
-        pickle.dump(test_bundle, f)
-
-    self._do_tests(test_bundle, EVAL)
- 
-
-  def _do_tests(self, test_bundle, testkey):
-    testsAvailable = {
-      "acpref1com": self.tester.acpref1com,
-      "timing": self.tester.phaseTiming,
-      "chart": self.tester.phaseSegmentationChart
-    }
-    if testkey in testsAvailable:  # if provided a testkey, do that test
-      testsAvailable[testkey](test_bundle)
-    else: # do them all
-      for action in testsAvailable.values():
-        action(test_bundle)
-
 
   def _get_metrics(self, TRAIN, EVAL, N_CLASSES, labelToClass, DEVICE):
     

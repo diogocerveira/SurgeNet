@@ -17,7 +17,7 @@ def learning(**the):
   print(f"A. [classroom] {Csr.id} ({Csr.status})\n   [model] {Csr.studentId} ({Csr.studentStatus})")
   print(f"   For {tuple(the['actions'])}\n")
   # dataset.py (dataset, data handling)
-  Ctl = dataset.Cataloguer(the["DATA"], Csr.path_annots)
+  Ctl = dataset.Cataloguer(Csr.DATA, Csr.path_annots)
   if "process" in the["actions"]:
     if the["PROCESS"]["sample"]:  # video to image frames
       Ctl.sample(the["PROCESS"]["path_rawVideos"], the["PROCESS"]["path_sample"], samplerate=the["PROCESS"]["samplerate"], sampleFormat=the["PROCESS"]["sampleFormat"], processing="", filter_annotated=the["PROCESS"]["filter_annotated"])
@@ -27,7 +27,7 @@ def learning(**the):
       Ctl.resize_frames(the["PROCESS"]["path_sample"], "/home/spaceship/Desktop/Diogo/surgenet/data/LDSS-local/png-025", dim_to=(480, 270))
       print(f"   [resize] {the['PROCESS']['path_sample']} ({the['PROCESS']['samplerate']} fps)")
     if the["PROCESS"]["label"]:  # label (csv file) image frames
-      Ctl.label(Csr.path_samples, Csr.path_labels, the["DATA"]["labelType"])
+      Ctl.label(Csr.path_samples, Csr.path_labels, Csr.DATA["labelType"])
       print(f"   [label] {Csr.path_labels}")
   dset = Ctl.build_dataset(Csr.path_samples, Csr.path_labels) # for now the dataset is still used from inside the cataloguer
   print(f"B. [dataset] {the['DATA']['id_dataset']} (#{Ctl.DATASET_SIZE})")
@@ -35,16 +35,16 @@ def learning(**the):
   print(f"   [classes] #{Ctl.N_CLASSES} ({'Balanced' if Ctl.BALANCED else 'Unbalanced'}) {list(Ctl.labelToClass.values())}\n")
   
   # teaching.py (metrics, train validation, test)
-  Tch = teaching.Teacher(the["TRAIN"], the["EVAL"], Ctl, the["device"])
-  print(f"C. [training] {the['TRAIN']['train_point']} on [device] {the['device']}")
-  print(f"   [folds] #{the['TRAIN']['k_folds']} [epochs] #{the['TRAIN']['HYPER']['n_epochs']} [batch size] {the['TRAIN']['HYPER']['batchSize']}\n")
+  Tch = teaching.Teacher(Csr.TRAIN, the["EVAL"], Ctl, the["device"])
+  print(f"C. [training] {Csr.TRAIN['train_point']} on [device] {the['device']}")
+  print(f"   [folds] #{Csr.TRAIN['k_folds']} [epochs] #{Csr.TRAIN['HYPER']['n_epochs']} [batch size] {Csr.TRAIN['HYPER']['batchSize']}\n")
   highScore = 0.0
 
   # Index split of the dataset (virtual)
-  for fold, splits in enumerate(Ctl.split(the["TRAIN"]["k_folds"])):
+  for fold, splits in enumerate(Ctl.split(Csr.TRAIN["k_folds"])):
     # iterating folds (trio tuples of idxs [0] and videoIds [1])
     ((train_idxs, valid_idxs, test_idxs), (train_videoIds, valid_videoIds, test_videoIds)) = splits
-    if fold in the["TRAIN"]["skipFolds"]:
+    if fold in Csr.TRAIN["skipFolds"]:
       continue
     print(f"  Fold {fold + 1} splits:\n\ttrain {train_videoIds}\n\tvalid {valid_videoIds}\n\ttest {test_videoIds}\n")
     # Create the model
@@ -54,17 +54,17 @@ def learning(**the):
     model = machine.PhaseNet(the["MODEL"]["domain"], spaceinator, timeinator, Csr.id, fold + 1)
 
     dset.path_spaceFeatures = os.path.join(Csr.path_exportedFeatures, f"spacefmaps_f{fold + 1}.pt")
-    trainloader, validloader, testloader = Ctl.batch(dset, model.inputType, the["TRAIN"]["HYPER"]["batchSize"], train_idxs=train_idxs, valid_idxs=valid_idxs, test_idxs=test_idxs)
+    trainloader, validloader, testloader = Ctl.batch(dset, model.inputType, Csr.TRAIN["HYPER"]["batchSize"], Csr.TRAIN["HYPER"]["clipSize"], train_idxs=train_idxs, valid_idxs=valid_idxs, test_idxs=test_idxs)
    
     Tch.writer = SummaryWriter(log_dir=os.path.join(Csr.path_events, model.id.split('_')[1])) # object for logging stats
 
     # TRAIN
     if "train" in the["actions"]:
-      trainedModel, valid_maxScore, betterState = Tch.teach(model, trainloader, validloader, the["TRAIN"]["HYPER"]["n_epochs"], Csr.path_states, the["TRAIN"]["path_resumeModel"])
-      if the["TRAIN"]["save_betterState"]:
+      trainedModel, valid_maxScore, betterState = Tch.teach(model, trainloader, validloader, Csr.TRAIN["HYPER"]["n_epochs"], Csr.path_states, Csr.TRAIN["path_resumeModel"])
+      if Csr.TRAIN["save_betterState"]:
         path_betterState = os.path.join(Csr.path_states, f"{trainedModel.id}-{valid_maxScore:.2f}")
         torch.save(betterState, path_betterState)
-      if the["TRAIN"]["save_lastState"]:
+      if Csr.TRAIN["save_lastState"]:
         path_lastState = os.path.join(Csr.path_states, f"{trainedModel.id}-{trainedModel.valid_score:.2f}")
         torch.save(trainedModel.state_dict(), path_lastState)
 
@@ -74,7 +74,7 @@ def learning(**the):
       if "train" in the["actions"]:
         spaceinator.load_state_dict(trainedModel.state_dict(), strict=False)
       path_export = os.path.join(Csr.path_features, f"spacefmaps_{model.id.split('_')[1]}.pt")
-      spaceinator.export_features(DataLoader(Ctl.dataset, batch_size=the["TRAIN"]["HYPER"]["batchSize"]), path_export, the["PROCESS"]["featureLayer"], the["device"])
+      spaceinator.export_features(DataLoader(Ctl.dataset, batch_size=Csr.TRAIN["HYPER"]["batchSize"]), path_export, the["PROCESS"]["featureLayer"], the["device"])
       t2 = time.time()
       print(f"Exporting features took {(t2 - t1) // 3600} hours and {(((t2 - t1) % 3600) / 60):.1f} minutes!")
     
@@ -96,7 +96,7 @@ def learning(**the):
             if the["EVAL"]["path_model"]: # chose before running
               stateDict = torch.load(the["EVAL"]["path_model"], weights_only=False, map_location=the["device"])
               Tch.evaluate(test_bundle, the["EVAL"], fold + 1, Csr, Ctl.N_CLASSES, Ctl.labelToClass,
-                the["DATA"]["extradata"], Csr.path_eval, Csr.path_aprfc, Csr.path_phaseCharts, the["TEST"]["path_preds"])
+                Csr.DATA["extradata"], Csr.path_eval, Csr.path_aprfc, Csr.path_phaseCharts, the["TEST"]["path_preds"])
               print("Breaking testing loop on 'Fold 1' because a path_model was provided without 'train' action.")
               break
             else: # choose from the states folder (corresponding to fold)
