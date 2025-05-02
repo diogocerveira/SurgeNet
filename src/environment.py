@@ -5,6 +5,7 @@ from collections import defaultdict
 import torch.nn as nn
 import datetime
 import yaml
+import shutil
 
 def modeFilter(preds, windowSize):
   def mode(sequence):
@@ -126,6 +127,7 @@ class Classroom():
         if os.path.basename(path) == "student-profile.yml": # if file is student-profile.yml, write the model characteristics
           with open(path, "w") as f:
             yaml.dump({"MODEL": MODEL}, f)
+      
       else:  # Otherwise, it's a directory path
         os.makedirs(path, exist_ok=True)
 
@@ -146,6 +148,7 @@ class Classroom():
     paths_logs = {}
     paths_logs["path_logs"] = os.path.join(self.path_root, "logs")
     paths_logs["path_learningConditions"] = os.path.join(self.path_classroom, "learning-conditions.yml")
+    
     paths_logs["path_student"] = os.path.join(self.path_classroom, id_student)
     paths_logs["path_studentProfile"] = os.path.join(paths_logs["path_student"], "student-profile.yml")
     paths_logs["path_eval"] = os.path.join(paths_logs["path_student"], "eval")
@@ -159,12 +162,8 @@ class Classroom():
     paths_logs["path_process"] = os.path.join(paths_logs["path_student"], "process")
     paths_logs["path_modeFilter"] = os.path.join(paths_logs["path_process"], "mode-filter")
     paths_logs["path_features"] = os.path.join(paths_logs["path_process"], "features")
+    
+    paths_logs["path_exportedFeatures"] = os.path.os.path.join(self.path_classroom, "spatialphase", "process", "features")
     return paths_logs
 
-def get_metrics(classWeights, device, computePeriod, n_classes, idxToClass, agg):
-  criterion = nn.CrossEntropyLoss(weight=classWeights)
-  trainAcc = RunningMetric(MulticlassAccuracy(device=device), computePeriod)
-  validAcc = RunningMetric(MulticlassAccuracy(device=device), computePeriod // 2)
-  testBM = MetricBunch({"accuracy": 1, "precision": 1, "recall": 1, "f1score": 1,
-                         "confusionMatrix": 1}, n_classes, idxToClass, agg, device)
-  return criterion, trainAcc, validAcc, testBM
+

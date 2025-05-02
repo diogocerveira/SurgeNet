@@ -10,7 +10,7 @@ from torchvision import datasets
 import numpy as np
 from sklearn.model_selection import KFold, GroupKFold, train_test_split
 from torchvision import datasets
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, TensorDataset
 import time
 from torchvision.transforms import v2 as transforms
 import shutil
@@ -46,6 +46,7 @@ class SampledVideosDataset(Dataset):
     # Filter labels to include only rows where the frame file exists
     # self.labels = self.filter_valid_frames(self.labels) # Useful when using short version of the dataset with the full labels.csv
     # print("self_labels\n", self.labels)
+    self.path_spaceFeatures = None
 
     self.videoNames = self.labels["videoId"].unique()  # Extract unique video identifiers
     self.videoToGroup = {videoId: idx for idx, videoId in enumerate(self.videoNames)}
@@ -57,10 +58,11 @@ class SampledVideosDataset(Dataset):
     # count number of files (images) in the samples folder directories (sampled video folders)
     for video in self.videoNames:
       # print(video)
-      length += len(os.listdir(os.path.join(self.path_samples, video)))
+      length += len([vid for vid in os.listdir(os.path.join(self.path_samples, video)) if not vid.startswith(('.', '_')) and not os.path.isdir(os.path.join(self.path_samples, video, vid))])
     if length != len(self.labels):
       raise ValueError(f"Number of files in samples folder ({length}) and labels.csv ({len(self.labels)}) do not match!") 
     return length
+  
   def __getitem__(self, idx):
     """Retrieve a single item from the dataset based on an index"""
     path_img = os.path.join(self.path_samples, self.labels.loc[idx, "videoId"],
@@ -68,10 +70,11 @@ class SampledVideosDataset(Dataset):
     # Read images and labels
     img = self.transform(cv2.cvtColor(cv2.imread(path_img), cv2.COLOR_BGR2RGB))
     label = self.labels.loc[idx, "class"]
+    # print(f"img: {img.shape}, label: {label}, idx: {torch.tensor(idx)}")  # WTFFFF does not print
     return (img, label, torch.tensor(idx))
   def __getitems__(self, idxs):
     """Retrieve items from the dataset based on index or list of indices."""
-    # Convert input idxs to list
+    # Convert dset idxs to list
     if isinstance(idxs, slice):  # Convert slice to list
       idxs = list(range(*idxs.indices(len(self.labels))))
     elif torch.is_tensor(idxs) or isinstance(idxs, np.ndarray):
@@ -80,7 +83,6 @@ class SampledVideosDataset(Dataset):
     # each idx is a int tensor
     path_imgs = [os.path.join(self.path_samples, self.labels.loc[i, "videoId"],
         self.labels.loc[i, "frameId"] + '.' + self.datatype) for i in idxs]
-  
     # Read images and labels
     # imgs = [iio.imread(p) for p in path_imgs]
     imgs = [cv2.cvtColor(cv2.imread(p), cv2.COLOR_BGR2RGB) for p in path_imgs]
@@ -92,6 +94,7 @@ class SampledVideosDataset(Dataset):
     imgs = torch.stack(imgs)
     labels = torch.tensor(labels)
     idxs = torch.tensor(idxs)
+    # print(f"imgs: {imgs.shape}, labels: {labels}, idxs: {idxs}")
     return list(zip(imgs, labels, idxs))
   
   def _get_labels(self, path_labels):
@@ -106,7 +109,7 @@ class SampledVideosDataset(Dataset):
       # self.write_labels_csv(df, "deg.csv")
       return labels
     except:
-      raise ValueError("\nInvalid path_labels/labels.csv file (might suggent inexistent or a problematic dataset)")
+      raise ValueError("\nInvalid path_labels/labels.csv file (might suggest inexistent or a problematic dataset)")
   def update_labels(self, path_labels):
     self.labels = self._get_labels(path_labels)
   
@@ -153,11 +156,6 @@ class SampledVideosDataset(Dataset):
       return list_out[0]
     # print(list_out)
     return list_out
-  
-  def get_classWeights(self):
-    # print(self.labels.columns)
-    cw = self.labels["class"].value_counts() / self.__len__()
-    return torch.tensor(cw.values, dtype=torch.float32)
 
 
 class Cataloguer():
@@ -291,7 +289,7 @@ class Cataloguer():
     for sampledVideoId in os.listdir(path_from):
       path_annot = os.path.join(self.path_annots, f"{sampledVideoId}.json")
       path_video = os.path.join(path_from, sampledVideoId)
-      if os.path.exists(path_annot):  # if video is annotated
+      if os.path.exists(path_annot):  # if video is annotated (to make a better check)
         with open(path_annot, 'r', encoding=detect_encoding(path_annot)) as f:
           annots = json.load(f)  # parsed into list of dicts=annotations
           labelsNL = [m["content"] for m in annots]
@@ -299,7 +297,9 @@ class Cataloguer():
         labelsInt = [extract_class(p)[0] for p in labelsNL]
         annotatedPoints = list(zip(timestamps, labelsInt))
         # print("annotatedPoints: ", annotatedPoints)
-        framesId = [os.path.splitext(frame)[0] for frame in os.listdir(path_video)]
+        framesId = [os.path.splitext(frame)[0] for frame in os.listdir(path_video) if not frame.startswith(('.', '_')) and not os.path.isdir(os.path.join(path_video, frame))]
+        # print(framesId)
+        
         framesTimestamps = [int(frameId.split('_')[1]) for frameId in framesId]  # convert to int
         # print(len(framesTimestamps))
         if labelType == "phase-class":
@@ -393,7 +393,13 @@ class Cataloguer():
           randomAnnot = json.load(f)
           classesNL = [m["content"] for m in randomAnnot]
           labelToClass = {int(extract_class(p)[0]): extract_class(p)[0] + get_sigla(extract_class(p)[1]) for p in classesNL}
-          labelToClass[0] = "0ther"
+          
+          if 0 in self.dataset.labels["class"].unique():
+            labelToClass[0] = "0ther" 
+        # filter out non-existing classes in the real (e.g. partial, lite versions) dataset of items
+        assert len(labelToClass) == len(self.dataset.labels["class"].unique()), f"Number of classes ({len(labelToClass)}) and labels ({len(self.dataset.labels['class'].unique())}) do not match! Aborting labeling."
+        # labelToClass = {int(k): v for k, v in labelToClass.items() if k in self.dataset.labels["class"].unique()}
+        
         return labelToClass
       
     elif self.dataset.DATA_SCOPE == "external":
@@ -467,18 +473,18 @@ class Cataloguer():
       outerKF = GroupKFold(n_splits=k_folds)
       outerGroups = dataset.get_grouping()
       outerKFSplit = outerKF.split(np.arange(len(dataset)), groups=outerGroups)  # train/valid and test split - fold split
-      for tv_idx, test_idx in outerKFSplit:
-        # print('\n', tv_idx, test_idx, '\n')
+      for tv_idx, test_idxs in outerKFSplit:
+        # print('\n', tv_idx, test_idxs, '\n')
         # tv_subset = torch.utils.data.Subset(dataset, tv_idx)
         innerGroups = dataset.get_grouping(tv_idx)
         # print(innerGroups)
         innerKF = GroupKFold(n_splits=k_folds - 1)
         train_localIdxs, valid_localIdxs = next(innerKF.split(tv_idx, groups=innerGroups))  # train and valid split - practice split
         # print("trainloc", train_localIdxs, '\n', "validloc", valid_localIdxs)
-        train_idx = tv_idx[train_localIdxs] # the inner splits idx don't match the outer directly
-        valid_idx = tv_idx[valid_localIdxs] # because idxs for some video were removed (need to map back)
-        listOfIdxs.append([train_idx, valid_idx, test_idx])
-        # print('\n', [train_idx, valid_idx, test_idx], '\n')
+        train_idxs = tv_idx[train_localIdxs] # the inner splits idx don't match the outer directly
+        valid_idxs = tv_idx[valid_localIdxs] # because idxs for some video were removed (need to map back)
+        listOfIdxs.append([train_idxs, valid_idxs, test_idxs])
+        # print('\n', [train_idxs, valid_idxs, test_idxs], '\n')
 
       videosSplit = dataset.get_idxToVideo(listOfIdxs)
       # print(videosSplit[0])
@@ -488,57 +494,96 @@ class Cataloguer():
     # Train / Valid Split
     elif dataset.DATA_SCOPE == "external":
       indices = np.arange(len(dataset[0]))
-      train_idx, valid_idx = train_test_split(indices, train_size = (k_folds - 1) / (k_folds), random_state=53)
-      # print(train_idx, valid_idx)
+      train_idxs, valid_idxs = train_test_split(indices, train_size = (k_folds - 1) / (k_folds), random_state=53)
+      # print(train_idxs, valid_idxs)
       # print(dataset[1])
-      listOfIdxs.append([train_idx, valid_idx, dataset[1]])
+      listOfIdxs.append([train_idxs, valid_idxs, dataset[1]])
       return tuple(zip(listOfIdxs, [[["no"], ["groups"], ["here"]]]))
 
-    # print(f"Train idxs: {train_idx}\nValid idxs: {valid_idx}\nTest idxs: {test_idx}")
-    # return train_idx, valid_idx, test_idx
+    # print(f"Train idxs: {train_idxs}\nValid idxs: {valid_idxs}\nTest idxs: {test_idxs}")
+    # return train_idxs, valid_idxs, test_idxs
 
-  def batch(self, size_batch, inputType, train_idx=None, valid_idx=None, test_idx=None):
+  def batch(self, dset, inputType, size_batch, train_idxs=None, valid_idxs=None, test_idxs=None):
     ''' helper for loading data, features or stopping when fx_mode == 'export'
     '''
     # print(inputType)
     if inputType == "images":
-      return self._batch_images(size_batch, train_idx, valid_idx, test_idx)
-    elif inputType == "features":
-      return self._batch_features(size_batch, train_idx, valid_idx, test_idx)
+      return self._batch_images(dset, size_batch, train_idxs, valid_idxs, test_idxs)
+    elif inputType == "fmaps":
+      return self._batch_clips(dset, size_batch, train_idxs, valid_idxs, test_idxs)
     else:
       raise ValueError("Invalid Batch Mode!")
-  def _batch_images(self, size_batch, train_idx=None, valid_idx=None, test_idx=None):
+  def _batch_images(self, dset, size_batch, train_idxs=None, valid_idxs=None, test_idxs=None):
     loaders = {}
     if self.dataset.DATA_SCOPE == "local":
-      if np.any(train_idx):
-        loaders["trainloader"] = DataLoader(dataset=self.dataset, batch_size=size_batch, sampler=torch.utils.data.SubsetRandomSampler(train_idx))
-      if np.any(valid_idx):
-        loaders["validloader"] = DataLoader(dataset=self.dataset, batch_size=size_batch, sampler=torch.utils.data.SubsetRandomSampler(valid_idx))
-      if np.any(test_idx):
-        loaders["testloader"] = DataLoader(dataset=self.dataset, batch_size=size_batch, sampler=torch.utils.data.SubsetRandomSampler(test_idx))
+      if np.any(train_idxs):
+        loaders["trainloader"] = DataLoader(dataset=dset, batch_size=size_batch, sampler=torch.utils.data.SubsetRandomSampler(train_idxs))
+      if np.any(valid_idxs):
+        loaders["validloader"] = DataLoader(dataset=dset, batch_size=size_batch, sampler=torch.utils.data.SubsetRandomSampler(valid_idxs))
+      if np.any(test_idxs):
+        loaders["testloader"] = DataLoader(dataset=dset, batch_size=size_batch, sampler=torch.utils.data.SubsetRandomSampler(test_idxs))
     elif self.dataset.DATA_SCOPE == "external":
-      # test_idx actually carries the test part of the dataset when using CIFAR-10
-      if np.any(train_idx):
-        loaders["trainloader"] = DataLoader(dataset=self.dataset[0], batch_size=size_batch, sampler=torch.utils.data.SubsetRandomSampler(train_idx))
-      if np.any(valid_idx):
-        loaders["validloader"] = DataLoader(dataset=self.dataset[0], batch_size=size_batch, sampler=torch.utils.data.SubsetRandomSampler(valid_idx))
-      if np.any(test_idx):
-        loaders["testloader"] = DataLoader(dataset=test_idx, batch_size=size_batch, shuffle=True)
+      # test_idxs actually carries the test part of the dataset when using CIFAR-10
+      if np.any(train_idxs):
+        loaders["trainloader"] = DataLoader(dataset=dset[0], batch_size=size_batch, sampler=torch.utils.data.SubsetRandomSampler(train_idxs))
+      if np.any(valid_idxs):
+        loaders["validloader"] = DataLoader(dataset=dset[0], batch_size=size_batch, sampler=torch.utils.data.SubsetRandomSampler(valid_idxs))
+      if np.any(test_idxs):
+        loaders["testloader"] = DataLoader(dataset=test_idxs, batch_size=size_batch, shuffle=True)
       # print(next(trainloader).shape)
     return loaders.values()
-  def _batch_features2(self, size_batch, train_idx=None, valid_idx=None, test_idx=None):
-    if train_idx.any():
-      trainloader = DataLoader(dataset=self.dataset, batch_size=size_batch, sampler=torch.utils.data.SubsetRandomSampler(train_idx))
-    if valid_idx.any():
-      validloader = DataLoader(dataset=self.dataset, batch_size=size_batch, sampler=torch.utils.data.SubsetRandomSampler(valid_idx))
-    if test_idx.any():
-      testloader = DataLoader(dataset=self.dataset, batch_size=size_batch, sampler=torch.utils.data.SubsetRandomSampler(test_idx))
-    return trainloader, validloader, testloader
-  def _batch_features(self, train_idx=None, valid_idx=None, test_idx=None):
 
+  def _batch_clips(self, dset, size_batch, train_idxs=None, valid_idxs=None, test_idxs=None):
+    assert os.path.exists(dset.path_spaceFeatures), f"No exported space features found in {dset.path_spaceFeatures}!"
+    featuresDict = torch.load(dset.path_spaceFeatures, weights_only=False)
+    firstKey = next(iter(featuresDict))
+    featureLayer = list(featuresDict[firstKey].keys())[-1]  # get the last layer of features
+    # for now only allow the last layer of features
+    loader = [[], [], []]
+    size_clip = 3
+    for split, idxs in enumerate([train_idxs, valid_idxs, test_idxs]):
+
+      feats = torch.stack([featuresDict[i][featureLayer] for i in idxs]).squeeze(1) # to [n_frames, features_size] 
+      labels = dset.labels["class"].values[idxs] # use class column as np array for indexing labels
+      clips, clipLabels, clipIdxs = self._clip_dataitems(feats, labels, idxs, size_clip)  # clips is now [n_clips, n_features, features_size]
+      
+      # the dataset zips the tensors together to be feed to a dataloader (unzips them)
+      featset = TensorDataset(clips, clipLabels, clipIdxs)
+      # print(featset[0][0].shape, featset[0][1].shape, featset[0][2].shape)
+      loader[split] = DataLoader(featset, batch_size=size_batch, shuffle=False)
+    exampleBatch = next(iter(loader[0]))
+    print(f"\tBatch example shapes:\n\t[space features] {exampleBatch[0].shape}\n\t[labels] {exampleBatch[1].shape}\n\t[idxs] {exampleBatch[2].shape}\n")
+    return loader
+  def _clip_dataitems(self, feats, labels, idxs, size_clip=3):
+    # split into groups (clips) with size "size_clip" 
+    
+    # if not divisible by size_clip, pad the last clip
+    if feats.shape[0] % size_clip != 0:
+      pad_size = size_clip - (feats.shape[0] % size_clip)
+      tensorPadding = torch.zeros(pad_size, feats.shape[1], dtype=feats.dtype, device=feats.device)
+      labelPadding = np.zeros(pad_size, dtype=np.int64)  # Assuming labels are int64
+      idxPadding = np.array([-1] * pad_size, dtype=np.int64)  # Assuming idxs are int64
+      feats = torch.cat([feats, tensorPadding], dim=0)
+      labels = np.concatenate([labels, labelPadding])
+      idxs = np.concatenate([idxs, idxPadding])
+    # print(f"feats shape: {feats.shape}, labels shape: {labels.shape}, idxs shape: {idxs.shape}")
+    # print(feats.shape, labels.shape, idxs.shape)
+    clips = feats.view(-1, feats.shape[1], size_clip)  # reshape to [n_clips, features_size, n_features==size_clip]
+    clipLabels = torch.tensor(labels).view(-1, size_clip)  # reshape to [n_clips, n_features]
+    clipIdxs = torch.tensor(idxs).view(-1, size_clip)  # reshape to [n_clips, n_features]
+    # print(f"clips shape: {clips.shape}, clipLabels shape: {clipLabels.shape}, clipIdxs shape: {clipIdxs.shape}")
+    return clips, clipLabels, clipIdxs
+    
+
+    clips = torch.stack(clips).permute(0, 2, 1)  # now tensor: [n_clips, features_size, n_features==size_clip]
+    print(clips.shape)
+      
+
+  def _old_batch_features(self, path_spaceFeatures, train_idxs=None, valid_idxs=None, test_idxs=None):
+    assert os.path.exists(path_spaceFeatures), f"No exported space features found in {path_spaceFeatures}!"
     # batch size is "one video"
     loader = [[], [], []] 
-    for i, idx in enumerate([train_idx, valid_idx, test_idx]):
+    for i, idx in enumerate([train_idxs, valid_idxs, test_idxs]):
       df = self.dataset.labels.iloc[idx].copy()
       # print(df.columns)
       df["timestamp"] = df["frame"].str.split('_', expand=True)[1].astype(int)  # Ensure numeric sorting    

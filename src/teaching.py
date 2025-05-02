@@ -10,6 +10,7 @@ import seaborn as sns
 import pickle
 import time
 import pandas as pd
+import gc
 
 class Teacher():
   ''' Each Teacher teaches (action = train) 'k_folds' models from 1 dataset, besides saving
@@ -21,12 +22,14 @@ class Teacher():
       Pipeline: (train -> validate) x n_epochs -> test
   '''
   def __init__(self, TRAIN, EVAL, Ctl, DEVICE):
-    train_metric, valid_metric, test_metrics = self._get_metrics(TRAIN, EVAL, Ctl.dataset.N_CLASSES, Ctl.labelToClass, DEVICE)
+    self.N_CLASSES = Ctl.dataset.N_CLASSES
+    train_metric, valid_metric, test_metrics = self._get_metrics(TRAIN, EVAL, self.N_CLASSES, Ctl.labelToClass, DEVICE)
     criterion = self._get_criterion(TRAIN["criterionId"], Ctl.classWeights, DEVICE)
     self.trainer = Trainer(train_metric, criterion, TRAIN["HYPER"], DEVICE)
     self.validater = Validater(valid_metric, criterion, DEVICE)
-    self.tester = Tester(test_metrics, DEVICE)
+    self.tester = Tester(test_metrics, Ctl.dataset.labels, DEVICE)
 
+    self.save_checkpoints = TRAIN["save_checkpoints"]
     self.highScore = -np.inf
     self.bestState = {}
     
@@ -52,7 +55,6 @@ class Teacher():
     for epoch in range(startEpoch, n_epochs):
       print(f"-------------- Epoch {epoch + 1} --------------")
       train_loss, train_score = self.trainer.train(model, trainloader, optimizer, epoch)
-      # assert 1 == 0
       valid_loss, valid_score = self.validater.validate(model, validloader, epoch)
 
       self.writer.add_scalar("Loss/train", train_loss, epoch + 1)
@@ -71,29 +73,25 @@ class Teacher():
         valid_maxScore = valid_score
         betterState = model.state_dict()
       if ((epoch + 1) % 5) == 0:  # Save checkpoint every 5 epochs
-        print(f"\n* Checkpoint reached ({epoch + 1}/{n_epochs}) *\n")
-        path_checkpoint = os.path.join(path_states, f"{model.id}_cp{epoch + 1}.pth")
-        self.save_checkpoint(model, optimizer, epoch, valid_loss, path_checkpoint)
+        if self.save_checkpoints:
+          print(f"\n* Checkpoint reached ({epoch + 1}/{n_epochs}) *\n")
+          path_checkpoint = os.path.join(path_states, f"{model.id}_cp{epoch + 1}.pth")
+          self.save_checkpoint(model, optimizer, epoch, valid_loss, path_checkpoint)
       model.valid_score = valid_score
+
+      # clear GPU memory
+      torch.cuda.empty_cache()
+      gc.collect()
     return model, valid_maxScore, betterState
 
-  def evaluate(self, test_bundle, EVAL, fold, date, N_CLASSES, labelToClass, path_eval=None, path_aprfc=None, path_phaseCharts=None):
-    # print(predictions[0], targets[0], imageIds[0])
-    # torch.nn.functional.one_hot(tensor, N_CLASSES=-1)
-    if EVAL["export_testBundle"]:
-      path_to = os.path.join(path_eval, f"predictions_fold{fold}")
-      with open(path_to, 'wb') as f: # Save the DataFrame
-        pickle.dump(test_bundle, f)
+  def evaluate(self, test_bundle, eval_tests, modelId, labelToClass, Csr):
 
-    if EVAL["aprfc"]:
-      self.tester._aprfc(self.writer, path_aprfc, fold, test_bundle)
-    if EVAL["phaseTiming"]:
-      outText = self.tester._phase_lengths(test_bundle, N_CLASSES, labelToClass)
-      self.tester._aprfc(self.writer, path_aprfc, fold, test_bundle)
-      # print(list(final_bundle.groupby("Video")))
-      outText = self.tester._phase_lengths(test_bundle, N_CLASSES, labelToClass, test_bundle)
-    if EVAL["phaseChart"]:
-      self.tester._phase_graph(test_bundle, path_phaseCharts, fold, date, outText, test_bundle)
+    if eval_tests["aprfc"]:
+      self.tester._aprfc(self.writer, modelId, Csr.path_events, Csr.path_aprfc)
+    if eval_tests["phaseTiming"]:
+      outText = self.tester._phase_timing(test_bundle, self.N_CLASSES, labelToClass)
+      if eval_tests["phaseChart"]:
+        self.tester._phase_graph(test_bundle, Csr.path_phaseCharts, modelId, outText)
 
   def evaluate2(self, model, testloader, EVAL, extradata=None, path_to=None):
     # _, ext = os.path.splitext(path_from)
@@ -107,7 +105,7 @@ class Teacher():
     t2 = time.time()
     print(f"Testing took {t2 - t1:.2f} seconds")
     # self.tester.test_metrics.display()
-    # print(sampleNames[0], preds[0], targets[0])
+    # print(sampleIds[0], preds[0], targets[0])
     # torch.nn.functional.one_hot(tensor, N_CLASSES=-1)
     test_bundle = self._get_bundle(preds, targets, extradata)
     if path_to:
@@ -131,6 +129,7 @@ class Teacher():
 
 
   def _get_metrics(self, TRAIN, EVAL, N_CLASSES, labelToClass, DEVICE):
+    
     train_metric = RunningMetric(TRAIN["train_metric"], N_CLASSES, DEVICE, EVAL["agg"], EVAL["computeRate"], EVAL["updateRate"])
     valid_metric = RunningMetric(TRAIN["valid_metric"], N_CLASSES, DEVICE, EVAL["agg"], EVAL["computeRate"] // 2, EVAL["updateRate"])
     test_metrics = MetricBunch(EVAL["test_metrics"], N_CLASSES, labelToClass, EVAL["agg"], EVAL["computeRate"], DEVICE)
@@ -191,11 +190,17 @@ class Trainer():
       # print("inputs: ", inputs.shape, "\ttargets: ", targets.shape, '\n')
       optimizer.zero_grad() # reset the parameter gradients before backward step
       outputs = model(inputs) # forward pass
-      # print("\noutputs: ", outputs.shape)
-      loss = self.criterion(outputs, targets) # calculate loss  # -1 for getting last stage guesses
+      # print(inputs.shape, targets, data[2])
+      # print("outputs: ", outputs.shape, "\ttargets: ", targets.shape, '\n')
+      if model.inputType == "fmaps":
+        outputs = outputs.permute(0, 2, 1).reshape(-1, outputs.shape[1]) # outputs shape of [n_fmaps, classes]
+        targets = targets.reshape(-1) # targets shape of [n_fmaps]
+      # print("outputs: ", outputs.shape, "\ttargets: ", targets.shape, '\n')
+      loss = self.criterion(outputs, targets) # calculate loss
       loss.backward() # backward pass
       optimizer.step()    # a single optimization step
-      runningLoss += loss.item() # accumulate loss
+      # runningLoss += loss.item() # accumulate loss
+      outputs = torch.argmax(outputs, dim=1)  # get labels with max prediction values
       self.train_metric.update(outputs, targets)
       if batch % self.train_metric.computeRate == 0:
         print(f"\t  T [E{epoch + 1} B{batch + 1}]   scr: {self.train_metric.score():.4f}")
@@ -221,8 +226,15 @@ class Validater():
         inputs, targets = data[0].to(self.DEVICE), data[1].to(self.DEVICE)
         outputs = model(inputs)
         # print(labels[:5], outputs[:5])
+        # print("outputs: ", outputs.shape, "\ttargets: ", targets.shape, '\n')
+        if model.inputType == "fmaps":
+          outputs = outputs.permute(0, 2, 1).reshape(-1, outputs.shape[1]) # outputs shape of [n_fmaps, classes]
+          targets = targets.reshape(-1) # targets shape of [n_fmaps]
+        # print("outputs: ", outputs.shape, "\ttargets: ", targets.shape, '\n')
         loss = self.criterion(outputs, targets)
         runningLoss += loss.item()
+   
+        outputs = torch.argmax(outputs, dim=1) # get labels with max prediction values
         self.valid_metric.update(outputs, targets)  # updates with data from new batch
         if batch % self.valid_metric.computeRate == 0:
           print(f"\t  V [E{epoch + 1} B{batch + 1}]   scr: {self.valid_metric.score():.4f}")
@@ -231,79 +243,88 @@ class Validater():
 class Tester():
   ''' Part of the teacher that knows how to test a model knowledge in multiple ways
   '''
-  def __init__(self, metrics, DEVICE):
+  def __init__(self, metrics, labels, DEVICE):
     self.test_metrics = metrics
     self.DEVICE = DEVICE
+    self.labels = labels
   
-  def test(self, model, testloader, extradata=None, path_export=None):
-    ''' Test the model - return Preds, labels and sampleNames
+  def test(self, model, testloader, export_bundle, path_export=None):
+    ''' Test the model - return Preds, labels and sampleIds
     '''
     self.test_metrics.reset()
     predsList = []
     targetsList = []
     sampleIdsList = []
     model.eval().to(self.DEVICE); print("\n\tTesting...")
-    print(extradata)
     with torch.no_grad():
       for batch, data in enumerate(testloader):
-        if extradata["id"]:
-          inputs, targets, sampleNames = data[0].to(self.DEVICE), data[1].to(self.DEVICE), data[2]
-          sampleIdsList.extend(sampleNames)
-        else:
-          inputs, targets = data[0].to(self.DEVICE), data[1].to(self.DEVICE)
-        outputs = model(inputs).squeeze(0).permute(1, 0)
+        inputs, targets, sampleIds = data[0].to(self.DEVICE), data[1].to(self.DEVICE), data[2].to(self.DEVICE)
+        outputs = model(inputs)
+        if model.inputType == "fmaps":
+          outputs = outputs.permute(0, 2, 1).reshape(-1, outputs.shape[1]) # outputs shape of [n_fmaps, classes]
+          targets = targets.reshape(-1) # targets shape of [n_fmaps]
+          sampleIds = sampleIds.reshape(-1)
         _, preds = torch.max(outputs, 1)  # get labels with max prediction values
-
         predsList.append(preds)
         targetsList.append(targets)
+        sampleIdsList.append(sampleIds)
+
+        outputs = torch.argmax(outputs, dim=1)  # get labels with max prediction values
         self.test_metrics.update(outputs, targets)
         if batch % self.test_metrics.accuracy.computeRate == 0:
           print(f"\t  T [B{batch + 1}]   scr: {self.test_metrics.accuracy.score():.4f}")
     predsList = torch.cat(predsList).cpu().tolist()  # flattens the list of tensor
     targetsList = torch.cat(targetsList).cpu().tolist()
-    # sampleIdsList = [imgId for batch in sampleIds for imgId in batch]
+    sampleIdsList = torch.cat(sampleIdsList).cpu().tolist()
+
+    # print(f"Preds: {predsList}\n Targets: {targetsList}\n SampleIds: {sampleIdsList}")
     test_bundle = self._get_bundle(predsList, targetsList, sampleIdsList)
-    if path_export:
+    if export_bundle:
       with open(path_export, 'wb') as f:
         pickle.dump(test_bundle, f)
     # print(len(predsList), len(targetsList), len(sampleIdsList))
     # print(f"SampleIds Type: {type(sampleIdsList[0])}, Content: {sampleIdsList[:5]}")
     return test_bundle
 
-  def _get_bundle(self, preds, targets, extradata):
-    preBundle = {
-      "Preds": preds,
-      'Targets': targets,
-      'SampleName': extradata
-    }
-    # if extradata:
-    #   preBundle.update(extradata)
-    # print(len(preds), len(targets), len(extradata))
-    # print(f"Sample Names Type: {type(extradata[0])}, Content: {extradata[:5]}")
-    bundle = pd.DataFrame(preBundle)
-    # print(bundle.head())
+  def _get_bundle(self, preds, targets, sampleIds):
+    # for now requires ordered parameters
+     # 1. Create base DataFrame
+    bundle = pd.DataFrame({
+        "Pred": preds,
+        "Target": targets,
+        "SampleId": sampleIds
+    })
+    # 2. Extract Video and Timestamp from self.labels
+    label_info = self.labels.copy()
+    label_info[['Video', 'Timestamp']] = label_info['frameId'].str.split('_', expand=True)
+    label_info['SampleId'] = label_info.index  # assume labels are indexed by sampleId
 
-    # assuming frames in the structure of videoName_relativeTime
-    bundle[['Video', 'Timestamp']] = bundle["SampleName"].str.split('_', expand=True) # expand creates two columns, instead of just leaving data as a split list
-    bundle["Timestamp"] = bundle["Timestamp"].astype(int)
-    bundle = bundle.sort_values(by=['Video', 'Timestamp']) # Sort the DataFrame by VIDEO and TIME
-    #bundle['AbsoluteTime'] = bundle.groupby('Video').cumcount() # Convert Relative Time to Absolute Time
+    # 3. Merge video info into bundle where sampleId >= 0
+    bundle = bundle.merge(label_info[['SampleId', 'Video', 'Timestamp']], on='SampleId', how='left')
+    # 4. Forward-fill Video/Timestamp for padding frames (SampleId == -1)
+    bundle[['Video', 'Timestamp']] = bundle[['Video', 'Timestamp']].ffill()
+    bundle["Timestamp"] = bundle["Timestamp"].astype(int)  # Convert Timestamp to int
+    # 5. Sort by video and timestamp to ensure order
+    bundle = bundle.sort_values(by=['Video', 'Timestamp']).reset_index(drop=True)
+    # 6. Optional: assign absolute frame order
+    bundle['AbsoluteFrameIndex'] = bundle.groupby('Video').cumcount()
     return bundle
   
-  def _aprfc(self, writer, path_to, fold, path_aprfc):
+  def _aprfc(self, writer, modelId, path_events, path_aprfc):
     # self.test_metrics.display()
+    fold = int(modelId.split("_")[1][1]) # get fold number from modelId
     writer.add_scalar(f"accuracy/test", self.test_metrics.get_accuracy(), fold)
     writer.add_scalar(f"precision/test", self.test_metrics.get_precision(), fold)
     writer.add_scalar(f"recall/test", self.test_metrics.get_recall(), fold)
     writer.add_scalar(f"f1score/test", self.test_metrics.get_f1score(), fold)
-    image_cf = plt.imread(self.test_metrics.get_confusionMatrix(path_to, path_aprfc))
+    image_cf = plt.imread(self.test_metrics.get_confusionMatrix(path_events, path_aprfc))
     tensor_cf = torch.tensor(image_cf).permute(2, 0, 1)
     writer.add_image(f"confusion_matrix/test", tensor_cf, fold)
     writer.close()
     
-  def _phase_lengths_i2(self, df, N_CLASSES, labelToClass, samplerate=1):
+  def _phase_timing_i2(self, df, N_CLASSES, labelToClass, samplerate=1):
     outText = []
-    lp, lt = len(df["Preds"]), len(df["Targets"])
+    lp, lt = len(df["Pred"]), len(df["Target"])
     # N_CLASSES = (max(df["Targets"]) + 1)  # assuming regular int encoding
     # N_CLASSES = len(preds[0]) # assuming one hot encoding
     assert lp == lt, "Targets and Preds Size Incompatibility"
@@ -314,16 +335,16 @@ class Tester():
 
     for idx, video in enumerate(videos):
       print()
-      df_filtered = df[df["Video"] == video][["Preds", "Targets"]]
+      df_filtered = df[df["Video"] == video][["Pred", "Target"]]
       
-      classes_video = pd.Series(df_filtered["Targets"].unique())
+      classes_video = pd.Series(df_filtered["Target"].unique())
       # pd.set_option("display.max_rows", 100)
       # print(df_filtered["Targets"].iloc[:100])
       print(classes_video.reindex(range(N_CLASSES), fill_value=-1).values)
       # Reset for each video
       
-      phases_preds_video = df_filtered["Preds"].value_counts().reindex(range(N_CLASSES), fill_value=0) # Targets video counts
-      phases_gt_video = df_filtered["Targets"].value_counts().reindex(range(N_CLASSES), fill_value=0) # Targets video counts
+      phases_preds_video = df_filtered["Pred"].value_counts().reindex(range(N_CLASSES), fill_value=0) # Targets video counts
+      phases_gt_video = df_filtered["Target"].value_counts().reindex(range(N_CLASSES), fill_value=0) # Targets video counts
       # ensures every class is accounted for in cumulative count, even with no occurrences
       phases_preds_sum += phases_preds_video.values
       phases_gt_sum += phases_gt_video.values
@@ -356,10 +377,10 @@ class Tester():
   # phase_metric([1, 1, 2, 3, 3, 4, 0, 5], [0, 0, 0, 2, 3, 4, 5, 1])
     return outText
 
-  def _phase_lengths(self, df, N_CLASSES, labelToClass, samplerate=1):
-    return self._phase_lengths_i2(df, N_CLASSES, labelToClass, samplerate=1)
+  def _phase_timing(self, df, N_CLASSES, labelToClass, samplerate=1):
+    return self._phase_timing_i2(df, N_CLASSES, labelToClass, samplerate=1)
 
-  def _phase_graph(self, df, path_out, fold, date, outText, path_phaseCharts):
+  def _phase_graph(self, df, path_phaseCharts, modelId, outText):
       # df = pd.DataFrame({
       #     'SampleName': ['vid1_1', 'vid1_3', 'vid1_2', 'vid2_20', 'vid2_23', 'vid2_40', 'vid2_51', 'vid2_52'],
       #     'Targets': [0, 1, 1, 2, 0, 1, 1, 1],  # Example target labels
@@ -379,7 +400,7 @@ class Tester():
       # Plotting
       for idx, video in enumerate(videos):
 
-        data_video = df[df['Video'] == video][["Targets", "Preds"]]
+        data_video = df[df['Video'] == video][["Target", "Pred"]]
         fig, (ax, ax_text) = plt.subplots(nrows=2, gridspec_kw={'height_ratios': [3, 1]}, figsize=(9, 6))
           
         # ax = axes[idx]  # for saving all videos to same image
@@ -408,7 +429,6 @@ class Tester():
         ax_text.text(0, 0.5, ot, transform=ax_text.transAxes, fontsize=11, 
                     verticalalignment='center', horizontalalignment='left',
                     bbox=dict(boxstyle="round,pad=0.3", edgecolor="black", facecolor="white"))
-
       
         # Create custom legend
         handles = [plt.Rectangle((0, 0), 1, 1, color=color_map[i]) for i in color_map.keys()]
@@ -417,7 +437,7 @@ class Tester():
 
         plt.tight_layout()
         # plt.show(block=True)
-        plt.savefig(os.path.join(path_out, f"{date}_{os.path.basename(path_phaseCharts)}_{video[:4]}.png"))
+        plt.savefig(os.path.join(path_phaseCharts, f"{modelId}_{video[:4]}_phase-ev.png"))
         plt.close(fig)
 
       plt.figure()
@@ -430,12 +450,12 @@ class Tester():
                   bbox=dict(boxstyle="round,pad=0.3", edgecolor="black", facecolor="white"))
       plt.tight_layout()
       plt.show(block=True)
-      plt.savefig(os.path.join(path_out, f"{date}_{os.path.basename(path_phaseCharts)}_oa-avg-phase-rep.png"))
+      plt.savefig(os.path.join(path_phaseCharts, f"{modelId}_oa-avg-phase-ev.png"))
       plt.close()
 
       t2 = time.time()
       print(f"Video graphing took {t2 - t1:.2f} seconds")
-      print(f"\nSaved phase metric graphs to {path_out}")
+      print(f"\nSaved phase metric graphs to {path_phaseCharts}")
 
 class EarlyStopper:
   ''' Controls the validation loss progress to keep it going down and improve times
@@ -466,6 +486,8 @@ class StillMetric:
       Performs metric update and computation based on a frequency provided
   '''
   def __init__(self, metricName, N_CLASSES, DEVICE, agg="micro"):
+    self.name = metricName
+
     if metricName == "accuracy":
       self.metric = MulticlassAccuracy(average="micro", num_classes=N_CLASSES, device=DEVICE)
     elif metricName == "precision":
@@ -490,16 +512,8 @@ class RunningMetric(StillMetric):
     super().__init__(metricName, N_CLASSES, DEVICE, agg)
     self.computeRate = computeRate  # num of batches between computations
     self.updateFreq = updateFreq  # num of batches between updates
-    
-  # def running(self, outputs, labels, batch, epoch):
-  #   if (batch + 1) % self.updateFreq == 0:
-  #     self.metric.update(outputs, labels)
-  #   if (batch + 1) % self.computeRate == 0:
-  #     metric_result = self.metric.compute().item()
-  #     print(f"\t  [E{epoch + 1} B{batch + 1}]   scr: {metric_result:.4f}")
-  #     return metric_result
-
-  def update(self, outputs, targets):
+  
+  def update(self, outputs, targets):      
     self.metric.update(outputs, targets)
 
 
@@ -589,3 +603,12 @@ class MetricBunch:
       print("! Dataset group lacks representation of all classes !")
       return path_to
   
+def get_testState(path_states, modelId):
+  for state in os.listdir(path_states):
+    if modelId in state:
+      path_state = os.path.join(path_states, state)
+      print(f"    Loading state from model {modelId}")
+      state = torch.load(path_state, weights_only=False)
+      return state
+  else:
+    raise ValueError(f"Model {modelId} not found in {path_states}")

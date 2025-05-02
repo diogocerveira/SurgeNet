@@ -37,12 +37,8 @@ def learning(**the):
   # teaching.py (metrics, train validation, test)
   Tch = teaching.Teacher(the["TRAIN"], the["EVAL"], Ctl, the["device"])
   print(f"C. [training] {the['TRAIN']['train_point']} on [device] {the['device']}")
-  print(f"   [folds] #{the['TRAIN']['k_folds']} [epochs] #{the['TRAIN']['HYPER']['n_epochs']} [batches] #{the['TRAIN']['HYPER']['batchSize']}\n")
+  print(f"   [folds] #{the['TRAIN']['k_folds']} [epochs] #{the['TRAIN']['HYPER']['n_epochs']} [batch size] {the['TRAIN']['HYPER']['batchSize']}\n")
   highScore = 0.0
-
-  spaceinator = machine.Spaceinator(the["MODEL"])
-  print(f"    Feature size of {spaceinator.featureSize} at node '{spaceinator.featureNode}'\n")
-  timeinator = machine.Timeinator(the["MODEL"], spaceinator.featureSize)
 
   # Index split of the dataset (virtual)
   for fold, splits in enumerate(Ctl.split(the["TRAIN"]["k_folds"])):
@@ -52,41 +48,36 @@ def learning(**the):
       continue
     print(f"  Fold {fold + 1} splits:\n\ttrain {train_videoIds}\n\tvalid {valid_videoIds}\n\ttest {test_videoIds}\n")
     # Create the model
-    
+    spaceinator = machine.Spaceinator(the["MODEL"], Ctl.dataset.N_CLASSES)
+    print(f"    Feature size of {spaceinator.featureSize} at node '{spaceinator.featureNode}'\n")
+    timeinator = machine.Timeinator(the["MODEL"], spaceinator.featureSize, Ctl.dataset.N_CLASSES)
     model = machine.PhaseNet(the["MODEL"]["domain"], spaceinator, timeinator, Csr.id, fold + 1)
 
-    trainloader, validloader, testloader = Ctl.batch(
-        the["TRAIN"]["HYPER"]["batchSize"], model.inputType, train_idx=train_idxs, valid_idx=valid_idxs, test_idx=test_idxs)
-
-    Tch.writer = SummaryWriter(os.path.join(Csr.path_events, model.id)) # object for logging stats
+    dset.path_spaceFeatures = os.path.join(Csr.path_exportedFeatures, f"spacefmaps_f{fold + 1}.pt")
+    trainloader, validloader, testloader = Ctl.batch(dset, model.inputType, the["TRAIN"]["HYPER"]["batchSize"], train_idxs=train_idxs, valid_idxs=valid_idxs, test_idxs=test_idxs)
+   
+    Tch.writer = SummaryWriter(log_dir=os.path.join(Csr.path_events, model.id.split('_')[1])) # object for logging stats
 
     # TRAIN
     if "train" in the["actions"]:
-      trained_model, valid_maxScore, betterState = Tch.teach(model, trainloader, validloader, the["TRAIN"]["HYPER"]["n_epochs"], Csr.path_states, the["TRAIN"]["path_resumeModel"])
+      trainedModel, valid_maxScore, betterState = Tch.teach(model, trainloader, validloader, the["TRAIN"]["HYPER"]["n_epochs"], Csr.path_states, the["TRAIN"]["path_resumeModel"])
       if the["TRAIN"]["save_betterState"]:
-        path_betterState = os.path.join(Csr.path_states, f"{trained_model.id}-{valid_maxScore:.2f}")
+        path_betterState = os.path.join(Csr.path_states, f"{trainedModel.id}-{valid_maxScore:.2f}")
         torch.save(betterState, path_betterState)
       if the["TRAIN"]["save_lastState"]:
-        path_lastState = os.path.join(Csr.path_states, f"{trained_model.id}-{trained_model.valid_score:.2f}")
-        torch.save(trained_model.state_dict(), path_lastState)
+        path_lastState = os.path.join(Csr.path_states, f"{trainedModel.id}-{trainedModel.valid_score:.2f}")
+        torch.save(trainedModel.state_dict(), path_lastState)
 
     # PROCESS - Feature extraction
     if the["PROCESS"]["fx_spatial"] and "process" in the["actions"]:
       t1 = time.time()
       if "train" in the["actions"]:
-        spaceinator.load_state_dict(trained_model.state_dict(), strict=False)
+        spaceinator.load_state_dict(trainedModel.state_dict(), strict=False)
       path_export = os.path.join(Csr.path_features, f"spacefmaps_{model.id.split('_')[1]}.pt")
-      spaceinator.export_features(DataLoader(Ctl.dataset, batch_size=the["TRAIN"]["HYPER"]["batchSize"]), path_export, ["flatten"], the["device"])
+      spaceinator.export_features(DataLoader(Ctl.dataset, batch_size=the["TRAIN"]["HYPER"]["batchSize"]), path_export, the["PROCESS"]["featureLayer"], the["device"])
       t2 = time.time()
       print(f"Exporting features took {(t2 - t1) // 3600} hours and {(((t2 - t1) % 3600) / 60):.1f} minutes!")
-      # load features
-      try:
-        features = torch.load(path_export, weights_only=False, map_location=the["device"])
-      except Exception as e:
-        print(f"No features provided for processing: {e}\n")
-        break
-      print(features[0]["flatten"], features[0]["flatten"].shape)
-
+    
     # EVALUATE 
     if "eval" in the["actions"]:
       if the["EVAL"]["eval_from"] == "predictions":
@@ -104,24 +95,29 @@ def learning(**the):
           else: # load model from 
             if the["EVAL"]["path_model"]: # chose before running
               stateDict = torch.load(the["EVAL"]["path_model"], weights_only=False, map_location=the["device"])
-            else: # choose on runtime
-              pass
+              Tch.evaluate(test_bundle, the["EVAL"], fold + 1, Csr, Ctl.N_CLASSES, Ctl.labelToClass,
+                the["DATA"]["extradata"], Csr.path_eval, Csr.path_aprfc, Csr.path_phaseCharts, the["TEST"]["path_preds"])
+              print("Breaking testing loop on 'Fold 1' because a path_model was provided without 'train' action.")
+              break
+            else: # choose from the states folder (corresponding to fold)
+              stateDict = teaching.get_testState(Csr.path_states, model.id)
               # path_model = environment.choose_in_path(Csr.path_models)
               # stateDict = torch.load(path_model, weights_only=False, map_location=the["device"])
             model.load_state_dict(stateDict, strict=False)
         except Exception as e:
-          print(f"Error loading model: {e}\n")
+          print(f"Error loading model state for testing: {e}\n")
           break
         t1 = time.time()
-        path_export = os.path.join(Csr.path_predictions, f"{model.id}_preds")
-        test_bundle  = Tch.tester.test(model, testloader, extradata=the["DATA"]["recycle_itemIds"], path_export=path_export)
+        path_export = os.path.join(Csr.path_predictions, f"preds_{model.id.split('_')[1]}.pt")
+        test_bundle  = Tch.tester.test(model, testloader, the["EVAL"]["export_testBundle"], path_export=path_export)
         t2 = time.time()
         print(f"Testing took {t2 - t1:.2f} seconds")
+        print(test_bundle.head())
       else:
         raise ValueError("Invalid evalFrom choice!")
       
       # PROCESS - Filterting
-      if the["PROCESS"]["modeFilter"] and "process" in the["actions"]:
+      if the["PROCESS"]["apply_modeFilter"] and "process" in the["actions"]:
         if the["PROCESS"]["path_bundle"]:
           ## path_bundle = utils.choose_in_path(Csr.path_modeFilter)
           with open(the["PROCESS"]["path_bundle"], 'rb') as f:
@@ -140,12 +136,12 @@ def learning(**the):
             print(f"No predictions (test_bundle) provided for processing: {e}")
             continue
       
-      Tch.evaluate(test_bundle, the["EVAL"], fold + 1, Csr, Ctl.N_CLASSES, Ctl.labelToClass,
-          the["DATA"]["extradata"], Csr.path_eval, Csr.path_aprfc, Csr.path_phaseCharts, the["TEST"]["path_preds"])
+      Tch.evaluate(test_bundle, the["EVAL"]["eval_tests"], model.id, Ctl.labelToClass, Csr)
 
     Tch.writer.close()
-    print(f"  [fold] {fold + 1} done\n")
-    break # == 1 folc (debug)
+    print(f"\n\t = = = = = \t = = = = =\n\t\t Fold {fold + 1} done!\n\t = = = = = \t = = = = =\n")
+    # break # == 1 folc (debug)
+  os.system(f"tensorboard --logdir={Csr.path_events}")
  
 if __name__ == "__main__":
   # Load default parameters from config.yml

@@ -24,7 +24,7 @@ class PhaseNet(nn.Module):
       inputType = "images"
     elif modelDomain == "temporal":
       inators = [timeinator]
-      inputType = "features"
+      inputType = "fmaps"
     elif modelDomain == "full":
       inators = [spaceinator, timeinator]
       inputType = "images"
@@ -47,18 +47,20 @@ class Spaceinator(nn.Module):
               _features: train and _features features in runtime
               load: load presaved features and forward them
   '''
-  def __init__(self, MODEL):
+  def __init__(self, MODEL, n_classes):
     super().__init__()
     self.domain = MODEL["domain"]
-    self.n_classes = MODEL["n_classes"]
+    self.n_classes = n_classes
     arch = MODEL["spaceArch"]
     preweights = self._get_preweights(MODEL["spacePreweights"])
     transferMode = MODEL["spaceTransferLearning"]
     self.model = self._get_model(arch, preweights, transferMode, MODEL["path_spaceModel"])  # to implement my own in model.py 
-    self.featureSize = self.model.fc.in_features 
+    self.featureSize = self.model.fc.in_features
     self.featureNode = fxs.get_graph_node_names(self.model)[0][-2] # -2 is the flatten node (virtual layer)
+
+    if self.domain == "temporal" and MODEL["path_spaceModel"]:
+      self.exportedFeatures = torch.load(MODEL["path_spaceModel"], weights_only=False, map_location="cpu")
     
-    self.path_features = MODEL["path_spaceFeatures"]  # train_nodes, eval_nodes = fx.get_graph_node_names(self.model)
     # print(self.model)
     # print(self.model.parameters())
     # print(train_nodes == eval_nodes, end='\t'); print(train_nodes)
@@ -88,6 +90,7 @@ class Spaceinator(nn.Module):
         model.fc = nn.Linear(n_features, self.n_classes)
       elif self.domain == "temporal" or self.domain == "full":
         model.fc = nn.Identity()  # Remove classification layer, assumed already trained or not the end of the network
+        model.fc.in_features = n_features
     elif transferMode == "finetuning":  
       model.fc = nn.Linear(n_features, self.n_classes)
     else:
@@ -181,50 +184,61 @@ class Spaceinator(nn.Module):
     return defaultdict(None)
 
 class Timeinator(nn.Module):
-  ''' Receives [batch_size, in_channels, in_length] feature tensors
+  ''' Receives [batch_size, in_channels == feature size, in_length == length of clip of vid] feature tensors
       Outputs [batch_size, N_CLASSES, in_length] further guesses
   '''
-  def __init__(self, MODEL, featureSize):
+  def __init__(self, MODEL, in_channels, n_classes):
     super().__init__()
 
-    self.N_STAGES = MODEL["n_stages"]
+    N_STAGES = MODEL["n_stages"]
     N_BLOCKS = MODEL["n_blocks"]
-    N_FILTERS = MODEL["n_filters"]
+    N_KERNELS = MODEL["n_kernels"]
     TF_FILTER = MODEL["tf_filter"]
-    self.conv1x1_in = nn.Conv1d(featureSize, N_FILTERS, kernel_size=1)
-    self.blocks = nn.ModuleList([copy.deepcopy(_TCBlock(N_FILTERS, N_FILTERS, TF_FILTER, 2**b)) for b in range(N_BLOCKS)])
-    self.conv_out = nn.Conv1d(N_FILTERS, 6, kernel_size=1)
-    self.featureSize = 6
+    N_CLASSES = n_classes
+    self.conv1x1_in = nn.Conv1d(in_channels, N_KERNELS, kernel_size=1)
+    self.stages = nn.ModuleList([copy.deepcopy(_TCStage(N_BLOCKS, N_KERNELS, TF_FILTER)) for s in range(N_STAGES)])
+    self.conv1x1_out = nn.Conv1d(N_KERNELS, N_CLASSES, kernel_size=1)
+    self.featureSize = N_KERNELS
 
   def forward(self, x):
-    x = self.conv1x1_in(x)
+    # print("Before Timeinator Shape: ", x.shape)
+    x = self.conv1x1_in(x)  # adapt number of channels (features) to the number of kernels per filter
+    # print("After conv1x1_in Shape: ", x.shape)
     x_acm = x.unsqueeze(0)  # add dimension for accumulation stage results
-    for _ in range(self.N_STAGES):
-      for block in self.blocks:
-        x = block(x)
-      x = F.softmax(self.conv_out(x), dim=1)  # get predictions from logits
-      x_acm = torch.cat((x_acm, x.unsqueeze(0)), dim=0)
-    return x.squeeze(0).permute(1, 0) # x_accm for more in depth (returning last state guess)
+    for stage in self.stages:
+      x = stage(x)  # apply the stage (blocks of dilated convolutions) - keeps the same number of channels
+      # x = F.softmax(self.conv_out(x), dim=1)  # get predictions from logits
+      x_acm = torch.cat((x_acm, x.unsqueeze(0)), dim=0) # accumulate stage results
+    x = self.conv1x1_out(x)  # adapt number of channels (features) to the number of classes
+    # print("After conv1x1_out Shape: ", x.shape)
+    return x # x_accm for more in depth (returning last state guess)
 
 class _TCStage(nn.Module):
-  def __init__(self, in_channels, out_channels, filterSize, dilation):
+  def __init__(self, n_blocks, n_kernels, tf_filter):
     super().__init__()
-    self.dconv = nn.Conv1d(in_channels, out_channels, kernel_size=filterSize, padding=dilation, dilation=dilation)
-    self.conv1x1 = nn.Conv1d(out_channels, out_channels, kernel_size=1)
-
-class _TCBlock(nn.Module):
+    # self.conv1x1_in = nn.Conv1d(in_channels, n_kernels, kernel_size=1) # adapts fv channel dimension
+    self.blocks = nn.ModuleList([copy.deepcopy(_TCResBlock(n_kernels, n_kernels, tf_filter, 2**b)) for b in range(n_blocks)])
+    # self.conv1x1_out = nn.Conv1d(n_kernels, out_channels, kernel_size=1)
+  def forward(self, x):
+    # x = self.conv1x1_in(x)
+    for block in self.blocks:
+      x = block(x)
+    # x = self.conv1x1_out(x)
+    return x
+  
+class _TCResBlock(nn.Module):
   # Dilated Residual Block of Layers
-  def __init__(self, in_channels, out_channels, filterSize, dilation):
+  def __init__(self, in_channels, out_channels, kernelSize, dilation):
     super().__init__()
-    self.dconv = nn.Conv1d(in_channels, out_channels, kernel_size=filterSize, padding=dilation, dilation=dilation)
+    self.convDilated = nn.Conv1d(in_channels, out_channels, kernel_size=kernelSize, padding=dilation, dilation=dilation)
     self.conv1x1 = nn.Conv1d(out_channels, out_channels, kernel_size=1) # filter with time frame 1: mix learned features
     self.dropout = nn.Dropout()
   
   def forward(self, x):
     # x becomes the residual
-    out = F.relu(self.dconv(x))
-    out = self.conv1x1(x)
-    out = self.dropout(x)
+    out = F.relu(self.convDilated(x))
+    # out = self.conv1x1(x)
+    # out = self.dropout(x)
     return out + x
 
 class Classifier(nn.Module):
@@ -242,26 +256,26 @@ class Guesser(nn.Module):
   ''' Receives [batch_size, in_channels, in_length] feature tensors
       Outputs [batch_size, N_CLASSES, in_length] 1st guesses
   '''
-  def __init__(self, featureSize, N_CLASSES, N_BLOCKS, N_FILTERS, filterSize):
+  def __init__(self, featureSize, N_CLASSES, N_BLOCKS, N_KERNELS, kernelSize):
     super().__init__()
     self.N_BLOCKS = N_BLOCKS
-    self.conv1x1_in = nn.Conv1d(featureSize, N_FILTERS, kernel_size=1) # adapts fv channel dimension
+    self.conv1x1_in = nn.Conv1d(featureSize, N_KERNELS, kernel_size=1) # adapts fv channel dimension
     
     ## ALternative Guesser: Using different blocks from Predictor
     # self.dconv1 = nn.ModuleList((
-    #   nn.Conv1d(N_FILTERS, N_FILTERS, filterSize, padding=2**(N_BLOCKS - 1 - b), dilation=2**(N_BLOCKS - 1 - b))
+    #   nn.Conv1d(N_KERNELS, N_KERNELS, kernelSize, padding=2**(N_BLOCKS - 1 - b), dilation=2**(N_BLOCKS - 1 - b))
     #             for b in range(N_BLOCKS) ))
     # self.dconv2 = nn.ModuleList((
-    #   nn.Conv1d(N_FILTERS, N_FILTERS, filterSize, padding=2**b, dilation=2**b)
+    #   nn.Conv1d(N_KERNELS, N_KERNELS, kernelSize, padding=2**b, dilation=2**b)
     #             for b in range(N_BLOCKS )))
     # self.conv_fusion = nn.ModuleList((  # merge two previous
-    #   nn.Conv1d(2 * N_FILTERS, N_FILTERS, kernel_size=1) 
+    #   nn.Conv1d(2 * N_KERNELS, N_KERNELS, kernel_size=1) 
     #             for _ in range(N_BLOCKS) ))
     
     ## Same Guesser: Same blocks as improver
-    self.blocks = nn.ModuleList([copy.deepcopy(_TCBlock(N_FILTERS, N_FILTERS, filterSize, 2**b)) for b in range(N_BLOCKS)])
+    self.blocks = nn.ModuleList([copy.deepcopy(_TCResBlock(N_KERNELS, N_KERNELS, kernelSize, 2**b)) for b in range(N_BLOCKS)])
     # self.dropout = nn.Dropout()
-    self.conv_out = nn.Conv1d(N_FILTERS, N_CLASSES, kernel_size=1)
+    self.conv_out = nn.Conv1d(N_KERNELS, N_CLASSES, kernel_size=1)
 
   def forward(self, x):
     x = self.conv1x1_in(x)
@@ -274,12 +288,12 @@ class Refiner(nn.Module):
   ''' Receives [batch_size, N_CLASSES, in_length] 1st guesses
       Outputs [batch_size, N_CLASSES, in_length] further guesses
   '''
-  def __init__(self, N_CLASSES, N_STAGES, N_BLOCKS, N_FILTERS, filterSize):
+  def __init__(self, N_CLASSES, N_STAGES, N_BLOCKS, N_KERNELS, kernelSize):
     super().__init__()
     self.N_STAGES = N_STAGES
-    self.conv1x1_in = nn.Conv1d(N_CLASSES, N_FILTERS, kernel_size=1)
-    self.blocks = nn.ModuleList([copy.deepcopy(_TCBlock(N_FILTERS, N_FILTERS, filterSize, 2**b)) for b in range(N_BLOCKS)])
-    self.conv_out = nn.Conv1d(N_FILTERS, N_CLASSES, kernel_size=1)
+    self.conv1x1_in = nn.Conv1d(N_CLASSES, N_KERNELS, kernel_size=1)
+    self.blocks = nn.ModuleList([copy.deepcopy(_TCResBlock(N_KERNELS, N_KERNELS, kernelSize, 2**b)) for b in range(N_BLOCKS)])
+    self.conv_out = nn.Conv1d(N_KERNELS, N_CLASSES, kernel_size=1)
   
   def forward(self, x):
     x = self.conv1x1_in(x)
