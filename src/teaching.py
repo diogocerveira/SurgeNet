@@ -88,10 +88,19 @@ class Teacher():
 
     if eval_tests["aprfc"]:
       self.tester._aprfc(self.writer, modelId, Csr.path_events, Csr.path_aprfc)
+      # clear GPU memory
+      torch.cuda.empty_cache()
+      gc.collect()
     if eval_tests["phaseTiming"]:
       outText = self.tester._phase_timing(test_bundle, self.N_CLASSES, labelToClass)
+      # clear GPU memory
+      torch.cuda.empty_cache()
+      gc.collect()
       if eval_tests["phaseChart"]:
         self.tester._phase_graph(test_bundle, Csr.path_phaseCharts, modelId, outText)
+        # clear GPU memory
+        torch.cuda.empty_cache()
+        gc.collect()
 
   def _get_metrics(self, TRAIN, EVAL, N_CLASSES, labelToClass, DEVICE):
     

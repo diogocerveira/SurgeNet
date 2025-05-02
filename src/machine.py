@@ -85,16 +85,16 @@ class Spaceinator(nn.Module):
       for param in model.parameters():  # freeze all layers
         param.requires_grad = False
         # parameters of newly constructed modules have requires_grad=True by default
-      # remove final layer if passing features to another model (not learning them)
-      if self.domain == "spatial":
-        model.fc = nn.Linear(n_features, self.n_classes)
-      elif self.domain == "temporal" or self.domain == "full":
-        model.fc = nn.Identity()  # Remove classification layer, assumed already trained or not the end of the network
-        model.fc.in_features = n_features
-    elif transferMode == "finetuning":  
-      model.fc = nn.Linear(n_features, self.n_classes)
+    elif transferMode == "fine-tune":  
+      pass
     else:
       raise ValueError("Invalid transfer learning mode!")
+    # remove final layer if passing features to another model (not learning them)
+    if self.domain == "spatial":
+      model.fc = nn.Linear(n_features, self.n_classes)
+    elif self.domain == "temporal" or self.domain == "full":
+      model.fc = nn.Identity()  # Remove classification layer, assumed already trained or not the end of the network
+      model.fc.in_features = n_features # ?
     
     # If provided with a model state, load it
     stateDict = None

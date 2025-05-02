@@ -1,10 +1,10 @@
 path_root: . #/batataclan
 seed: 53  # 5 --> 3 or 3 --> 5  DO NOT CHANGE SEED (it messes up with fold training)
 device:
-id_classroom: LDSS-2504-2 #LDSSi-2504-1 # if empty creates new learning environment, else loads it (dataset-YYMM-DDHH)
+id_classroom:  #LDSSi-2504-1 # if empty creates new learning environment, else loads it (dataset-YYMM-DDHH)
 actions:
 - train        # train (spatial, temporal, full)
-# - process      # process (sample-n-label, mode-filter, extractFeatures)
+- process      # process (sample-n-label, mode-filter, extractFeatures)
 - eval         # eval (aprfc, phaseTiming, phaseChart)
 
 # DATA and TRAIN properties define an unique classroom
@@ -19,7 +19,7 @@ TRAIN:
   train_point: start # (start, resume)
   path_resumeModel:  # to continue training from a checkpoint model if train-point == resume
   save_checkpoints: False
-  checkpointRate: 5 # epoch frequency to save a checkpoint
+  checkpointRate: 6 # epoch frequency to save a checkpoint
   save_betterState: False
   save_lastState: True
   log_events: True
@@ -59,9 +59,9 @@ PROCESS:  # Process
 
 MODEL:  # for models created/trained in the run
   type: phase
-  domain: temporal # spatial, temporal, full
+  domain: spatial # spatial, temporal, full
 # spatial
-  spaceTransferLearning: fixed-fx # fine-tune | fixed-fx
+  spaceTransferLearning: fine-tune # fine-tune | fixed-fx
   spaceArch: resnet50
   spacePreweights: default # sfx = spatial feature extraction
   path_spaceModel: #C:/Users/DC/Documents/Programming/python/ucl/ML_SurgeNet/logs/LDSS/run_20241104-00/checkpoints/LDSS-20241104-00-fold6-0.837800.pth # if empty, uses new untrained one

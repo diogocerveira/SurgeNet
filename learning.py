@@ -9,6 +9,7 @@ from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader
 import pickle
 from src import dataset, environment, machine, teaching
+import gc
 
 def learning(**the):
   ''' Note: trying out "the" instead of "kwargs"/"config" for readability purposes '''
@@ -67,7 +68,9 @@ def learning(**the):
       if Csr.TRAIN["save_lastState"]:
         path_lastState = os.path.join(Csr.path_states, f"{trainedModel.id}-{trainedModel.valid_score:.2f}")
         torch.save(trainedModel.state_dict(), path_lastState)
-
+    # clear GPU memory
+    torch.cuda.empty_cache()
+    gc.collect()
     # PROCESS - Feature extraction
     if the["PROCESS"]["fx_spatial"] and "process" in the["actions"]:
       t1 = time.time()
@@ -77,7 +80,9 @@ def learning(**the):
       spaceinator.export_features(DataLoader(Ctl.dataset, batch_size=Csr.TRAIN["HYPER"]["batchSize"]), path_export, the["PROCESS"]["featureLayer"], the["device"])
       t2 = time.time()
       print(f"Exporting features took {(t2 - t1) // 3600} hours and {(((t2 - t1) % 3600) / 60):.1f} minutes!")
-    
+    # clear GPU memory
+    torch.cuda.empty_cache()
+    gc.collect()
     # EVALUATE 
     if "eval" in the["actions"]:
       if the["EVAL"]["eval_from"] == "predictions":
@@ -141,7 +146,7 @@ def learning(**the):
     Tch.writer.close()
     print(f"\n\t = = = = = \t = = = = =\n\t\t Fold {fold + 1} done!\n\t = = = = = \t = = = = =\n")
     # break # == 1 folc (debug)
-  os.system(f"tensorboard --logdir={Csr.path_events}")
+  os.system(f"tensorboard --logdir={Csr.path_classroom}")
  
 if __name__ == "__main__":
   # Load default parameters from config.yml

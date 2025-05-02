@@ -339,7 +339,8 @@ class Cataloguer():
   def _get_phaseClass(self, framesTimestamps, annotatedPoints):
     framesClass = []
     for ts in framesTimestamps:
-      for i in range(0, len(annotatedPoints), 2): # step of 2 because boundary frames are in pairs (beginning+end)
+      print()
+      for i in range(0, len(annotatedPoints) - 1, 2): # step of 2 because boundary frames are in pairs (beginning+end)
         if (ts >= annotatedPoints[i][0]) and (ts < annotatedPoints[i + 1][0]):
           framesClass.append(annotatedPoints[i][1])
           break

@@ -68,21 +68,24 @@ class Classroom():
         id_classroom = f"{DATA['id_dataset'].split('-')[0]}-{datetime.datetime.now().strftime('%y%m')}-1" # create new classroom  
         while id_classroom in os.listdir(os.path.join(self.path_root, "logs")): # number new classrooms of the month by creation order
           id_classroom = id_classroom[:-1] + str(int(id_classroom[-1]) + 1)  # increment last digit
-    
+        os.makedirs(os.path.join(self.path_root, "logs", id_classroom), exist_ok=True)
+
     # create classroom path before checking for student profile (necessary)
     self.path_classroom = os.path.join(self.path_root, "logs", id_classroom)
-    os.makedirs(self.path_classroom, exist_ok=True)
-    id_student = self.match_studentProfile(MODEL)
 
+    id_student = self.match_studentProfile(MODEL)
     if id_student:  # found match
       studentStatus = "Matched"
     else:
       studentStatus = "New"
       id_student = f"{MODEL['domain']}{MODEL['type']}1"
       num = 2
-      while id_student in os.path.listdir(self.path_classroom): # if already student of same type, give it a num id
+      while id_student in os.listdir(self.path_classroom): # if already student of same type, give it a num id
         id_student[-1] = num
         num += 1
+      os.makedirs(os.path.join(self.path_classroom, id_student), exist_ok=True)
+
+    self.path_student = os.path.join(self.path_classroom, id_student)
 
     self.id = id_classroom
     self.status = classroomStatus
@@ -105,7 +108,7 @@ class Classroom():
     
   def match_learningEnvironment(self, TRAIN, DATA):
     path_logs = os.path.join(self.path_root, "logs")
-    classrooms = [c for c in os.listdir(path_logs)]
+    classrooms = [c for c in os.listdir(path_logs) if "learning-conditions.yml" in os.listdir(os.path.join(path_logs, c))]
     for id_classroom in classrooms:
       with open(os.path.join(path_logs, id_classroom, "learning-conditions.yml"), 'r') as f:
         learningConditions = yaml.safe_load(f)
@@ -165,21 +168,20 @@ class Classroom():
     paths_logs["path_logs"] = os.path.join(self.path_root, "logs")
     paths_logs["path_learningConditions"] = os.path.join(self.path_classroom, "learning-conditions.yml")
     
-    paths_logs["path_student"] = os.path.join(self.path_classroom, id_student)
-    paths_logs["path_studentProfile"] = os.path.join(paths_logs["path_student"], "student-profile.yml")
-    paths_logs["path_eval"] = os.path.join(paths_logs["path_student"], "eval")
+    paths_logs["path_studentProfile"] = os.path.join(self.path_student, "student-profile.yml")
+    paths_logs["path_eval"] = os.path.join(self.path_student, "eval")
     paths_logs["path_aprfc"] = os.path.join(paths_logs["path_eval"], "aprfc")
     paths_logs["path_phaseCharts"] = os.path.join(paths_logs["path_eval"], "phase-charts")
     paths_logs["path_phaseTiming"] = os.path.join(paths_logs["path_eval"], "phase-timing")
-    paths_logs["path_train"] = os.path.join(paths_logs["path_student"], "train")
+    paths_logs["path_train"] = os.path.join(self.path_student, "train")
     paths_logs["path_predictions"] = os.path.join(paths_logs["path_train"], "predictions")
     paths_logs["path_events"] = os.path.join(paths_logs["path_train"], "events")
     paths_logs["path_states"] = os.path.join(paths_logs["path_train"], "models")
-    paths_logs["path_process"] = os.path.join(paths_logs["path_student"], "process")
+    paths_logs["path_process"] = os.path.join(self.path_student, "process")
     paths_logs["path_modeFilter"] = os.path.join(paths_logs["path_process"], "mode-filter")
     paths_logs["path_features"] = os.path.join(paths_logs["path_process"], "features")
     
-    paths_logs["path_exportedFeatures"] = os.path.os.path.join(self.path_classroom, "spatialphase", "process", "features")
+    paths_logs["path_exportedFeatures"] = os.path.os.path.join(self.path_student, "process", "features")
     return paths_logs
 
 
