@@ -169,7 +169,7 @@ class Spaceinator(nn.Module):
         images, ids = data[0].to(device), [int(id) for id in data[2]]
         features = self._extract(images, nodesToExtract)
         for layer in features:
-          print(f"{layer}: {features[layer].shape}")
+          # print(f"{layer}: {features[layer].shape}")
           for imageId, ftrs in zip(ids, features[layer]): # Save features from chosen nodes/layers for each image ID
             out_features[imageId][layer] = ftrs.unsqueeze(0).to(device)
             # print(list(out_features.items()))

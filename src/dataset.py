@@ -518,19 +518,19 @@ class Cataloguer():
     loaders = {}
     if self.dataset.DATA_SCOPE == "local":
       if np.any(train_idxs):
-        loaders["trainloader"] = DataLoader(dataset=dset, batch_size=size_batch, sampler=torch.utils.data.SubsetRandomSampler(train_idxs))
+        loaders["trainloader"] = DataLoader(dataset=dset, batch_size=size_batch, num_workers=2, sampler=torch.utils.data.SubsetRandomSampler(train_idxs))
       if np.any(valid_idxs):
-        loaders["validloader"] = DataLoader(dataset=dset, batch_size=size_batch, sampler=torch.utils.data.SubsetRandomSampler(valid_idxs))
+        loaders["validloader"] = DataLoader(dataset=dset, batch_size=size_batch, num_workers=2, sampler=torch.utils.data.SubsetRandomSampler(valid_idxs))
       if np.any(test_idxs):
-        loaders["testloader"] = DataLoader(dataset=dset, batch_size=size_batch, sampler=torch.utils.data.SubsetRandomSampler(test_idxs))
+        loaders["testloader"] = DataLoader(dataset=dset, batch_size=size_batch, num_workers=2, sampler=torch.utils.data.SubsetRandomSampler(test_idxs))
     elif self.dataset.DATA_SCOPE == "external":
       # test_idxs actually carries the test part of the dataset when using CIFAR-10
       if np.any(train_idxs):
-        loaders["trainloader"] = DataLoader(dataset=dset[0], batch_size=size_batch, sampler=torch.utils.data.SubsetRandomSampler(train_idxs))
+        loaders["trainloader"] = DataLoader(dataset=dset[0], batch_size=size_batch, num_workers=2, sampler=torch.utils.data.SubsetRandomSampler(train_idxs))
       if np.any(valid_idxs):
-        loaders["validloader"] = DataLoader(dataset=dset[0], batch_size=size_batch, sampler=torch.utils.data.SubsetRandomSampler(valid_idxs))
+        loaders["validloader"] = DataLoader(dataset=dset[0], batch_size=size_batch, num_workers=2, sampler=torch.utils.data.SubsetRandomSampler(valid_idxs))
       if np.any(test_idxs):
-        loaders["testloader"] = DataLoader(dataset=test_idxs, batch_size=size_batch, shuffle=True)
+        loaders["testloader"] = DataLoader(dataset=test_idxs, batch_size=size_batch, num_workers=2, shuffle=True)
       # print(next(trainloader).shape)
     return loaders.values()
 
@@ -551,7 +551,7 @@ class Cataloguer():
       # the dataset zips the tensors together to be feed to a dataloader (unzips them)
       featset = TensorDataset(clips, clipLabels, clipIdxs)
       # print(featset[0][0].shape, featset[0][1].shape, featset[0][2].shape)
-      loader[split] = DataLoader(featset, batch_size=size_batch, shuffle=False)
+      loader[split] = DataLoader(featset, batch_size=size_batch, num_workers=4, shuffle=False)
     exampleBatch = next(iter(loader[0]))
     print(f"\tBatch example shapes:\n\t[space features] {exampleBatch[0].shape}\n\t[labels] {exampleBatch[1].shape}\n\t[idxs] {exampleBatch[2].shape}\n")
     return loader

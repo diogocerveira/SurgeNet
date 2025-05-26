@@ -12,6 +12,7 @@ from src import dataset, environment, machine, teaching
 import gc
 
 def learning(**the):
+  
   ''' Note: trying out "the" instead of "kwargs"/"config" for readability purposes '''
    # classroom.py (learning environment, paths)
   Csr = environment.Classroom(the["path_root"], the["TRAIN"], the["DATA"], the["MODEL"], id_classroom=the["id_classroom"])
@@ -56,8 +57,9 @@ def learning(**the):
 
     dset.path_spaceFeatures = os.path.join(Csr.path_exportedFeatures, f"spacefmaps_f{fold + 1}.pt")
     trainloader, validloader, testloader = Ctl.batch(dset, model.inputType, Csr.TRAIN["HYPER"]["batchSize"], Csr.TRAIN["HYPER"]["clipSize"], train_idxs=train_idxs, valid_idxs=valid_idxs, test_idxs=test_idxs)
-   
-    Tch.writer = SummaryWriter(log_dir=os.path.join(Csr.path_events, model.id.split('_')[1])) # object for logging stats
+
+    if "train" in the["actions"] or "eval" in the["actions"]:
+      Tch.writer = SummaryWriter(log_dir=os.path.join(Csr.path_events, model.id.split('_')[1])) # object for logging stats
 
     # TRAIN
     if "train" in the["actions"]:
@@ -71,18 +73,23 @@ def learning(**the):
     # clear GPU memory
     torch.cuda.empty_cache()
     gc.collect()
+
     # PROCESS - Feature extraction
     if the["PROCESS"]["fx_spatial"] and "process" in the["actions"]:
       t1 = time.time()
       if "train" in the["actions"]:
         spaceinator.load_state_dict(trainedModel.state_dict(), strict=False)
-      path_export = os.path.join(Csr.path_features, f"spacefmaps_{model.id.split('_')[1]}.pt")
+      elif the["PROCESS"]["fx_load_models"]:
+        fx_stateDict, fx_stateId = teaching.get_testState(Csr.path_states, model.id)
+        spaceinator.load_state_dict(fx_stateDict, strict=False)
+      path_export = os.path.join(Csr.path_features, f"spacefmaps_{fx_stateId.split('_')[1]}.pt")
       spaceinator.export_features(DataLoader(Ctl.dataset, batch_size=Csr.TRAIN["HYPER"]["batchSize"]), path_export, the["PROCESS"]["featureLayer"], the["device"])
       t2 = time.time()
       print(f"Exporting features took {(t2 - t1) // 3600} hours and {(((t2 - t1) % 3600) / 60):.1f} minutes!")
     # clear GPU memory
     torch.cuda.empty_cache()
     gc.collect()
+
     # EVALUATE 
     if "eval" in the["actions"]:
       if the["EVAL"]["eval_from"] == "predictions":
@@ -99,16 +106,16 @@ def learning(**the):
             model.load_state_dict(betterState, strict=False)
           else: # load model from 
             if the["EVAL"]["path_model"]: # chose before running
-              stateDict = torch.load(the["EVAL"]["path_model"], weights_only=False, map_location=the["device"])
+              test_stateDict, test_stateId = torch.load(the["EVAL"]["path_model"], weights_only=False, map_location=the["device"])
               Tch.evaluate(test_bundle, the["EVAL"], fold + 1, Csr, Ctl.N_CLASSES, Ctl.labelToClass,
                 Csr.DATA["extradata"], Csr.path_eval, Csr.path_aprfc, Csr.path_phaseCharts, the["TEST"]["path_preds"])
               print("Breaking testing loop on 'Fold 1' because a path_model was provided without 'train' action.")
               break
             else: # choose from the states folder (corresponding to fold)
-              stateDict = teaching.get_testState(Csr.path_states, model.id)
+              test_stateDict = teaching.get_testState(Csr.path_states, model.id)
               # path_model = environment.choose_in_path(Csr.path_models)
               # stateDict = torch.load(path_model, weights_only=False, map_location=the["device"])
-            model.load_state_dict(stateDict, strict=False)
+            model.load_state_dict(test_stateDict, strict=False)
         except Exception as e:
           print(f"Error loading model state for testing: {e}\n")
           break

@@ -578,11 +578,12 @@ class MetricBunch:
       return path_to
   
 def get_testState(path_states, modelId):
-  for state in os.listdir(path_states):
-    if modelId in state:
-      path_state = os.path.join(path_states, state)
-      print(f"    Loading state from model {modelId}")
-      state = torch.load(path_state, weights_only=False)
-      return state
+  # problem if 2 models with same id (e.g. last and best state)
+  for stateId in os.listdir(path_states):
+    if modelId in stateId:
+      path_state = os.path.join(path_states, stateId)
+      print(f"    Loading state from model {stateId}")
+      stateDict = torch.load(path_state, weights_only=False)
+      return stateDict, stateId
   else:
     raise ValueError(f"Model {modelId} not found in {path_states}")

@@ -3,9 +3,9 @@ seed: 53  # 5 --> 3 or 3 --> 5  DO NOT CHANGE SEED (it messes up with fold train
 device:
 id_classroom:  #LDSSi-2504-1 # if empty creates new learning environment, else loads it (dataset-YYMM-DDHH)
 actions:
-- train        # train (spatial, temporal, full)
+# - train        # train (spatial, temporal, full)
 - process      # process (sample-n-label, mode-filter, extractFeatures)
-- eval         # eval (aprfc, phaseTiming, phaseChart)
+# - eval         # eval (aprfc, phaseTiming, phaseChart)
 
 # DATA and TRAIN properties define an unique classroom
 DATA:
@@ -47,13 +47,14 @@ PROCESS:  # Process
   path_rawVideos: /media/spaceship/ExternalDr/Data/Leuven_DS_Sacropexy
   path_sample: /media/spaceship/ExternalDr/Data/Leuven_DS_Sacropexy/samples/png-025
 
-  label: True
+  label: False
 
   apply_modeFilter: False
   path_bundle: True
   export_modedPreds: True  # if apply-mode-filter == True
   
-  fx_spatial: False
+  fx_spatial: True
+  fx_load_models: True
   featureLayer:
   - flatten
 
