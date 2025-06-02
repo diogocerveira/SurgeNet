@@ -150,7 +150,10 @@ def learning(**the):
       
       Tch.evaluate(test_bundle, the["EVAL"]["eval_tests"], model.id, Ctl.labelToClass, Csr)
 
-    Tch.writer.close()
+    try: # not defined if only processing
+      Tch.writer.close()
+    except:
+      pass
     print(f"\n\t = = = = = \t = = = = =\n\t\t Fold {fold + 1} done!\n\t = = = = = \t = = = = =\n")
     # break # == 1 folc (debug)
   os.system(f"tensorboard --logdir={Csr.path_classroom}")
