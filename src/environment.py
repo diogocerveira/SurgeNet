@@ -52,8 +52,12 @@ def choose_in_path(path):
 class Classroom():
   ''' Handles paths to the learning environment "local everywhere" (originally the pathtaker)
   '''
-  def __init__(self, path_root, TRAIN, DATA, MODEL, id_classroom=None):
+  def __init__(self, path_root, TRAIN, DATA, MODEL, id_classroom=None, path_data=None):
     self.path_root = path_root
+    self.path_data = self.path_data = path_data if path_data is not None else path_root
+    self.path_logs = os.path.join(self.path_root, "logs")
+    os.makedirs(self.path_logs, exist_ok=True)
+
     classroomStatus = ''
     if id_classroom: # user choice
       if not os.path.exists(os.path.join(self.path_root, "logs", id_classroom)):
@@ -78,10 +82,11 @@ class Classroom():
       studentStatus = "Matched"
     else:
       studentStatus = "New"
-      id_student = f"{MODEL['domain']}{MODEL['type']}1"
-      num = 2
-      while id_student in os.listdir(self.path_classroom): # if already student of same type, give it a num id
-        id_student[-1] = num
+      num = 1
+      while True:
+        id_student = f"{MODEL['domain']}{MODEL['type']}{num}"
+        if id_student not in os.listdir(self.path_classroom):
+          break
         num += 1
       os.makedirs(os.path.join(self.path_classroom, id_student), exist_ok=True)
 
@@ -157,7 +162,7 @@ class Classroom():
   def _get_paths_data(self, id_dataset, labelType):
     ''' Get dictionary with paths for everything data'''
     paths_data = {}
-    paths_data["path_dataset"] = os.path.join(self.path_root, "data", id_dataset)
+    paths_data["path_dataset"] = os.path.join(self.path_data, "data", id_dataset)
     paths_data["path_samples"] = os.path.join(paths_data["path_dataset"], "samples")
     paths_data["path_labels"] = os.path.join(paths_data["path_dataset"], "labels", f"{labelType}.csv")
     paths_data["path_annots"] = os.path.join(paths_data["path_dataset"], "annotations")
@@ -165,7 +170,7 @@ class Classroom():
   def _get_paths_logs(self, id_student):
     ''' Get dictionary with paths to everything related to a run'''
     paths_logs = {}
-    paths_logs["path_logs"] = os.path.join(self.path_root, "logs")
+    paths_logs["path_logs"] = self.path_logs
     paths_logs["path_learningConditions"] = os.path.join(self.path_classroom, "learning-conditions.yml")
     
     paths_logs["path_studentProfile"] = os.path.join(self.path_student, "student-profile.yml")

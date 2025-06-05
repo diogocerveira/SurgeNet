@@ -1,15 +1,16 @@
 path_root: . #/batataclan
+path_data: /workspace/raid-diogo/
 seed: 53  # 5 --> 3 or 3 --> 5  DO NOT CHANGE SEED (it messes up with fold training)
 device:
 id_classroom:  #LDSSi-2504-1 # if empty creates new learning environment, else loads it (dataset-YYMM-DDHH)
 actions:
-# - train        # train (spatial, temporal, full)
+- train        # train (spatial, temporal, full)
 - process      # process (sample-n-label, mode-filter, extractFeatures)
-# - eval         # eval (aprfc, phaseTiming, phaseChart)
+- eval         # eval (aprfc, phaseTiming, phaseChart)
 
 # DATA and TRAIN properties define an unique classroom
 DATA:
-  id_dataset: LDSS-local  # (ldss-local, cifar10-ext)
+  id_dataset: LDSSi-local  # (LDSS-local, LDSSi-local, TEST-local, cifar10-ext)
   labelType: phase-class # time-to-next-phase, phase-label, time-to-video-end, time-since-video-start
   preprocessing: basic  # basic, augmentation
   recycle_itemIds: True  # for local dataset (__getitem__() returns the inputed frameIds to be used to fetch associated frame properties e.g. file path)
@@ -20,18 +21,20 @@ TRAIN:
   path_resumeModel:  # to continue training from a checkpoint model if train-point == resume
   save_checkpoints: False
   checkpointRate: 6 # epoch frequency to save a checkpoint
-  save_betterState: False
-  save_lastState: True
+  save_betterState: True
+  save_lastState: False
   log_events: True
   criterionId: weighted-cross-entropy # weighted-cross-entropy
   train_metric: accuracy
   valid_metric: accuracy  # guiding and evaluating training
   k_folds: 7 # match with datasetName (7 for LDSS, 5 for CIFAR10, 1 for None?)
   skipFolds: []  # 0 for fold 1... after a break (e.g. crash) allows to skip folds and restart from a checkpoint
+  minDelta: 0.001  # minimum delta to save a better state
+  patience: 5  # number of epochs to wait for a better state before stopping training
   HYPER:  # traditional hyperparameters
     n_epochs: 25
     batchSize: 16
-    clipSize: 9  # amount of frames (sec) per clip when temporal training
+    clipSize: 64  # amount of frames (sec) per clip when temporal training
     learningRate: 0.0005  # learning rate
     momentum: 0.9
     gamma: 0.1
@@ -47,14 +50,14 @@ PROCESS:  # Process
   path_rawVideos: /media/spaceship/ExternalDr/Data/Leuven_DS_Sacropexy
   path_sample: /media/spaceship/ExternalDr/Data/Leuven_DS_Sacropexy/samples/png-025
 
-  label: False
+  label: True
 
   apply_modeFilter: False
   path_bundle: True
   export_modedPreds: True  # if apply-mode-filter == True
   
   fx_spatial: True
-  fx_load_models: True
+  fx_load_models: True  #loads the spatial model to extract features if not training
   featureLayer:
   - flatten
 

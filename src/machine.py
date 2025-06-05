@@ -9,6 +9,7 @@ from copy import deepcopy
 from torch.utils.tensorboard import SummaryWriter
 import copy
 import torchvision.models.feature_extraction as fxs
+import numpy as np
 
 class PhaseNet(nn.Module):
   ''' Receives [batch_size, in_channels, in_length] 1st guesses
@@ -16,7 +17,7 @@ class PhaseNet(nn.Module):
   '''
   def __init__(self, modelDomain, spaceinator, timeinator, classroomId, fold):
     super().__init__()
-    self.valid_score = 0.0
+    self.valid_lastScore = -np.inf
 
     # the modular approach allows to have modules with no conditional on the forward pass
     if modelDomain == "spatial":

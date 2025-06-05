@@ -172,7 +172,7 @@ class Cataloguer():
     self.recycle_itemIds = DATA["recycle_itemIds"]
     # updated when dataset is built
     self.dataset = None
-    self.labelToClass = None
+    self.classToLabel = None
     self.N_CLASSES = None
     self.DATASET_SIZE = None
     self.classWeights = None
@@ -272,61 +272,74 @@ class Cataloguer():
   
   def label(self, path_from, path_to, labelType):
     ''' Label sampled videos'''
-    # Helper functions
-    def detect_encoding(path_to_frame):
-      ''' Extract and return annotation file encoding'''
-      with open(path_to_frame, 'rb') as f:
-        raw_data = f.read()
-        result = chardet.detect(raw_data)
-        return result['encoding']
-    def extract_class(protoclass):
-      ''' Transform "End of (x) y" protoclass into (x, y) -> specific for this way of annotation'''
-      for l in protoclass:
-        if l.isdigit():
-          return (int(l), protoclass[protoclass.find(l) + 3:])
-    totalFramesId = []
-    totalFramesClass = []
-    for sampledVideoId in os.listdir(path_from):
-      path_annot = os.path.join(self.path_annots, f"{sampledVideoId}.json")
-      path_video = os.path.join(path_from, sampledVideoId)
+    totalFrameIds = []
+    totalFrameClasses = []
+    for videoId in os.listdir(path_from): # sampled videos (folder of frames)
+      path_annot = os.path.join(self.path_annots, f"{videoId}.json")
+      path_video = os.path.join(path_from, videoId)
       if os.path.exists(path_annot):  # if video is annotated (to make a better check)
-        with open(path_annot, 'r', encoding=detect_encoding(path_annot)) as f:
+        with open(path_annot, 'r', encoding=self._detect_encoding(path_annot)) as f:
           annots = json.load(f)  # parsed into list of dicts=annotations
-          labelsNL = [m["content"] for m in annots]
+          descriptions = [a["content"] for a in annots]
           timestamps = [a["playback_timestamp"] for a in annots]
-        labelsInt = [extract_class(p)[0] for p in labelsNL]
-        annotatedPoints = list(zip(timestamps, labelsInt))
-        # print("annotatedPoints: ", annotatedPoints)
+        classToLabel = [self._parse_description(d)[0]:self._parse_description(d)[1] for d in descriptions] # for simplification, assuming class as number, and label as natural language
+        annotPoints = list(zip(timestamps, classes))
+        # print("annotPoints: ", annotPoints)
         framesId = [os.path.splitext(frame)[0] for frame in os.listdir(path_video) if not frame.startswith(('.', '_')) and not os.path.isdir(os.path.join(path_video, frame))]
-        # print(framesId)
-        
         framesTimestamps = [int(frameId.split('_')[1]) for frameId in framesId]  # convert to int
-        # print(len(framesTimestamps))
+        
         if labelType == "phase-class":
           get_class = self._get_phaseClass
         elif labelType == "time-to-next-phase":
           get_class = self._get_timeToNextPhase
-        totalFramesClass.extend(get_class(framesTimestamps, annotatedPoints))
-        totalFramesId.extend(framesId)
-        # print(len(totalFramesClass), len(totalFramesId))
-      elif sampledVideoId.startswith('.'):  # hidden file are disregarded
-        # print(f"   Skipping hidden file {sampledVideoId}\n")
+          
+        totalFrameClasses.extend(get_class(framesTimestamps, annotPoints))
+        totalFrameIds.extend(framesId)
+        # print(len(totalFrameClasses), len(totalFrameIds))
+      elif videoId.startswith('.'):  # hidden file are disregarded
+        # print(f"   Skipping hidden file {videoId}\n")
         continue
       else:
-        print(f"   Warning: {path_annot} not found, skipping annotation for {sampledVideoId}")
+        print(f"   Warning: {path_annot} not found, skipping annotation for {videoId}")
       # Prepare CSV file
-      assert len(totalFramesClass) == len(totalFramesId), f"Number of frames ({len(totalFramesClass)}) and labels ({len(totalFramesId)}) do not match! Aborting labeling."
+      assert len(totalFrameClasses) == len(totalFrameIds), f"Number of frames ({len(totalFrameClasses)}) and labels ({len(totalFrameIds)}) do not match! Aborting labeling."
+      print("max class: ", max(totalFrameClasses), "min class: ", min(totalFrameClasses))
       with open(path_to, 'w', newline='') as file_csv:  # newline='' maximizes compatibility with other os
         fieldNames = ['frameId', 'class']
         writer = csv.DictWriter(file_csv, fieldnames=fieldNames)
         if os.stat(path_to).st_size == 0: # Check if the file is empty to write the header
           writer.writeheader()
         # Batch write frames and annotations
-        for frameId, sampleClass in zip(totalFramesId, totalFramesClass):
+        for frameId, sampleClass in zip(totalFrameIds, totalFrameClasses):
           writer.writerow({'frameId': frameId, 'class': sampleClass})
-  def _label_timeSincePhaseStart(self, framesTimestamps, annotatedPoints):
+
+  def _detect_encoding(self, path_to_frame):
+  ''' Extract and return annotation file encoding'''
+  with open(path_to_frame, 'rb') as f:
+    raw_data = f.read()
+    result = chardet.detect(raw_data)
+    return result['encoding']
+  def _parse_description(self, protoclass):
+    ''' Transform "End of (x) y" protoclass into (x, y) -> x is the class number - specific for this way o annotation '''
+    # e.g. "End of (1) Phase 1" -> (1, "Phase 1")
+    for l in protoclass:
+      if l.isdigit():
+        return (int(l), protoclass[protoclass.find(l) + 3:])
+  def _get_phaseClass(self, framesTimestamps, annotPoints):
     framesClass = []
-    annotPhaseBegs = [annotatedPoints[i] for i in range(0, len(annotatedPoints), 2)]  # step of 2 to get only the beginning of each phase
+    # print(annotPoints)
+    # print(list(range(0, len(annotPoints), 2)))
+    for ts in framesTimestamps:
+      for i in range(0, len(annotPoints), 2): # step of 2 because boundary annotated frames are in pairs (beginning+end)
+        if (ts >= annotPoints[i][0]) and (ts <= annotPoints[i + 1][0]):
+          framesClass.append(annotPoints[i][1])
+          break
+      else:
+        framesClass.append(0)  # if no phase, append class 0
+    return framesClass
+  def _get_timeSincePhaseStart(self, framesTimestamps, annotPoints):
+    framesClass = []
+    annotPhaseBegs = [annotPoints[i] for i in range(0, len(annotPoints), 2)]  # step of 2 to get only the beginning of each phase
     for ts in framesTimestamps:
       for bTC in annotPhaseBegs:  # get the time until next phase (bigger ts) beginning
         if bTC[0] < ts:
@@ -335,21 +348,9 @@ class Cataloguer():
       else:
         framesClass.append(0)
     return framesClass
-
-  def _get_phaseClass(self, framesTimestamps, annotatedPoints):
+  def _get_timeToNextPhase(self, framesTimestamps, annotPoints):
     framesClass = []
-    for ts in framesTimestamps:
-      print()
-      for i in range(0, len(annotatedPoints) - 1, 2): # step of 2 because boundary frames are in pairs (beginning+end)
-        if (ts >= annotatedPoints[i][0]) and (ts < annotatedPoints[i + 1][0]):
-          framesClass.append(annotatedPoints[i][1])
-          break
-      else:
-        framesClass.append(0)  # if no phase, append class 0
-    return framesClass
-  def _get_timeToNextPhase(self, framesTimestamps, annotatedPoints):
-    framesClass = []
-    annotPhaseBegs = [annotatedPoints[i] for i in range(0, len(annotatedPoints), 2)]  # step of 2 to get only the beginning of each phase
+    annotPhaseBegs = [annotPoints[i] for i in range(0, len(annotPoints), 2)]  # step of 2 to get only the beginning of each phase
     for ts in framesTimestamps:
       for bTC in annotPhaseBegs:  # get the time until next phase (bigger ts) beginning
         if bTC[0] >= ts:
@@ -365,48 +366,36 @@ class Cataloguer():
       return len(self.dataset[0]) + len(self.dataset[1])
   def _get_classWeights(self):
     ''' Get class distribution form the Dataset object'''
-    # print(self.labels.columns)
     cw = self.dataset.labels["class"].value_counts() / self.DATASET_SIZE
     return torch.tensor(cw.values, dtype=torch.float32)  
-  def _get_labelToClass(self):
+  def _get_classToLabel(self):
     ''' Get a map from labels (int) to classesInt (string) '''
     if self.dataset.DATA_SCOPE == "local":
       def get_sigla(string):
         # get the first letter of each word in a string in uppercase
         return "".join([word[0].upper() for word in string.split()])
-      def detect_encoding(path_to_frame):
-        ''' Extract and return the file encoding'''
-        with open(path_to_frame, 'rb') as f:
-          raw_data = f.read()
-          result = chardet.detect(raw_data)
-          return result['encoding']
-      def extract_class(protoclass):
-        ''' Transform "End of (x) y" protoclass into (x, y) -> specific for this way o annotation '''
-        for l in protoclass:
-          if l.isdigit():
-            return (l, protoclass[protoclass.find(l) + 3:])
 
-      path_randomAnnot = os.path.join(self.path_annots, random.choice(os.listdir(self.path_annots))) # get random annotation to extract all classesInt (assuming they all have - they DON'T!!!)
-      # print(path_randomAnnot)
-      if os.path.exists(path_randomAnnot):
-        encoding = detect_encoding(path_randomAnnot)
-        with open(path_randomAnnot, 'r', encoding=encoding) as f:
+      path_fullAnnot = os.path.join(self.path_annots, "a90983a1-2329-4019-96e8-949493c3fc24.json") # get annotation w all classes to extract all classesInt (assuming they all have - they DON'T!!!)
+      # print(path_fullAnnot)
+      if os.path.exists(path_fullAnnot):
+        with open(path_fullAnnot, 'r', encoding=self._detect_encoding(path_fullAnnot)) as f:
           randomAnnot = json.load(f)
-          classesNL = [m["content"] for m in randomAnnot]
-          labelToClass = {int(extract_class(p)[0]): extract_class(p)[0] + get_sigla(extract_class(p)[1]) for p in classesNL}
+          annotPointsLabels = [m["content"] for m in randomAnnot]
+          classToLabel = {self._parse_description(p)[0]: (str(self._parse_description(p)[0]) + get_sigla(self._parse_description(p)[1])) for p in annotPointsLabels}
           
-          if 0 in self.dataset.labels["class"].unique():
-            labelToClass[0] = "0ther" 
+          if 0 in self.dataset.labels["class"].unique(): # dataset.labels were defined before classToLabel dict in self.build_dataset()
+            classToLabel[0] = "0ther"
         # filter out non-existing classes in the real (e.g. partial, lite versions) dataset of items
-        assert len(labelToClass) == len(self.dataset.labels["class"].unique()), f"Number of classes ({len(labelToClass)}) and labels ({len(self.dataset.labels['class'].unique())}) do not match! Aborting labeling."
-        # labelToClass = {int(k): v for k, v in labelToClass.items() if k in self.dataset.labels["class"].unique()}
+        assert len(classToLabel) == len(self.dataset.labels["class"].unique()), f"Number of classes ({len(classToLabel)}) and labels ({len(self.dataset.labels['class'].unique())}) do not match! Aborting labeling."
+        # classToLabel = {int(k): v for k, v in classToLabel.items() if k in self.dataset.labels["class"].unique()}
         
-        return labelToClass
+        return classToLabel
       
     elif self.dataset.DATA_SCOPE == "external":
       return {i: c for c, i in self.dataset[1].class_to_idx.items()};
     else:
       raise ValueError("Invalid DATA_SCOPE!")
+
   def _get_preprocessing(self, preprocessing):
     ''' Get torch group of tranforms directly applied to torch Dataset object'''
     if preprocessing == "basic":
@@ -453,7 +442,7 @@ class Cataloguer():
       raise ValueError("Invalid DATA_SCOPE!")
     
     self.dataset = dataset  # temporarily
-    self.labelToClass = self._get_labelToClass()   # gets dict for getting class name from int value
+    self.classToLabel = self._get_classToLabel()   # gets dict for getting class name from int value
     self.N_CLASSES = dataset.N_CLASSES
     self.DATASET_SIZE = self._get_datasetSize()
     self.classWeights = self._get_classWeights()

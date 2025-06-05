@@ -23,7 +23,7 @@ class Teacher():
   '''
   def __init__(self, TRAIN, EVAL, Ctl, DEVICE):
     self.N_CLASSES = Ctl.dataset.N_CLASSES
-    train_metric, valid_metric, test_metrics = self._get_metrics(TRAIN, EVAL, self.N_CLASSES, Ctl.labelToClass, DEVICE)
+    train_metric, valid_metric, test_metrics = self._get_metrics(TRAIN, EVAL, self.N_CLASSES, Ctl.classToLabel, DEVICE)
     criterion = self._get_criterion(TRAIN["criterionId"], Ctl.classWeights, DEVICE)
     self.trainer = Trainer(train_metric, criterion, TRAIN["HYPER"], DEVICE)
     self.validater = Validater(valid_metric, criterion, DEVICE)
@@ -32,6 +32,8 @@ class Teacher():
     self.save_checkpoints = TRAIN["save_checkpoints"]
     self.highScore = -np.inf
     self.bestState = {}
+    self.minDelta = TRAIN["minDelta"]  # minimal delta for early stopping
+    self.patience = TRAIN["patience"]  # patience for early stopping
     
   def teach(self, model, trainloader, validloader, n_epochs, path_states, path_resume=None):
     ''' Iterate through folds and epochs of model learning with training and validation
@@ -40,7 +42,7 @@ class Teacher():
     '''
     if not list(model.parameters()):
       raise ValueError("Model parameters are empty/invalid. Check model initialization.")
-    earlyStopper = EarlyStopper()
+    earlyStopper = EarlyStopper(self.patience, self.minDelta)
     optimizer = optim.SGD(model.parameters(), lr=self.trainer.learningRate, momentum=self.trainer.MOMENTUM)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=self.trainer.STEP_SIZE, gamma=self.trainer.GAMMA) # updates the optimizer by the GAMMA factor after the step_size
     # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=50)
@@ -64,27 +66,29 @@ class Teacher():
       print(f"Train Loss: {train_loss:4f}\tValid Loss: {valid_loss:4f}")
       scheduler.step()
 
-      if valid_loss <= valid_minLoss:
+      if (valid_minLoss - valid_loss) > earlyStopper.minDelta:  # if valid loss decreased by more than minDelta == good
         print(f"\n* New best model (valid loss): {valid_minLoss:.4f} --> {valid_loss:.4f} *\n")
         valid_minLoss = valid_loss
         valid_maxScore = valid_score
         betterState = model.state_dict()
-      if earlyStopper.early_stop(valid_loss):
+
+      if earlyStopper.early_stop(valid_loss): # same as prev if but for a [patience] number of epochs in a row
         print(f"\n* Stopped early *\n")
         break
+        
       if ((epoch + 1) % 5) == 0:  # Save checkpoint every 5 epochs
         if self.save_checkpoints:
           print(f"\n* Checkpoint reached ({epoch + 1}/{n_epochs}) *\n")
           path_checkpoint = os.path.join(path_states, f"{model.id}_cp{epoch + 1}.pth")
           self.save_checkpoint(model, optimizer, epoch, valid_loss, path_checkpoint)
-      model.valid_score = valid_score
+      model.valid_lastScore = valid_score
 
       # clear GPU memory
       torch.cuda.empty_cache()
       gc.collect()
     return model, valid_maxScore, betterState
 
-  def evaluate(self, test_bundle, eval_tests, modelId, labelToClass, Csr):
+  def evaluate(self, test_bundle, eval_tests, modelId, classToLabel, Csr):
 
     if eval_tests["aprfc"]:
       self.tester._aprfc(self.writer, modelId, Csr.path_events, Csr.path_aprfc)
@@ -92,7 +96,7 @@ class Teacher():
       torch.cuda.empty_cache()
       gc.collect()
     if eval_tests["phaseTiming"]:
-      outText = self.tester._phase_timing(test_bundle, self.N_CLASSES, labelToClass)
+      outText = self.tester._phase_timing(test_bundle, self.N_CLASSES, classToLabel)
       # clear GPU memory
       torch.cuda.empty_cache()
       gc.collect()
@@ -102,11 +106,11 @@ class Teacher():
         torch.cuda.empty_cache()
         gc.collect()
 
-  def _get_metrics(self, TRAIN, EVAL, N_CLASSES, labelToClass, DEVICE):
+  def _get_metrics(self, TRAIN, EVAL, N_CLASSES, classToLabel, DEVICE):
     
     train_metric = RunningMetric(TRAIN["train_metric"], N_CLASSES, DEVICE, EVAL["agg"], EVAL["computeRate"], EVAL["updateRate"])
     valid_metric = RunningMetric(TRAIN["valid_metric"], N_CLASSES, DEVICE, EVAL["agg"], EVAL["computeRate"] // 2, EVAL["updateRate"])
-    test_metrics = MetricBunch(EVAL["test_metrics"], N_CLASSES, labelToClass, EVAL["agg"], EVAL["computeRate"], DEVICE)
+    test_metrics = MetricBunch(EVAL["test_metrics"], N_CLASSES, classToLabel, EVAL["agg"], EVAL["computeRate"], DEVICE)
     return train_metric, valid_metric, test_metrics
 
   def _get_criterion(self, CRITERION_ID, classWeights, DEVICE):
@@ -157,7 +161,7 @@ class Trainer():
                outputs can be predictions or logits?
     '''
     self.train_metric.reset()  # resets states, typically called between epochs
-    runningLoss = 0.0
+    runningLoss, totalSamples = 0.0, 0
     model.train().to(self.DEVICE)
     for batch, data in enumerate(trainloader, 0):   # start at batch 0
       inputs, targets = data[0].to(self.DEVICE), data[1].to(self.DEVICE) # data is a list of [inputs, labels]
@@ -173,12 +177,14 @@ class Trainer():
       loss = self.criterion(outputs, targets) # calculate loss
       loss.backward() # backward pass
       optimizer.step()    # a single optimization step
-      # runningLoss += loss.item() # accumulate loss
+
+      runningLoss += loss.item() * targets.numel() # accumulate loss by batch size (safer, though most batches are same size)
+      totalSamples += targets.numel()  # numel() returns the total number of elements in the tensor
       outputs = torch.argmax(outputs, dim=1)  # get labels with max prediction values
       self.train_metric.update(outputs, targets)
       if batch % self.train_metric.computeRate == 0:
         print(f"\t  T [E{epoch + 1} B{batch + 1}]   scr: {self.train_metric.score():.4f}")
-    return runningLoss / len(trainloader), self.train_metric.score()
+    return runningLoss / totalSamples, self.train_metric.score()
 
 class Validater():
   ''' Part of the teacher that knows how to validate a run of model training
@@ -193,7 +199,7 @@ class Validater():
         Out: valid_loss, valid_score
     '''
     self.valid_metric.reset() # Running metric, e.g. accuracy
-    runningLoss = 0.0
+    runningLoss, totalSamples = 0.0, 0
     model.eval()
     with torch.no_grad(): # don't calculate gradients (for learning only)
       for batch, data in enumerate(validloader, 0):
@@ -206,13 +212,14 @@ class Validater():
           targets = targets.reshape(-1) # targets shape of [n_fmaps]
         # print("outputs: ", outputs.shape, "\ttargets: ", targets.shape, '\n')
         loss = self.criterion(outputs, targets)
-        runningLoss += loss.item()
-   
+    
+        runningLoss += loss.item() * targets.numel() # accumulate loss by batch size (safer, though most batches are same size)
+        totalSamples += targets.numel()
         outputs = torch.argmax(outputs, dim=1) # get labels with max prediction values
         self.valid_metric.update(outputs, targets)  # updates with data from new batch
         if batch % self.valid_metric.computeRate == 0:
           print(f"\t  V [E{epoch + 1} B{batch + 1}]   scr: {self.valid_metric.score():.4f}")
-    return runningLoss / len(validloader), self.valid_metric.score()
+    return runningLoss / totalSamples, self.valid_metric.score()
 
 class Tester():
   ''' Part of the teacher that knows how to test a model knowledge in multiple ways
@@ -244,6 +251,9 @@ class Tester():
         sampleIdsList.append(sampleIds)
 
         outputs = torch.argmax(outputs, dim=1)  # get labels with max prediction values
+        print("outputs.shape", outputs.shape)
+        print("targets.min()", targets.min().item(), "targets.max()", targets.max().item())
+
         self.test_metrics.update(outputs, targets)
         if batch % self.test_metrics.accuracy.computeRate == 0:
           print(f"\t  T [B{batch + 1}]   scr: {self.test_metrics.accuracy.score():.4f}")
@@ -296,7 +306,7 @@ class Tester():
     writer.add_image(f"confusion_matrix/test", tensor_cf, fold)
     writer.close()
     
-  def _phase_timing_i2(self, df, N_CLASSES, labelToClass, samplerate=1):
+  def _phase_timing_i2(self, df, N_CLASSES, classToLabel, samplerate=1):
     outText = []
     lp, lt = len(df["Pred"]), len(df["Target"])
     # N_CLASSES = (max(df["Targets"]) + 1)  # assuming regular int encoding
@@ -331,7 +341,7 @@ class Tester():
       
       mix = list(zip(phases_preds_video / (60 * samplerate), phases_gt_video / (60 * samplerate), phases_diff_sum))
       ot = f"\nVideo {video} Phase Report\n" + f"{'':<12} |   T Preds    |    T Targets     ||  Diff\n" + '\n'.join(
-            f"{labelToClass[i]:<12} | {mix[i][0]:<8.2f}min | {mix[i][1]:<8.2f}min || {(mix[i][0] - mix[i][1]):<8.2f}min"
+            f"{classToLabel[i]:<12} | {mix[i][0]:<8.2f}min | {mix[i][1]:<8.2f}min || {(mix[i][0] - mix[i][1]):<8.2f}min"
             for i in range(N_CLASSES)
         )
       outText.append(ot)
@@ -343,7 +353,7 @@ class Tester():
     mix = list(zip(phases_preds_avg, phases_gt_avg, phases_diff_avg))
     
     otavg = "\n\nOverall Average Phase Report\n" + f"{'':<12} | T Avg Preds  |  T Avg Targets   || Total AE\n" + '\n'.join(
-            f"{labelToClass[i]:<12} | {mix[i][0]:<8.2f}min | {mix[i][1]:<8.2f}min || {(mix[i][2]):<8.2f}min"
+            f"{classToLabel[i]:<12} | {mix[i][0]:<8.2f}min | {mix[i][1]:<8.2f}min || {(mix[i][2]):<8.2f}min"
             for i in range(N_CLASSES)
       )
     print(otavg)
@@ -351,8 +361,8 @@ class Tester():
   # phase_metric([1, 1, 2, 3, 3, 4, 0, 5], [0, 0, 0, 2, 3, 4, 5, 1])
     return outText
 
-  def _phase_timing(self, df, N_CLASSES, labelToClass, samplerate=1):
-    return self._phase_timing_i2(df, N_CLASSES, labelToClass, samplerate=1)
+  def _phase_timing(self, df, N_CLASSES, classToLabel, samplerate=1):
+    return self._phase_timing_i2(df, N_CLASSES, classToLabel, samplerate=1)
 
   def _phase_graph(self, df, path_phaseCharts, modelId, outText):
       # df = pd.DataFrame({
@@ -434,9 +444,9 @@ class Tester():
 class EarlyStopper:
   ''' Controls the validation loss progress to keep it going down and improve times
   '''
-  def __init__(self, patience=3, minDelta=0.05):
+  def __init__(self, patience=5, minDelta=0.001):
     self.patience = patience
-    self.minDelta = minDelta  # percentual difference in decrease, 0 for no margin
+    self.minDelta = minDelta  # percentual difference for a worthy increase in performance, 0 for no margin
     self.valid_minLoss = np.inf
     self.counter = 0
 
@@ -444,6 +454,15 @@ class EarlyStopper:
     self.valid_minLoss = np.inf
     self.counter = 0
   def early_stop(self, valid_loss):
+    if (self.valid_minLoss - valid_loss) > self.minDelta:  # if loss decreased by more than minDelta
+      self.valid_minLoss = valid_loss
+      self.counter = 0  # reset warning/patience counter if loss decreases betw epochs
+    else:
+      self.counter += 1 # added 1 strike (5 strikes and you're out)
+      if self.counter >= self.patience:
+        return True
+    return False
+  def early_stop_opposite(self, valid_loss):
     if valid_loss < self.valid_minLoss:
       self.valid_minLoss = valid_loss
       self.counter = 0  # reset warning/patience counter if loss decreases betw epochs
@@ -495,9 +514,9 @@ class MetricBunch:
   ''' Gets a bunch of still metrics at cheap price
       Accuracy locked at agg==micro for now
   '''
-  def __init__(self, metricSwitches, N_CLASSES, labelToClass, agg, computeRate, DEVICE):  # metricSwitches is a boolean dict switch for getting metrics
+  def __init__(self, metricSwitches, N_CLASSES, classToLabel, agg, computeRate, DEVICE):  # metricSwitches is a boolean dict switch for getting metrics
     self.metricSwitches = metricSwitches
-    self.labelToClass = labelToClass
+    self.classToLabel = classToLabel
     self.agg = agg
     
     if self.metricSwitches["accuracy"]:
@@ -565,7 +584,7 @@ class MetricBunch:
     try:
       fig, ax = plt.subplots(figsize=(10, 7))
       sns.heatmap(self.confusionMatrix.metric.compute().cpu(), annot=True, fmt='.2f', cmap='Blues',
-                  xticklabels=self.labelToClass.values(), yticklabels=self.labelToClass.values(), ax=ax)
+                  xticklabels=self.classToLabel.values(), yticklabels=self.classToLabel.values(), ax=ax)
       ax.set_xlabel('Predicted')
       ax.set_ylabel('True')
       ax.set_title('Confusion Matrix')

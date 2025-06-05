@@ -15,7 +15,7 @@ def learning(**the):
   
   ''' Note: trying out "the" instead of "kwargs"/"config" for readability purposes '''
    # classroom.py (learning environment, paths)
-  Csr = environment.Classroom(the["path_root"], the["TRAIN"], the["DATA"], the["MODEL"], id_classroom=the["id_classroom"])
+  Csr = environment.Classroom(the["path_root"], the["TRAIN"], the["DATA"], the["MODEL"], id_classroom=the["id_classroom"], path_data=the["path_data"])
   print(f"A. [classroom] {Csr.id} ({Csr.status})\n   [model] {Csr.studentId} ({Csr.studentStatus})")
   print(f"   For {tuple(the['actions'])}\n")
   # dataset.py (dataset, data handling)
@@ -34,7 +34,7 @@ def learning(**the):
   dset = Ctl.build_dataset(Csr.path_samples, Csr.path_labels) # for now the dataset is still used from inside the cataloguer
   print(f"B. [dataset] {the['DATA']['id_dataset']} (#{Ctl.DATASET_SIZE})")
   print(f"   [preprocessing] {Ctl.preprocessing}")
-  print(f"   [classes] #{Ctl.N_CLASSES} ({'Balanced' if Ctl.BALANCED else 'Unbalanced'}) {list(Ctl.labelToClass.values())}\n")
+  print(f"   [classes] #{Ctl.N_CLASSES} ({'Balanced' if Ctl.BALANCED else 'Unbalanced'}) {list(Ctl.classToLabel.values())}\n")
   
   # teaching.py (metrics, train validation, test)
   Tch = teaching.Teacher(Csr.TRAIN, the["EVAL"], Ctl, the["device"])
@@ -65,20 +65,18 @@ def learning(**the):
     if "train" in the["actions"]:
       trainedModel, valid_maxScore, betterState = Tch.teach(model, trainloader, validloader, Csr.TRAIN["HYPER"]["n_epochs"], Csr.path_states, Csr.TRAIN["path_resumeModel"])
       if Csr.TRAIN["save_betterState"]:
-        path_betterState = os.path.join(Csr.path_states, f"{trainedModel.id}-{valid_maxScore:.2f}")
-        torch.save(betterState, path_betterState)
+        trainedModel.id = f"{trainedModel.id}-{valid_maxScore:.2f}" # update model id with the best validation score
+        torch.save(betterState, os.path.join(Csr.path_states, trainedModel.id))
       if Csr.TRAIN["save_lastState"]:
-        path_lastState = os.path.join(Csr.path_states, f"{trainedModel.id}-{trainedModel.valid_score:.2f}")
-        torch.save(trainedModel.state_dict(), path_lastState)
-    # clear GPU memory
-    torch.cuda.empty_cache()
-    gc.collect()
+        trainedModel.id = f"{trainedModel.id}-{trainedModel.valid_lastScore:.2f}"
+        torch.save(trainedModel.state_dict(), os.path.join(Csr.path_states, trainedModel.id))
 
     # PROCESS - Feature extraction
     if the["PROCESS"]["fx_spatial"] and "process" in the["actions"]:
       t1 = time.time()
       if "train" in the["actions"]:
         spaceinator.load_state_dict(trainedModel.state_dict(), strict=False)
+        fx_stateId = trainedModel.id
       elif the["PROCESS"]["fx_load_models"]:
         fx_stateDict, fx_stateId = teaching.get_testState(Csr.path_states, model.id)
         spaceinator.load_state_dict(fx_stateDict, strict=False)
@@ -86,9 +84,9 @@ def learning(**the):
       spaceinator.export_features(DataLoader(Ctl.dataset, batch_size=Csr.TRAIN["HYPER"]["batchSize"]), path_export, the["PROCESS"]["featureLayer"], the["device"])
       t2 = time.time()
       print(f"Exporting features took {(t2 - t1) // 3600} hours and {(((t2 - t1) % 3600) / 60):.1f} minutes!")
-    # clear GPU memory
-    torch.cuda.empty_cache()
-    gc.collect()
+      # clear GPU memory
+      torch.cuda.empty_cache()
+      gc.collect()
 
     # EVALUATE 
     if "eval" in the["actions"]:
@@ -107,7 +105,7 @@ def learning(**the):
           else: # load model from 
             if the["EVAL"]["path_model"]: # chose before running
               test_stateDict, test_stateId = torch.load(the["EVAL"]["path_model"], weights_only=False, map_location=the["device"])
-              Tch.evaluate(test_bundle, the["EVAL"], fold + 1, Csr, Ctl.N_CLASSES, Ctl.labelToClass,
+              Tch.evaluate(test_bundle, the["EVAL"], fold + 1, Csr, Ctl.N_CLASSES, Ctl.classToLabel,
                 Csr.DATA["extradata"], Csr.path_eval, Csr.path_aprfc, Csr.path_phaseCharts, the["TEST"]["path_preds"])
               print("Breaking testing loop on 'Fold 1' because a path_model was provided without 'train' action.")
               break
@@ -148,7 +146,7 @@ def learning(**the):
             print(f"No predictions (test_bundle) provided for processing: {e}")
             continue
       
-      Tch.evaluate(test_bundle, the["EVAL"]["eval_tests"], model.id, Ctl.labelToClass, Csr)
+      Tch.evaluate(test_bundle, the["EVAL"]["eval_tests"], model.id, Ctl.classToLabel, Csr)
 
     try: # not defined if only processing
       Tch.writer.close()
@@ -158,11 +156,11 @@ def learning(**the):
     # break # == 1 folc (debug)
   os.system(f"tensorboard --logdir={Csr.path_classroom}")
  
+
 if __name__ == "__main__":
   # Load default parameters from config.yml
   with open(os.path.join("settings", "config-default.yml"), "r") as file:
     config = yaml.safe_load(file)
-
   # Set up argparse fir CLASSROOMtime overriding
   parser = argparse.ArgumentParser(description="Override config parameters at CLASSROOMtime")
   parser.add_argument("--action", type=str, help="Action to perform T-rainE-val process)")
