@@ -1,5 +1,5 @@
 path_root: . #/batataclan
-path_data: #/workspace/raid-diogo/
+path_data: /workspace/raid-diogo/
 seed: 53  # 5 --> 3 or 3 --> 5  DO NOT CHANGE SEED (it messes up with fold training)
 device:
 id_classroom:  #LDSSi-2504-1 # if empty creates new learning environment, else loads it (dataset-YYMM-DDHH)
@@ -10,7 +10,7 @@ actions:
 
 # DATA and TRAIN properties define an unique classroom
 DATA:
-  id_dataset: TEST-local  # (LDSS-local, LDSSi-local, TEST-local, cifar10-ext)
+  id_dataset: LDSS-local  # (LDSS-local, LDSSi-local, TEST-local, cifar10-ext)
   labelType: single-phase # time-to-next-phase, single-phase, time-to-video-end, time-since-video-start
   predicateLabels:
     - dissection
@@ -47,7 +47,7 @@ TRAIN: # to fix because the top ones should not define a classroom
   minDelta: 0.001  # minimum delta to save a better state
   patience: 5  # number of epochs to wait for a better state before stopping training
   HYPER:  # traditional hyperparameters
-    n_epochs: 2
+    n_epochs: 25
     batchSize: 16
     clipSize: 64  # amount of frames (sec) per clip when temporal training
     learningRate: 0.0005  # learning rate
@@ -62,8 +62,8 @@ PROCESS:  # Process
   sampleFormat: png
   filter_annotated: True
   resize: False
-  path_rawVideos: /media/spaceship/ExternalDr/Data/Leuven_DS_Sacropexy
-  path_sample: /media/spaceship/ExternalDr/Data/Leuven_DS_Sacropexy/samples/png-025
+  path_rawVideos: 
+  path_sample:
 
   label: True
 
@@ -80,7 +80,7 @@ MODEL:  # for models created/trained in the run
   type: phase
   domain: spatial # spatial, temporal, full
 # spatial
-  spaceTransferLearning: fine-tune # fine-tune | fixed-fx
+  spaceTransferLearning: fixed-fx # fine-tune | fixed-fx
   spaceArch: resnet50
   spacePreweights: default # sfx = spatial feature extraction
   path_spaceModel: #C:/Users/DC/Documents/Programming/python/ucl/ML_SurgeNet/logs/LDSS/run_20241104-00/checkpoints/LDSS-20241104-00-fold6-0.837800.pth # if empty, uses new untrained one

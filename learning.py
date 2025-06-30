@@ -155,7 +155,7 @@ def learning(**the):
       pass
     print(f"\n\t = = = = = \t = = = = =\n\t\t Fold {fold + 1} done!\n\t = = = = = \t = = = = =\n")
     # break # == 1 folc (debug)
-    break
+    # break
   os.system(f"tensorboard --logdir={Csr.path_classroom}")
  
 

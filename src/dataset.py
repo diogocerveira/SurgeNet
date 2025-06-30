@@ -105,8 +105,8 @@ class SampledVideosDataset(Dataset):
     imgs = torch.stack(imgs)
     labels = torch.tensor(labels).view(-1) if self.labelType.split('-')[0] == "single" else torch.tensor(labels)
     idxs = torch.tensor(idxs)
-    print("idxs: ", idxs[:5])
-    print("labels: ", labels[:5], '\n')
+    # print("idxs: ", idxs[:5])
+    # print("labels: ", labels[:5], '\n')
     # print(f"imgs: {imgs.shape}, labels: {labels}, idxs: {idxs}")
     return list(zip(imgs, labels, idxs))
   
@@ -403,9 +403,26 @@ class Cataloguer():
   def _impl_label_phase(self, framesTimestamps, phaseDelimiters):
     # phaseDelimiter is of type (timestamp, label)
     framesLabel = []
-    # print(phaseDelimiters)
+    # print(phaseDelimiters, '\n', len(phaseDelimiters))
     # print(framesTimestamps)
     # print(list(range(0, len(phaseDelimiters), 2)))
+    # Fix odd number of delimiters
+    try:
+      if phaseDelimiters[0][1] != phaseDelimiters[1][1]:
+        phaseDelimiters.insert(0, (0, phaseDelimiters[0][1]))
+        # print(phaseDelimiters[0])
+        # print(len(phaseDelimiters))
+      if phaseDelimiters[-1][1] != phaseDelimiters[-2][1]:
+        phaseDelimiters.append((max(framesTimestamps) + 1, phaseDelimiters[-1][1]))
+        # print(phaseDelimiters[-1])
+        # print(len(phaseDelimiters))
+        # print(phaseDelimiters)
+      # print(phaseDelimiters[0][1], "  ", phaseDelimiters[1][1])
+      # print(phaseDelimiters[-1][1], "  ", phaseDelimiters[-2][1])
+    except IndexError:
+      raise ValueError("Phase delimiters list is empty or has only one element, cannot label frames.")
+    assert len(phaseDelimiters) % 2 == 0, "Phase delimiters should be in pairs (beginning/resume+end/pause)"
+    # assert 1 == 0
     for ts in framesTimestamps:
       for i in range(0, len(phaseDelimiters), 2): # step of 2 because boundary annotated frames are in pairs (beginning/resume+end/pause)
         if (ts >= phaseDelimiters[i][0]) and (ts <= phaseDelimiters[i + 1][0]):

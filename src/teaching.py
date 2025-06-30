@@ -243,7 +243,7 @@ class Tester():
       for batch, data in enumerate(testloader):
         inputs, targets, sampleIds = data[0].to(self.DEVICE), data[1].to(self.DEVICE), data[2].to(self.DEVICE)
         outputs = model(inputs)
-        print(inputs[:5], '\n', targets[:5], '\n', outputs[:5])
+        # print(inputs[:5], '\n', targets[:5], '\n', outputs[:5])
         if model.inputType == "fmaps":
           outputs = outputs.permute(0, 2, 1).reshape(-1, outputs.shape[1]) # outputs shape of [n_fmaps, classes]
           targets = targets.reshape(-1) # targets shape of [n_fmaps]
@@ -255,7 +255,7 @@ class Tester():
 
         # print("outputs.shape", outputs.shape)
         outputs = torch.argmax(outputs, dim=1)  # get labels with max prediction values
-        print("pred: ", outputs[:5], '\n', "target: ", targets[:5])
+        # print("pred: ", outputs[:5], '\n', "target: ", targets[:5])
         # print("outputs.shape", outputs.shape)
         # print("targets.min()", targets.min().item(), "targets.max()", targets.max().item())
         self.test_metrics.update(outputs, targets)
@@ -351,8 +351,8 @@ class Tester():
       print("phases_gt counts:", phases_gt_video.to_numpy(), '\t', sum(phases_gt_video.to_numpy()))
       
       mix = list(zip(phases_preds_video / (60 * samplerate), phases_gt_video / (60 * samplerate), phases_diff_sum))
-      ot = f"\nVideo {video} Phase Report\n" + f"{'':<12} \t|   T Preds    |    T Targets     ||  Diff\n" + '\n'.join(
-            f"{classToLabelMap[i]:<12} \t| {mix[i][0]:<8.2f}min | {mix[i][1]:<8.2f}min || {(mix[i][0] - mix[i][1]):<8.2f}min"
+      ot = f"\nVideo {video} Phase Report\n" + f"{'':<12} \t\t|   T Preds    |    T Targets     ||  Diff\n" + '\n'.join(
+            f"{classToLabelMap[i]:<12} \t\t| {mix[i][0]:<8.2f}min | {mix[i][1]:<8.2f}min || {(mix[i][0] - mix[i][1]):<8.2f}min"
             for i in range(N_CLASSES)
         )
       outText.append(ot)
@@ -363,8 +363,8 @@ class Tester():
     phases_diff_avg = phases_diff_sum / len(videos) / (60 * samplerate)
     mix = list(zip(phases_preds_avg, phases_gt_avg, phases_diff_avg))
     
-    otavg = "\n\nOverall Average Phase Report\n" + f"{'':<12} \t| T Avg Preds  |  T Avg Targets   || Total AE\n" + '\n'.join(
-            f"{classToLabelMap[i]:<12} \t| {mix[i][0]:<8.2f}min | {mix[i][1]:<8.2f}min || {(mix[i][2]):<8.2f}min"
+    otavg = "\n\nOverall Average Phase Report\n" + f"{'':<12} \t\t| T Avg Preds  |  T Avg Targets   || Total AE\n" + '\n'.join(
+            f"{classToLabelMap[i]:<12} \t\t| {mix[i][0]:<8.2f}min | {mix[i][1]:<8.2f}min || {(mix[i][2]):<8.2f}min"
             for i in range(N_CLASSES)
       )
     print(otavg)
