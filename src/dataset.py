@@ -17,6 +17,7 @@ import shutil
 from torcheval.metrics import MulticlassAccuracy, MulticlassPrecision, MulticlassRecall, MulticlassF1Score, MulticlassConfusionMatrix
 import csv
 import cv2
+from collections import Counter
 
 import matplotlib
 matplotlib.use('Agg')
@@ -25,7 +26,7 @@ import matplotlib.pyplot as plt
 class SampledVideosDataset(Dataset):
   ''' Custom dataset of frames from sampled surgery videos
   '''
-  def __init__(self, DATA_SCOPE, path_samples, path_labels, transform, recycle_itemIds):
+  def __init__(self, DATA_SCOPE, labelType, path_samples, path_labels, transform):
     '''
       Args:
         path_labels (str): path to csv with annotations
@@ -34,13 +35,12 @@ class SampledVideosDataset(Dataset):
         transform (callable, optional): transform a sample
     '''
     self.DATA_SCOPE = DATA_SCOPE
+    self.labelType = labelType
     self.path_samples = path_samples
     self.datatype = "png"
     self.path_labels = path_labels
-    self.labels = self._get_labels(path_labels) # frameId, video, frame_label
+    self.labels = self._get_labels(path_labels) # frameId, videoId, frame_label
     # print(self.labels.index)
-    self.recycle_itemIds = recycle_itemIds
-    # print(type(recycle_itemIds))
     self.transform = transform
     # NOT WORKING
     # Filter labels to include only rows where the frame file exists
@@ -51,7 +51,15 @@ class SampledVideosDataset(Dataset):
     self.videoNames = self.labels["videoId"].unique()  # Extract unique video identifiers
     self.videoToGroup = {videoId: idx for idx, videoId in enumerate(self.videoNames)}
     
-    self.N_CLASSES = len(self.labels["class"].unique())
+    self.labelToClassMap = self.get_labelToClassMap(self.labels)
+    self.n_classes = len(self.labelToClassMap)
+    self.classWeights = self.get_labelWeights(self.labels)
+    print(f"Class weights: {self.classWeights}\n")
+     # check if the class distribution is balanced
+    if all([self.classWeights[i] == self.classWeights[i + 1] for i in range(len(self.classWeights) - 1)]):
+      self.BALANCED = True
+    else:
+      self.BALANCED = False
 
   def __len__(self):
     length = 0
@@ -66,10 +74,11 @@ class SampledVideosDataset(Dataset):
   def __getitem__(self, idx):
     """Retrieve a single item from the dataset based on an index"""
     path_img = os.path.join(self.path_samples, self.labels.loc[idx, "videoId"],
-      self.labels.loc[idx, "frameId"] + ".png")
+      self.labels.loc[idx, "frameId"] + '.' + self.datatype)
     # Read images and labels
     img = self.transform(cv2.cvtColor(cv2.imread(path_img), cv2.COLOR_BGR2RGB))
-    label = self.labels.loc[idx, "class"]
+    label = self.labels.loc[idx, "frameLabels"]
+    print("WTF")
     # print(f"img: {img.shape}, label: {label}, idx: {torch.tensor(idx)}")  # WTFFFF does not print
     return (img, label, torch.tensor(idx))
   def __getitems__(self, idxs):
@@ -86,14 +95,18 @@ class SampledVideosDataset(Dataset):
     # Read images and labels
     # imgs = [iio.imread(p) for p in path_imgs]
     imgs = [cv2.cvtColor(cv2.imread(p), cv2.COLOR_BGR2RGB) for p in path_imgs]
-    labels = self.labels.loc[idxs, "class"].tolist()
+    labels = self.labels.loc[idxs, "frameLabels"].tolist()
+    # convert natural language multi label to numeric single
+    labels = [[self.labelToClassMap[single] for single in multi.split(',')] for multi in labels]
     if self.transform:
       imgs = [self.transform(img) for img in imgs]
     else:
       imgs = [torch.tensor(img) for img in imgs]
     imgs = torch.stack(imgs)
-    labels = torch.tensor(labels)
+    labels = torch.tensor(labels).view(-1) if self.labelType.split('-')[0] == "single" else torch.tensor(labels)
     idxs = torch.tensor(idxs)
+    print("idxs: ", idxs[:5])
+    print("labels: ", labels[:5], '\n')
     # print(f"imgs: {imgs.shape}, labels: {labels}, idxs: {idxs}")
     return list(zip(imgs, labels, idxs))
   
@@ -106,17 +119,17 @@ class SampledVideosDataset(Dataset):
       # (Optional) Create a new column for videoId based on the frame column
       labels['videoId'] = labels['frameId'].str.split('_', expand=True)[0]
       # print(df.columns)
-      # self.write_labels_csv(df, "deg.csv")
+      # self._write_labels_csv(df, "deg.csv")
       return labels
     except:
       raise ValueError("\nInvalid path_labels/labels.csv file (might suggest inexistent or a problematic dataset)")
-  def update_labels(self, path_labels):
+  def _update_labels(self, path_labels):
     self.labels = self._get_labels(path_labels)
   
-  def write_labels_csv(self, df, path_to):
+  def _write_labels_csv(self, df, path_to):
     df.to_csv(path_to, index=False)
 
-  def get_grouping(self, idx=None):
+  def _get_grouping(self, idx=None):
     ''' Returns a list of numeric labels corresponding to the video groups '''
     if idx is None:
         idx = slice(None)  # This is equivalent to selecting all rows
@@ -124,14 +137,14 @@ class SampledVideosDataset(Dataset):
         idx = slice(*idx)  # Convert tuple to slice
     return [self.videoToGroup[videoId] for videoId in self.labels["videoId"][idx]]
   
-  def get_idxToVideo(self, listOfIdxs):
+  def _get_idxToVideo(self, listOfIdxs):
     ''' Extract video IDs (check for overlap in sets) - specific to each labels.csv implementation
         List of idxs [[tr_i, va_i, te_i], ...] --> List of videos [[vidsx, vidsy, vidsz], ...]
     '''
     # Load the CSV and extract videoId
     # AFFECTed THE ORIGINAL
     # df = self.labels
-    # df.drop(["frame", "class"], axis=1, inplace=True)  # Optional: Drop unnecessary columns if not needed
+    # df.drop(["frameId", "frameLabels"], axis=1, inplace=True)  # Optional: Drop unnecessary columns if not needed
     
     list_out = []
 
@@ -156,7 +169,31 @@ class SampledVideosDataset(Dataset):
       return list_out[0]
     # print(list_out)
     return list_out
+      
+  def get_labelWeights(self, labels):
+    ''' Get class distribution form the Dataset object'''
+    labels_counts = Counter()
+    for multi in labels["frameLabels"]:
+      single = [l.strip() for l in multi.split(',')] # comma separated labels
+      labels_counts.update(single)
+    cw = pd.Series(labels_counts) / self.__len__()  # normalize by the number of frames
 
+    return torch.tensor(cw.values, dtype=torch.float32)
+  
+  def get_labelToClassMap(self, labels):
+    ''' Convert to list of natural language labels into list of int number labels, saving a map class->label in classToLabelMap dict map '''
+    uniqueLabels = set()
+    # print(labels[:5])
+    for multi in set(labels["frameLabels"]):
+      for single in multi.split(','):
+        uniqueLabels.add(single)
+    labelToClassMap = {l:i for i, l in enumerate(sorted(list(uniqueLabels)))}
+    classes = [tuple([labelToClassMap[single] for single in multi.split(',')]) for multi in labels["frameLabels"]]
+    # print(classes[:5])
+    self.classToLabelMap = {i: l for i, l in enumerate(sorted(list(uniqueLabels)))}
+    print(self.classToLabelMap)
+    # print(classes[:5])
+    return labelToClassMap
 
 class Cataloguer():
   ''' Each Cataloguer organises/handles 1 dataset (local - LDSS - or external - CIFAR10)
@@ -167,16 +204,11 @@ class Cataloguer():
   '''
   def __init__(self, DATA, path_annots):
     self.path_annots = path_annots
-    self.id_dataset = DATA["id_dataset"]
-    self.preprocessing = DATA["preprocessing"]
-    self.recycle_itemIds = DATA["recycle_itemIds"]
+    self.preprocessingType = DATA["preprocessing"]
+    self.labelType = DATA["labelType"]
+    self.predicateLabelsPossible = DATA["predicateLabels"]
+    self.objectLabelsPossible = DATA["objectLabels"]
     # updated when dataset is built
-    self.dataset = None
-    self.classToLabel = None
-    self.N_CLASSES = None
-    self.DATASET_SIZE = None
-    self.classWeights = None
-    self.BALANCED = None
     self.features = None  # Default dict with for each frameId: {layerX: tensor, layerY: tensor, ...}
 
   def sample(self, path_rawVideos, path_to, samplerate=1, sampleFormat="png", processing="LDSS", filter_annotated=True):
@@ -271,134 +303,131 @@ class Cataloguer():
       print("C. Resizing finished!\n")
   
   def label(self, path_from, path_to, labelType):
-    ''' Label sampled videos'''
+    ''' folders of sampled videos -> labels.csv
+    '''
     totalFrameIds = []
-    totalFrameClasses = []
+    totalFrameLabels = []
     for videoId in os.listdir(path_from): # sampled videos (folder of frames)
       path_annot = os.path.join(self.path_annots, f"{videoId}.json")
       path_video = os.path.join(path_from, videoId)
       if os.path.exists(path_annot):  # if video is annotated (to make a better check)
-        with open(path_annot, 'r', encoding=self._detect_encoding(path_annot)) as f:
-          annots = json.load(f)  # parsed into list of dicts=annotations
-          descriptions = [a["content"] for a in annots]
-          timestamps = [a["playback_timestamp"] for a in annots]
-        classToLabel = [self._parse_description(d)[0]:self._parse_description(d)[1] for d in descriptions] # for simplification, assuming class as number, and label as natural language
-        annotPoints = list(zip(timestamps, classes))
-        # print("annotPoints: ", annotPoints)
+        phaseDelimiters = self._get_phaseDelimiters(path_annot)
+
+        if labelType.split('-')[1] == "phase":
+          get_frameLabels = self._impl_label_phase
+        elif labelType.split('-')[1] == "time-to-next-phase":
+          get_frameLabels = self._impl_label_timeToNextPhase
+        # print("phaseDelimiters: ", phaseDelimiters)
+        # get framesId from video folder that are not directories and do not start with . or _
         framesId = [os.path.splitext(frame)[0] for frame in os.listdir(path_video) if not frame.startswith(('.', '_')) and not os.path.isdir(os.path.join(path_video, frame))]
-        framesTimestamps = [int(frameId.split('_')[1]) for frameId in framesId]  # convert to int
-        
-        if labelType == "phase-class":
-          get_class = self._get_phaseClass
-        elif labelType == "time-to-next-phase":
-          get_class = self._get_timeToNextPhase
-          
-        totalFrameClasses.extend(get_class(framesTimestamps, annotPoints))
         totalFrameIds.extend(framesId)
+        
+        framesTimestamps = [int(frameId.split('_')[1]) for frameId in framesId]  # convert to int
+        frameLabels = get_frameLabels(framesTimestamps, phaseDelimiters)  # assume natural language
+        # print(frameLabels)
+        totalFrameLabels.extend(frameLabels)
         # print(len(totalFrameClasses), len(totalFrameIds))
-      elif videoId.startswith('.'):  # hidden file are disregarded
-        # print(f"   Skipping hidden file {videoId}\n")
+      elif videoId.startswith(('.', '_')):  # hidden file are disregarded
+        print(f"   Skipping hidden file {videoId}\n")
         continue
       else:
-        print(f"   Warning: {path_annot} not found, skipping annotation for {videoId}")
-      # Prepare CSV file
-      assert len(totalFrameClasses) == len(totalFrameIds), f"Number of frames ({len(totalFrameClasses)}) and labels ({len(totalFrameIds)}) do not match! Aborting labeling."
-      print("max class: ", max(totalFrameClasses), "min class: ", min(totalFrameClasses))
-      with open(path_to, 'w', newline='') as file_csv:  # newline='' maximizes compatibility with other os
-        fieldNames = ['frameId', 'class']
-        writer = csv.DictWriter(file_csv, fieldnames=fieldNames)
-        if os.stat(path_to).st_size == 0: # Check if the file is empty to write the header
-          writer.writeheader()
-        # Batch write frames and annotations
-        for frameId, sampleClass in zip(totalFrameIds, totalFrameClasses):
-          writer.writerow({'frameId': frameId, 'class': sampleClass})
+        print(f"   Warning: Skipping annotation for {videoId} ({path_annot} not found)")
 
-  def _detect_encoding(self, path_to_frame):
-  ''' Extract and return annotation file encoding'''
-  with open(path_to_frame, 'rb') as f:
-    raw_data = f.read()
-    result = chardet.detect(raw_data)
-    return result['encoding']
-  def _parse_description(self, protoclass):
-    ''' Transform "End of (x) y" protoclass into (x, y) -> x is the class number - specific for this way o annotation '''
-    # e.g. "End of (1) Phase 1" -> (1, "Phase 1")
-    for l in protoclass:
-      if l.isdigit():
-        return (int(l), protoclass[protoclass.find(l) + 3:])
-  def _get_phaseClass(self, framesTimestamps, annotPoints):
-    framesClass = []
-    # print(annotPoints)
-    # print(list(range(0, len(annotPoints), 2)))
-    for ts in framesTimestamps:
-      for i in range(0, len(annotPoints), 2): # step of 2 because boundary annotated frames are in pairs (beginning+end)
-        if (ts >= annotPoints[i][0]) and (ts <= annotPoints[i + 1][0]):
-          framesClass.append(annotPoints[i][1])
-          break
-      else:
-        framesClass.append(0)  # if no phase, append class 0
-    return framesClass
-  def _get_timeSincePhaseStart(self, framesTimestamps, annotPoints):
-    framesClass = []
-    annotPhaseBegs = [annotPoints[i] for i in range(0, len(annotPoints), 2)]  # step of 2 to get only the beginning of each phase
-    for ts in framesTimestamps:
-      for bTC in annotPhaseBegs:  # get the time until next phase (bigger ts) beginning
-        if bTC[0] < ts:
-          framesClass.append(int((ts - bTC[1]) / 1000))  # get difference in seconds
-          break
-      else:
-        framesClass.append(0)
-    return framesClass
-  def _get_timeToNextPhase(self, framesTimestamps, annotPoints):
-    framesClass = []
-    annotPhaseBegs = [annotPoints[i] for i in range(0, len(annotPoints), 2)]  # step of 2 to get only the beginning of each phase
-    for ts in framesTimestamps:
-      for bTC in annotPhaseBegs:  # get the time until next phase (bigger ts) beginning
-        if bTC[0] >= ts:
-          framesClass.append(int((bTC[1]-ts) / 1000))  # get difference in seconds
-          break
-      else:
-        framesClass.append(0)
-    return framesClass
-  def _get_datasetSize(self):
-    if self.dataset.DATA_SCOPE == "local":
-      return len(self.dataset)
-    elif self.dataset.DATA_SCOPE == "external":
-      return len(self.dataset[0]) + len(self.dataset[1])
-  def _get_classWeights(self):
-    ''' Get class distribution form the Dataset object'''
-    cw = self.dataset.labels["class"].value_counts() / self.DATASET_SIZE
-    return torch.tensor(cw.values, dtype=torch.float32)  
-  def _get_classToLabel(self):
-    ''' Get a map from labels (int) to classesInt (string) '''
-    if self.dataset.DATA_SCOPE == "local":
-      def get_sigla(string):
-        # get the first letter of each word in a string in uppercase
-        return "".join([word[0].upper() for word in string.split()])
+    # Prepare CSV file
+    with open(path_to, 'w', newline='') as file_csv:  # newline='' maximizes compatibility with other os
+      fieldNames = ['frameId', 'frameLabels']
+      writer = csv.DictWriter(file_csv, fieldnames=fieldNames)
+      if os.stat(path_to).st_size == 0: # Check if the file is empty to write the header
+        writer.writeheader()
+      # Batch write frames and annotations
+      for frameId, frameLabel in zip(totalFrameIds, totalFrameLabels):
+        writer.writerow({'frameId': frameId, 'frameLabels': frameLabel})
 
-      path_fullAnnot = os.path.join(self.path_annots, "a90983a1-2329-4019-96e8-949493c3fc24.json") # get annotation w all classes to extract all classesInt (assuming they all have - they DON'T!!!)
-      # print(path_fullAnnot)
-      if os.path.exists(path_fullAnnot):
-        with open(path_fullAnnot, 'r', encoding=self._detect_encoding(path_fullAnnot)) as f:
-          randomAnnot = json.load(f)
-          annotPointsLabels = [m["content"] for m in randomAnnot]
-          classToLabel = {self._parse_description(p)[0]: (str(self._parse_description(p)[0]) + get_sigla(self._parse_description(p)[1])) for p in annotPointsLabels}
-          
-          if 0 in self.dataset.labels["class"].unique(): # dataset.labels were defined before classToLabel dict in self.build_dataset()
-            classToLabel[0] = "0ther"
-        # filter out non-existing classes in the real (e.g. partial, lite versions) dataset of items
-        assert len(classToLabel) == len(self.dataset.labels["class"].unique()), f"Number of classes ({len(classToLabel)}) and labels ({len(self.dataset.labels['class'].unique())}) do not match! Aborting labeling."
-        # classToLabel = {int(k): v for k, v in classToLabel.items() if k in self.dataset.labels["class"].unique()}
-        
-        return classToLabel
+  def _get_phaseDelimiters(self, path_annot):
+    ''' extract annotated video frames from annotation file as (timestamp, label))
+    '''
+    with open(path_annot, 'r', encoding=self._detect_encoding(path_annot)) as f:
+      annot = json.load(f)  # parsed into list of dicts=annotations
+      timestamps = [a["playback_timestamp"] for a in annot]
+      protolabels = [a["content"] for a in annot]
+      labels = self._parse_protolabels(protolabels)
+      # labels should not have Other class, these are not annotated
+    return list(zip(timestamps, labels)) # ordered!
+  
+  def _detect_encoding(self, path_file):
+    ''' Extract and return annotation file encoding'''
+    with open(path_file, 'rb') as f:
+      rawData = f.read()
+      result = chardet.detect(rawData)
+      return result['encoding']
+    
+  def _parse_protolabels(self, protolabels):
+    ''' (list) protolabels -> label
+        e.g. ["End of (1) yellow xox and action", "Beg of (2) swallow"] into ["Y,X,A", "S, OtherObject"]
+        # Defines type of labelling as single class (e.g. "Y-X-Z") or multi class (e.g. "Y,X,Z")
+    '''
+    labels = []
+    for proto in protolabels:
+      found = []
       
-    elif self.dataset.DATA_SCOPE == "external":
-      return {i: c for c, i in self.dataset[1].class_to_idx.items()};
-    else:
-      raise ValueError("Invalid DATA_SCOPE!")
+      for label in self.predicateLabelsPossible:
+        if label.lower() in proto.lower():
+          found.append(self._get_sigla(label))
+          break  # assuming only 1 predicate per label
+          # print(label)
+      else:  # if no predicate found, append "Other"
+        found.append("0therPred")  # sort to have a consistent order
+      for label in self.objectLabelsPossible:
+        if label.lower() in proto.lower():
+          found.append(self._get_sigla(label))
+          break  # assuming only 1 object per label
+          # print(label)
+      else:
+        found.append("0TherObj")
+      
+      # found = sorted(found)  # sort the labels to have a consistent order
+      if self.labelType.split('-')[0] == "single":
+        found = '-'.join(found) # labels as strings like A-B-C
+      elif self.labelType.split('-')[0] == "multi":
+        found = ','.join(found) # labels as strings like A,B,C
+      else:
+        raise ValueError("Invalid labelType domain!")
+      labels.append(found)
+      # print(found)
+    return labels
 
-  def _get_preprocessing(self, preprocessing):
+  def _get_sigla(self, text):
+    # get the first letter of each word in a string in uppercase
+    return ''.join([word[0].upper() + word[1:3] for word in text.split()])
+  
+  def _impl_label_phase(self, framesTimestamps, phaseDelimiters):
+    # phaseDelimiter is of type (timestamp, label)
+    framesLabel = []
+    # print(phaseDelimiters)
+    # print(framesTimestamps)
+    # print(list(range(0, len(phaseDelimiters), 2)))
+    for ts in framesTimestamps:
+      for i in range(0, len(phaseDelimiters), 2): # step of 2 because boundary annotated frames are in pairs (beginning/resume+end/pause)
+        if (ts >= phaseDelimiters[i][0]) and (ts <= phaseDelimiters[i + 1][0]):
+          framesLabel.append(phaseDelimiters[i][1])
+          # print("ts: ", ts)
+          # print(phaseDelimiters[i][0], "  ", phaseDelimiters[i + 1][0], " : ", phaseDelimiters[i][1])
+          break
+      else: # appending anything if not a labelled phase
+        if self.labelType.split('-')[0] == "single":
+          otherLabel = "0therPred-0TherObj"  # if no phase, append both Other labels
+        elif self.labelType.split('-')[0] == "multi":
+          otherLabel = "0therPred,0TherObj"
+        else:
+          raise ValueError("Invalid labelType domain!")
+        framesLabel.append(otherLabel)  # if no phase, append both Other labels
+
+      # print("label(s): ", phaseDelimiters[i][1], '\n')
+    return framesLabel
+  
+  def _get_preprocessing(self, preprocessingType):
     ''' Get torch group of tranforms directly applied to torch Dataset object'''
-    if preprocessing == "basic":
+    if preprocessingType == "basic":
       transform = transforms.Compose([
         transforms.Resize((224, 224), antialias=True),
         transforms.ToImage(), # only for v2
@@ -408,7 +437,7 @@ class Cataloguer():
         # transforms.ToTensor(),
         # transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
         ])
-    elif preprocessing == "aug":
+    elif preprocessingType == "aug":
       transform = transforms.Compose([
       # from 0-255 Image/numpy.ndarray to 0.0-1.0 torch.FloatTensor
       transforms.Resize((224, 224), antialias=True),
@@ -418,71 +447,60 @@ class Cataloguer():
       transforms.RandomRotation((-90, 90)),
       transforms.ColorJitter(10, 2)
       ])
-    elif not preprocessing:
+    elif not preprocessingType:
       # make identity transform
       transform = transforms.Compose([
         transforms.ToImage(), # only for v2
         transforms.ToDtype(torch.float32, scale=True),
       ])
     else:
-      raise ValueError("Invalid preprocessing key")
+      raise ValueError("Invalid preprocessingType key")
     return transform
   
-  def build_dataset(self, path_samples, path_labels):
+  def build_dataset(self, DATA_SCOPE, path_samples=None, path_labels=None):
     ''' Get the Dataset objects according to the DATA_SCOPE'''
-    transform = self._get_preprocessing(self.preprocessing)
-    DATA_SCOPE = self.id_dataset.split('-')[1]
+    transform = self._get_preprocessing(self.preprocessingType)
+
     if DATA_SCOPE == "local":
-      dataset = SampledVideosDataset(DATA_SCOPE, path_samples, path_labels, transform, self.recycle_itemIds)    
+      dataset = SampledVideosDataset(DATA_SCOPE, self.labelType, path_samples, path_labels, transform)    
     elif DATA_SCOPE == "external":
-      train_dataset = datasets.CIFAR10(root=f"./data/{DATA_SCOPE}", train=True, download=True, transform=self.preprocessing)
-      test_dataset = datasets.CIFAR10(root=f"./data/{DATA_SCOPE}", train=False, download=True, transform=self.preprocessing)
+      train_dataset = datasets.CIFAR10(root=f"./data/{DATA_SCOPE}", train=True, download=True, transform=transform)
+      test_dataset = datasets.CIFAR10(root=f"./data/{DATA_SCOPE}", train=False, download=True, transform=transform)
       dataset = (train_dataset, test_dataset)
     else:
       raise ValueError("Invalid DATA_SCOPE!")
-    
-    self.dataset = dataset  # temporarily
-    self.classToLabel = self._get_classToLabel()   # gets dict for getting class name from int value
-    self.N_CLASSES = dataset.N_CLASSES
-    self.DATASET_SIZE = self._get_datasetSize()
-    self.classWeights = self._get_classWeights()
-     # check if the class distribution is balanced
-    if all([self.classWeights[i] == self.classWeights[i + 1] for i in range(len(self.classWeights) - 1)]):
-      self.BALANCED = True
-    else:
-      self.BALANCED = False
     return dataset
   
-  def split(self, k_folds, dataset=None):
+  def split(self, k_folds, dataset):
     ''' returns ([])
     '''
-    dataset = self.dataset
     # Practice / Test Split
     listOfIdxs = []
-    if dataset.DATA_SCOPE == "local":
-      outerKF = GroupKFold(n_splits=k_folds)
-      outerGroups = dataset.get_grouping()
-      outerKFSplit = outerKF.split(np.arange(len(dataset)), groups=outerGroups)  # train/valid and test split - fold split
-      for tv_idx, test_idxs in outerKFSplit:
-        # print('\n', tv_idx, test_idxs, '\n')
-        # tv_subset = torch.utils.data.Subset(dataset, tv_idx)
-        innerGroups = dataset.get_grouping(tv_idx)
-        # print(innerGroups)
-        innerKF = GroupKFold(n_splits=k_folds - 1)
-        train_localIdxs, valid_localIdxs = next(innerKF.split(tv_idx, groups=innerGroups))  # train and valid split - practice split
-        # print("trainloc", train_localIdxs, '\n', "validloc", valid_localIdxs)
-        train_idxs = tv_idx[train_localIdxs] # the inner splits idx don't match the outer directly
-        valid_idxs = tv_idx[valid_localIdxs] # because idxs for some video were removed (need to map back)
-        listOfIdxs.append([train_idxs, valid_idxs, test_idxs])
-        # print('\n', [train_idxs, valid_idxs, test_idxs], '\n')
+    try:
+      if dataset.DATA_SCOPE == "local":
+        outerKF = GroupKFold(n_splits=k_folds)
+        outerGroups = dataset._get_grouping()
+        outerKFSplit = outerKF.split(np.arange(len(dataset)), groups=outerGroups)  # train/valid and test split - fold split
+        for tv_idx, test_idxs in outerKFSplit:
+          # print('\n', tv_idx, test_idxs, '\n')
+          # tv_subset = torch.utils.data.Subset(dataset, tv_idx)
+          innerGroups = dataset._get_grouping(tv_idx)
+          # print(innerGroups)
+          innerKF = GroupKFold(n_splits=k_folds - 1)
+          train_localIdxs, valid_localIdxs = next(innerKF.split(tv_idx, groups=innerGroups))  # train and valid split - practice split
+          # print("trainloc", train_localIdxs, '\n', "validloc", valid_localIdxs)
+          train_idxs = tv_idx[train_localIdxs] # the inner splits idx don't match the outer directly
+          valid_idxs = tv_idx[valid_localIdxs] # because idxs for some video were removed (need to map back)
+          listOfIdxs.append([train_idxs, valid_idxs, test_idxs])
+          # print('\n', [train_idxs, valid_idxs, test_idxs], '\n')
 
-      videosSplit = dataset.get_idxToVideo(listOfIdxs)
-      # print(videosSplit[0])
-      # print(listOfIdxs[0])
-      return tuple(zip(listOfIdxs, videosSplit))
-
+        videosSplit = dataset._get_idxToVideo(listOfIdxs)
+        # print(videosSplit[0])
+        # print(listOfIdxs[0])
+        return tuple(zip(listOfIdxs, videosSplit))
+    except:
+      print("Error in split() for local dataset, assuming external dataset split instead")
     # Train / Valid Split
-    elif dataset.DATA_SCOPE == "external":
       indices = np.arange(len(dataset[0]))
       train_idxs, valid_idxs = train_test_split(indices, train_size = (k_folds - 1) / (k_folds), random_state=53)
       # print(train_idxs, valid_idxs)
@@ -503,16 +521,19 @@ class Cataloguer():
       return self._batch_clips(dset, size_batch, size_clip, train_idxs, valid_idxs, test_idxs)
     else:
       raise ValueError("Invalid Batch Mode!")
+    
   def _batch_images(self, dset, size_batch, train_idxs=None, valid_idxs=None, test_idxs=None):
     loaders = {}
-    if self.dataset.DATA_SCOPE == "local":
-      if np.any(train_idxs):
-        loaders["trainloader"] = DataLoader(dataset=dset, batch_size=size_batch, num_workers=2, sampler=torch.utils.data.SubsetRandomSampler(train_idxs))
-      if np.any(valid_idxs):
-        loaders["validloader"] = DataLoader(dataset=dset, batch_size=size_batch, num_workers=2, sampler=torch.utils.data.SubsetRandomSampler(valid_idxs))
-      if np.any(test_idxs):
-        loaders["testloader"] = DataLoader(dataset=dset, batch_size=size_batch, num_workers=2, sampler=torch.utils.data.SubsetRandomSampler(test_idxs))
-    elif self.dataset.DATA_SCOPE == "external":
+    try:
+      if dset.DATA_SCOPE == "local":
+        if np.any(train_idxs):
+          loaders["trainloader"] = DataLoader(dataset=dset, batch_size=size_batch, num_workers=2, sampler=torch.utils.data.SubsetRandomSampler(train_idxs))
+        if np.any(valid_idxs):
+          loaders["validloader"] = DataLoader(dataset=dset, batch_size=size_batch, num_workers=2, sampler=torch.utils.data.SubsetRandomSampler(valid_idxs))
+        if np.any(test_idxs):
+          loaders["testloader"] = DataLoader(dataset=dset, batch_size=size_batch, num_workers=2, sampler=torch.utils.data.SubsetRandomSampler(test_idxs))
+    except:
+      print("Error in batch() for local dataset, assuming external dataset batch instead")
       # test_idxs actually carries the test part of the dataset when using CIFAR-10
       if np.any(train_idxs):
         loaders["trainloader"] = DataLoader(dataset=dset[0], batch_size=size_batch, num_workers=2, sampler=torch.utils.data.SubsetRandomSampler(train_idxs))
@@ -534,7 +555,7 @@ class Cataloguer():
     for split, idxs in enumerate([train_idxs, valid_idxs, test_idxs]):
 
       feats = torch.stack([featuresDict[i][featureLayer] for i in idxs]).squeeze(1) # to [n_frames, features_size] 
-      labels = dset.labels["class"].values[idxs] # use class column as np array for indexing labels
+      labels = dset.labels["frameLabels"].values[idxs] # use class column as np array for indexing labels
       clips, clipLabels, clipIdxs = self._clip_dataitems(feats, labels, idxs, size_clip)  # clips is now [n_clips, n_features, features_size]
       
       # the dataset zips the tensors together to be feed to a dataloader (unzips them)
@@ -544,6 +565,7 @@ class Cataloguer():
     exampleBatch = next(iter(loader[0]))
     print(f"\tBatch example shapes:\n\t[space features] {exampleBatch[0].shape}\n\t[labels] {exampleBatch[1].shape}\n\t[idxs] {exampleBatch[2].shape}\n")
     return loader
+  
   def _clip_dataitems(self, feats, labels, idxs, size_clip=3):
     # split into groups (clips) with size "size_clip" 
     
@@ -567,52 +589,11 @@ class Cataloguer():
 
     clips = torch.stack(clips).permute(0, 2, 1)  # now tensor: [n_clips, features_size, n_features==size_clip]
     print(clips.shape)
-      
-
-  def _old_batch_features(self, path_spaceFeatures, train_idxs=None, valid_idxs=None, test_idxs=None):
-    assert os.path.exists(path_spaceFeatures), f"No exported space features found in {path_spaceFeatures}!"
-    # batch size is "one video"
-    loader = [[], [], []] 
-    for i, idx in enumerate([train_idxs, valid_idxs, test_idxs]):
-      df = self.dataset.labels.iloc[idx].copy()
-      # print(df.columns)
-      df["timestamp"] = df["frame"].str.split('_', expand=True)[1].astype(int)  # Ensure numeric sorting    
-      df = df.sort_values(by=["videoId", "timestamp"])
-      # print(df)
-      for vid, group in df.groupby("videoId"):
-        try:
-          # print(self.features[list(self.features.keys())[-1]])
-          # Accumulate features, labels and frame_nmes as tensors for each video
-          feats = torch.stack([self.features[frame["frame"]][self.FEATURE_LAYER] for _, frame in group.iterrows()])
-          labels = torch.tensor(group["class"].values)
-          frameNames = [frame["frame"] for _, frame in group.iterrows()]
-
-          # Ensure the channel dimension is present
-          # print(features.shape)
-          feats = feats.permute(1, 0).unsqueeze(0)  # to [size_batch, features_size, n_frames]
-          # print(feats.shape, labels.shape, len(frameNames))
-          # Store tuple of tensors (features, labels, frame indices) for this video in loader[i]
-          loader[i].append((feats, labels, frameNames))
-        except KeyError as e: 
-          print(f"KeyError: {e}")
-          break
-        except ValueError as e:
-          print(f"ValueError: {e}")
-          break
-        except Exception as e:
-          print(f"Unexpected error: {e}")
-          break
-        # video = vid
-    # print(loader[2][video][0])
-    # assert 1 == 0
-
-    return loader # trainloader, validloader, testloader
-    
 
 class Showcaser:
   def __init__(self):
     pass
-  def show(self, imgs, im_type=torch.Tensor):
+  def show(self, imgs, imDomain=torch.Tensor):
     if not isinstance(imgs, list):
       imgs = [imgs]
     size_imgs = len(imgs); print(size_imgs)
@@ -622,7 +603,7 @@ class Showcaser:
       fig, axes = plt.subplots(rows, cols, figsize=(8, 11))
       for i, ax in enumerate(axes.flat):  # Iterate over the tensors and plot each one
         if i < size_imgs:
-          if im_type == torch.Tensor:
+          if imDomain == torch.Tensor:
             if i.dim() == 1:
               print("Tensor is 1D.")
               i = i.view(1, -1) # Reshape the tensor to 2D for visualization

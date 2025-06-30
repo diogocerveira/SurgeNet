@@ -21,13 +21,16 @@ class PhaseNet(nn.Module):
 
     # the modular approach allows to have modules with no conditional on the forward pass
     if modelDomain == "spatial":
-      inators = [spaceinator]
+      classifier = nn.Linear(spaceinator.featureSize, spaceinator.n_classes)
+      inators = [spaceinator, classifier]
       inputType = "images"
     elif modelDomain == "temporal":
+      classifier = nn.Linear(timeinator.featureSize, timeinator.n_classes)
       inators = [timeinator]
       inputType = "fmaps"
     elif modelDomain == "full":
-      inators = [spaceinator, timeinator]
+      classifier = nn.Linear(timeinator.featureSize, timeinator.n_classes)
+      inators = [spaceinator, timeinator, classifier]
       inputType = "images"
     else:
       raise ValueError("Invalid domain choice!")
@@ -91,11 +94,13 @@ class Spaceinator(nn.Module):
     else:
       raise ValueError("Invalid transfer learning mode!")
     # remove final layer if passing features to another model (not learning them)
-    if self.domain == "spatial":
-      model.fc = nn.Linear(n_features, self.n_classes)
-    elif self.domain == "temporal" or self.domain == "full":
-      model.fc = nn.Identity()  # Remove classification layer, assumed already trained or not the end of the network
-      model.fc.in_features = n_features # ?
+    model.fc = nn.Identity()
+    model.fc.in_features = n_features # otherwise Identity does not have in_features attribute
+    # if self.domain == "spatial":
+    #   model.fc = nn.Linear(n_features, self.n_classes)
+    # elif self.domain == "temporal" or self.domain == "full":
+    #   model.fc = nn.Identity()  # Remove classification layer, assumed already trained or not the end of the network
+    #   model.fc.in_features = n_features # ?
     
     # If provided with a model state, load it
     stateDict = None
@@ -138,23 +143,6 @@ class Spaceinator(nn.Module):
   # def classify(self, N_CLASSES):
     # self.model = get_resnet50(N_CLASSES, model_weights=modelPreWeights, extract_features=False)  # Keeps last classifier layer
 
-  def load(self, path_from, layer=None):
-    layer = self.featureNode
-    # print(layer, path_from)
-    features = torch.load(os.path.join(path_from, os.listdir(path_from)[0]), weights_only=False, map_location="cpu") # single item on the dir [0]
-    # print(features.keys())
-    
-    for i in features.keys():
-      # print(i)
-      random_f = features[i]
-      # print(random_f.keys())
-      # print(random_f)
-      # break
-    example_feature = random_f[layer] # defaultdict of defaultdicts
-    self.features = features
-    self.featureSize = example_feature.size(0) # assuming every value has the same dim
-    print("\nE.g. Feature: ", example_feature.squeeze(-1).squeeze(-1))
-    print("Features Size: ", self.featureSize, '\n')
 
   def _extract(self, images, nodesToExtract):
     # Extract features at specified nodes
@@ -195,11 +183,11 @@ class Timeinator(nn.Module):
     N_BLOCKS = MODEL["n_blocks"]
     N_KERNELS = MODEL["n_kernels"]
     TF_FILTER = MODEL["tf_filter"]
-    N_CLASSES = n_classes
+    self.n_classes = n_classes
     self.conv1x1_in = nn.Conv1d(in_channels, N_KERNELS, kernel_size=1)
     self.stages = nn.ModuleList([copy.deepcopy(_TCStage(N_BLOCKS, N_KERNELS, TF_FILTER)) for s in range(N_STAGES)])
-    self.conv1x1_out = nn.Conv1d(N_KERNELS, N_CLASSES, kernel_size=1)
-    self.featureSize = N_KERNELS
+    self.conv1x1_out = nn.Conv1d(N_KERNELS, self.n_classes, kernel_size=1)
+    self.featureSize = self.n_classes
 
   def forward(self, x):
     # print("Before Timeinator Shape: ", x.shape)

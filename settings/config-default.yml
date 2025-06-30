@@ -1,5 +1,5 @@
 path_root: . #/batataclan
-path_data: /workspace/raid-diogo/
+path_data: #/workspace/raid-diogo/
 seed: 53  # 5 --> 3 or 3 --> 5  DO NOT CHANGE SEED (it messes up with fold training)
 device:
 id_classroom:  #LDSSi-2504-1 # if empty creates new learning environment, else loads it (dataset-YYMM-DDHH)
@@ -10,13 +10,27 @@ actions:
 
 # DATA and TRAIN properties define an unique classroom
 DATA:
-  id_dataset: LDSSi-local  # (LDSS-local, LDSSi-local, TEST-local, cifar10-ext)
-  labelType: phase-class # time-to-next-phase, phase-label, time-to-video-end, time-since-video-start
+  id_dataset: TEST-local  # (LDSS-local, LDSSi-local, TEST-local, cifar10-ext)
+  labelType: single-phase # time-to-next-phase, single-phase, time-to-video-end, time-since-video-start
+  predicateLabels:
+    - dissection
+    - fixation
+    - reperitonealisation
+    # 0therPred
+  objectLabels:
+    - promontory
+    - vault # same phase as right parasigmoidal gutter
+    # 0therObj
+# Full
+     # - Dissection of the promontory
+    # - Dissection of the right parasigmoidal gutter and the vault
+    # - Fixation of the implant to the vault
+    # - Fixation of the implant to the promontory
+    # - Reperitonealisation
   preprocessing: basic  # basic, augmentation
-  recycle_itemIds: True  # for local dataset (__getitem__() returns the inputed frameIds to be used to fetch associated frame properties e.g. file path)
   datatype: png-image #, jpeg-image, feature-dict
 
-TRAIN:
+TRAIN: # to fix because the top ones should not define a classroom
   train_point: start # (start, resume)
   path_resumeModel:  # to continue training from a checkpoint model if train-point == resume
   save_checkpoints: False
@@ -24,15 +38,16 @@ TRAIN:
   save_betterState: True
   save_lastState: False
   log_events: True
+  skipFolds: []  # 0 for fold 1... after a break (e.g. crash) allows to skip folds and restart from a checkpoint
+
   criterionId: weighted-cross-entropy # weighted-cross-entropy
   train_metric: accuracy
   valid_metric: accuracy  # guiding and evaluating training
-  k_folds: 7 # match with datasetName (7 for LDSS, 5 for CIFAR10, 1 for None?)
-  skipFolds: []  # 0 for fold 1... after a break (e.g. crash) allows to skip folds and restart from a checkpoint
+  k_folds: 7 # number of folds for cross-validation
   minDelta: 0.001  # minimum delta to save a better state
   patience: 5  # number of epochs to wait for a better state before stopping training
   HYPER:  # traditional hyperparameters
-    n_epochs: 25
+    n_epochs: 2
     batchSize: 16
     clipSize: 64  # amount of frames (sec) per clip when temporal training
     learningRate: 0.0005  # learning rate

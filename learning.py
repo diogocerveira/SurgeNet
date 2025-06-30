@@ -12,7 +12,6 @@ from src import dataset, environment, machine, teaching
 import gc
 
 def learning(**the):
-  
   ''' Note: trying out "the" instead of "kwargs"/"config" for readability purposes '''
    # classroom.py (learning environment, paths)
   Csr = environment.Classroom(the["path_root"], the["TRAIN"], the["DATA"], the["MODEL"], id_classroom=the["id_classroom"], path_data=the["path_data"])
@@ -30,34 +29,36 @@ def learning(**the):
       print(f"   [resize] {the['PROCESS']['path_sample']} ({the['PROCESS']['samplerate']} fps)")
     if the["PROCESS"]["label"]:  # label (csv file) image frames
       Ctl.label(Csr.path_samples, Csr.path_labels, Csr.DATA["labelType"])
-      print(f"   [label] {Csr.path_labels}")
-  dset = Ctl.build_dataset(Csr.path_samples, Csr.path_labels) # for now the dataset is still used from inside the cataloguer
-  print(f"B. [dataset] {the['DATA']['id_dataset']} (#{Ctl.DATASET_SIZE})")
-  print(f"   [preprocessing] {Ctl.preprocessing}")
-  print(f"   [classes] #{Ctl.N_CLASSES} ({'Balanced' if Ctl.BALANCED else 'Unbalanced'}) {list(Ctl.classToLabel.values())}\n")
+      print(f"   A new labels.csv was created {Csr.path_labels}")
+      
+  dset = Ctl.build_dataset(Csr.DATA["id_dataset"].split('-')[1], Csr.path_samples, Csr.path_labels) # for now the dataset is still used from inside the cataloguer
+  print(f"B. [dataset] {the['DATA']['id_dataset']} (#{len(dset)})")
+  print(f"   [label] {Csr.DATA['labelType']}")
+  print(f"   [preprocessing] {Ctl.preprocessingType}")
+  print(f"   [classes] #{dset.n_classes} ({'Balanced' if dset.BALANCED else 'Unbalanced'}) {list(dset.labelToClassMap.keys())}\n")
   
   # teaching.py (metrics, train validation, test)
-  Tch = teaching.Teacher(Csr.TRAIN, the["EVAL"], Ctl, the["device"])
+  Tch = teaching.Teacher(Csr.TRAIN, the["EVAL"], dset, the["device"])
   print(f"C. [training] {Csr.TRAIN['train_point']} on [device] {the['device']}")
   print(f"   [folds] #{Csr.TRAIN['k_folds']} [epochs] #{Csr.TRAIN['HYPER']['n_epochs']} [batch size] {Csr.TRAIN['HYPER']['batchSize']}\n")
   highScore = 0.0
 
   # Index split of the dataset (virtual)
-  for fold, splits in enumerate(Ctl.split(Csr.TRAIN["k_folds"])):
+  for fold, splits in enumerate(Ctl.split(Csr.TRAIN["k_folds"], dset)):
     # iterating folds (trio tuples of idxs [0] and videoIds [1])
     ((train_idxs, valid_idxs, test_idxs), (train_videoIds, valid_videoIds, test_videoIds)) = splits
     if fold in Csr.TRAIN["skipFolds"]:
       continue
     print(f"  Fold {fold + 1} splits:\n\ttrain {train_videoIds}\n\tvalid {valid_videoIds}\n\ttest {test_videoIds}\n")
     # Create the model
-    spaceinator = machine.Spaceinator(the["MODEL"], Ctl.dataset.N_CLASSES)
+    spaceinator = machine.Spaceinator(the["MODEL"], dset.n_classes)
     print(f"    Feature size of {spaceinator.featureSize} at node '{spaceinator.featureNode}'\n")
-    timeinator = machine.Timeinator(the["MODEL"], spaceinator.featureSize, Ctl.dataset.N_CLASSES)
+    timeinator = machine.Timeinator(the["MODEL"], spaceinator.featureSize, dset.n_classes)
     model = machine.PhaseNet(the["MODEL"]["domain"], spaceinator, timeinator, Csr.id, fold + 1)
 
     dset.path_spaceFeatures = os.path.join(Csr.path_exportedFeatures, f"spacefmaps_f{fold + 1}.pt")
     trainloader, validloader, testloader = Ctl.batch(dset, model.inputType, Csr.TRAIN["HYPER"]["batchSize"], Csr.TRAIN["HYPER"]["clipSize"], train_idxs=train_idxs, valid_idxs=valid_idxs, test_idxs=test_idxs)
-
+    
     if "train" in the["actions"] or "eval" in the["actions"]:
       Tch.writer = SummaryWriter(log_dir=os.path.join(Csr.path_events, model.id.split('_')[1])) # object for logging stats
 
@@ -81,7 +82,7 @@ def learning(**the):
         fx_stateDict, fx_stateId = teaching.get_testState(Csr.path_states, model.id)
         spaceinator.load_state_dict(fx_stateDict, strict=False)
       path_export = os.path.join(Csr.path_features, f"spacefmaps_{fx_stateId.split('_')[1]}.pt")
-      spaceinator.export_features(DataLoader(Ctl.dataset, batch_size=Csr.TRAIN["HYPER"]["batchSize"]), path_export, the["PROCESS"]["featureLayer"], the["device"])
+      spaceinator.export_features(DataLoader(dset, batch_size=Csr.TRAIN["HYPER"]["batchSize"]), path_export, the["PROCESS"]["featureLayer"], the["device"])
       t2 = time.time()
       print(f"Exporting features took {(t2 - t1) // 3600} hours and {(((t2 - t1) % 3600) / 60):.1f} minutes!")
       # clear GPU memory
@@ -146,7 +147,7 @@ def learning(**the):
             print(f"No predictions (test_bundle) provided for processing: {e}")
             continue
       
-      Tch.evaluate(test_bundle, the["EVAL"]["eval_tests"], model.id, Ctl.classToLabel, Csr)
+      Tch.evaluate(test_bundle, the["EVAL"]["eval_tests"], model.id, dset.labelToClassMap, Csr)
 
     try: # not defined if only processing
       Tch.writer.close()
@@ -154,6 +155,7 @@ def learning(**the):
       pass
     print(f"\n\t = = = = = \t = = = = =\n\t\t Fold {fold + 1} done!\n\t = = = = = \t = = = = =\n")
     # break # == 1 folc (debug)
+    break
   os.system(f"tensorboard --logdir={Csr.path_classroom}")
  
 

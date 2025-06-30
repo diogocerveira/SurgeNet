@@ -112,10 +112,12 @@ class Classroom():
         self.DATA = loaded_data["DATA"]
     
   def match_learningEnvironment(self, TRAIN, DATA):
-    path_logs = os.path.join(self.path_root, "logs")
-    classrooms = [c for c in os.listdir(path_logs) if "learning-conditions.yml" in os.listdir(os.path.join(path_logs, c))]
+    classrooms = [c for c in os.listdir(self.path_logs)
+                  if c.startswith(('.', '_'))
+                  and os.path.isdir(os.path.join(self.path_logs, c))
+                  and "learning-conditions.yml" in os.listdir(os.path.join(self.path_logs, c))]
     for id_classroom in classrooms:
-      with open(os.path.join(path_logs, id_classroom, "learning-conditions.yml"), 'r') as f:
+      with open(os.path.join(self.path_logs, id_classroom, "learning-conditions.yml"), 'r') as f:
         learningConditions = yaml.safe_load(f)
         # if new learning parameters match a previous classroom with same "subject" (id_dataset)
         if learningConditions["TRAIN"] == TRAIN and learningConditions["DATA"] == DATA:

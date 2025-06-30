@@ -1,5 +1,5 @@
 import torch.nn as nn
-from torcheval.metrics import MulticlassAccuracy, MulticlassPrecision, MulticlassRecall, MulticlassF1Score, MulticlassConfusionMatrix
+from torcheval.metrics import MulticlassAccuracy, MultilabelAccuracy, MulticlassPrecision, MulticlassRecall, MulticlassF1Score, MulticlassConfusionMatrix
 from src import machine
 import torch
 import numpy as np
@@ -21,13 +21,13 @@ class Teacher():
       Action - teach, eval
       Pipeline: (train -> validate) x n_epochs -> test
   '''
-  def __init__(self, TRAIN, EVAL, Ctl, DEVICE):
-    self.N_CLASSES = Ctl.dataset.N_CLASSES
-    train_metric, valid_metric, test_metrics = self._get_metrics(TRAIN, EVAL, self.N_CLASSES, Ctl.classToLabel, DEVICE)
-    criterion = self._get_criterion(TRAIN["criterionId"], Ctl.classWeights, DEVICE)
+  def __init__(self, TRAIN, EVAL, dataset, DEVICE):
+    self.N_CLASSES = dataset.n_classes
+    train_metric, valid_metric, test_metrics = self._get_metrics(TRAIN, EVAL, self.N_CLASSES, dataset.labelToClassMap, dataset.labelType, DEVICE)
+    criterion = self._get_criterion(TRAIN["criterionId"], dataset.classWeights, DEVICE)
     self.trainer = Trainer(train_metric, criterion, TRAIN["HYPER"], DEVICE)
     self.validater = Validater(valid_metric, criterion, DEVICE)
-    self.tester = Tester(test_metrics, Ctl.dataset.labels, DEVICE)
+    self.tester = Tester(test_metrics, dataset.labels, DEVICE)
 
     self.save_checkpoints = TRAIN["save_checkpoints"]
     self.highScore = -np.inf
@@ -88,7 +88,7 @@ class Teacher():
       gc.collect()
     return model, valid_maxScore, betterState
 
-  def evaluate(self, test_bundle, eval_tests, modelId, classToLabel, Csr):
+  def evaluate(self, test_bundle, eval_tests, modelId, labelToClassMap, Csr):
 
     if eval_tests["aprfc"]:
       self.tester._aprfc(self.writer, modelId, Csr.path_events, Csr.path_aprfc)
@@ -96,7 +96,7 @@ class Teacher():
       torch.cuda.empty_cache()
       gc.collect()
     if eval_tests["phaseTiming"]:
-      outText = self.tester._phase_timing(test_bundle, self.N_CLASSES, classToLabel)
+      outText = self.tester._phase_timing(test_bundle, self.N_CLASSES, labelToClassMap)
       # clear GPU memory
       torch.cuda.empty_cache()
       gc.collect()
@@ -106,11 +106,11 @@ class Teacher():
         torch.cuda.empty_cache()
         gc.collect()
 
-  def _get_metrics(self, TRAIN, EVAL, N_CLASSES, classToLabel, DEVICE):
+  def _get_metrics(self, TRAIN, EVAL, N_CLASSES, labelToClass, labelType, DEVICE):
     
-    train_metric = RunningMetric(TRAIN["train_metric"], N_CLASSES, DEVICE, EVAL["agg"], EVAL["computeRate"], EVAL["updateRate"])
-    valid_metric = RunningMetric(TRAIN["valid_metric"], N_CLASSES, DEVICE, EVAL["agg"], EVAL["computeRate"] // 2, EVAL["updateRate"])
-    test_metrics = MetricBunch(EVAL["test_metrics"], N_CLASSES, classToLabel, EVAL["agg"], EVAL["computeRate"], DEVICE)
+    train_metric = RunningMetric(TRAIN["train_metric"], N_CLASSES, DEVICE, EVAL["agg"], EVAL["computeRate"], labelType, EVAL["updateRate"])
+    valid_metric = RunningMetric(TRAIN["valid_metric"], N_CLASSES, DEVICE, EVAL["agg"], EVAL["computeRate"] // 2, labelType, EVAL["updateRate"])
+    test_metrics = MetricBunch(EVAL["test_metrics"], N_CLASSES, labelToClass, EVAL["agg"], EVAL["computeRate"], DEVICE, labelType)
     return train_metric, valid_metric, test_metrics
 
   def _get_criterion(self, CRITERION_ID, classWeights, DEVICE):
@@ -168,11 +168,13 @@ class Trainer():
       # print("inputs: ", inputs.shape, "\ttargets: ", targets.shape, '\n')
       optimizer.zero_grad() # reset the parameter gradients before backward step
       outputs = model(inputs) # forward pass
+      # print(inputs[:5], targets[:5], outputs[:5])
       # print(inputs.shape, targets, data[2])
       # print("outputs: ", outputs.shape, "\ttargets: ", targets.shape, '\n')
       if model.inputType == "fmaps":
         outputs = outputs.permute(0, 2, 1).reshape(-1, outputs.shape[1]) # outputs shape of [n_fmaps, classes]
         targets = targets.reshape(-1) # targets shape of [n_fmaps]
+      
       # print("outputs: ", outputs.shape, "\ttargets: ", targets.shape, '\n')
       loss = self.criterion(outputs, targets) # calculate loss
       loss.backward() # backward pass
@@ -205,7 +207,7 @@ class Validater():
       for batch, data in enumerate(validloader, 0):
         inputs, targets = data[0].to(self.DEVICE), data[1].to(self.DEVICE)
         outputs = model(inputs)
-        # print(labels[:5], outputs[:5])
+        # print(inputs[:5], targets[:5], outputs[:5])
         # print("outputs: ", outputs.shape, "\ttargets: ", targets.shape, '\n')
         if model.inputType == "fmaps":
           outputs = outputs.permute(0, 2, 1).reshape(-1, outputs.shape[1]) # outputs shape of [n_fmaps, classes]
@@ -241,6 +243,7 @@ class Tester():
       for batch, data in enumerate(testloader):
         inputs, targets, sampleIds = data[0].to(self.DEVICE), data[1].to(self.DEVICE), data[2].to(self.DEVICE)
         outputs = model(inputs)
+        print(inputs[:5], '\n', targets[:5], '\n', outputs[:5])
         if model.inputType == "fmaps":
           outputs = outputs.permute(0, 2, 1).reshape(-1, outputs.shape[1]) # outputs shape of [n_fmaps, classes]
           targets = targets.reshape(-1) # targets shape of [n_fmaps]
@@ -250,10 +253,11 @@ class Tester():
         targetsList.append(targets)
         sampleIdsList.append(sampleIds)
 
+        # print("outputs.shape", outputs.shape)
         outputs = torch.argmax(outputs, dim=1)  # get labels with max prediction values
-        print("outputs.shape", outputs.shape)
-        print("targets.min()", targets.min().item(), "targets.max()", targets.max().item())
-
+        print("pred: ", outputs[:5], '\n', "target: ", targets[:5])
+        # print("outputs.shape", outputs.shape)
+        # print("targets.min()", targets.min().item(), "targets.max()", targets.max().item())
         self.test_metrics.update(outputs, targets)
         if batch % self.test_metrics.accuracy.computeRate == 0:
           print(f"\t  T [B{batch + 1}]   scr: {self.test_metrics.accuracy.score():.4f}")
@@ -297,16 +301,23 @@ class Tester():
   def _aprfc(self, writer, modelId, path_events, path_aprfc):
     # self.test_metrics.display()
     fold = int(modelId.split("_")[1][1]) # get fold number from modelId
-    writer.add_scalar(f"accuracy/test", self.test_metrics.get_accuracy(), fold)
-    writer.add_scalar(f"precision/test", self.test_metrics.get_precision(), fold)
-    writer.add_scalar(f"recall/test", self.test_metrics.get_recall(), fold)
-    writer.add_scalar(f"f1score/test", self.test_metrics.get_f1score(), fold)
-    image_cf = plt.imread(self.test_metrics.get_confusionMatrix(path_events, path_aprfc))
-    tensor_cf = torch.tensor(image_cf).permute(2, 0, 1)
-    writer.add_image(f"confusion_matrix/test", tensor_cf, fold)
+    if self.test_metrics.accuracy:
+      writer.add_scalar(f"accuracy/test", self.test_metrics.get_accuracy(), fold)
+    if self.test_metrics.precision:
+      writer.add_scalar(f"precision/test", self.test_metrics.get_precision(), fold)
+    if self.test_metrics.recall:
+      writer.add_scalar(f"recall/test", self.test_metrics.get_recall(), fold)
+    if self.test_metrics.f1score:
+      writer.add_scalar(f"f1score/test", self.test_metrics.get_f1score(), fold)
+    if self.test_metrics.confusionMatrix:
+      image_cf = plt.imread(self.test_metrics.get_confusionMatrix(path_events, path_aprfc))
+      tensor_cf = torch.tensor(image_cf).permute(2, 0, 1)
+      writer.add_image(f"confusion_matrix/test", tensor_cf, fold)
+
     writer.close()
     
-  def _phase_timing_i2(self, df, N_CLASSES, classToLabel, samplerate=1):
+  def _phase_timing_i2(self, df, N_CLASSES, labelToClassMap, samplerate=1):
+    classToLabelMap = {v: k for k, v in labelToClassMap.items()}  # reverse mapping from class to label
     outText = []
     lp, lt = len(df["Pred"]), len(df["Target"])
     # N_CLASSES = (max(df["Targets"]) + 1)  # assuming regular int encoding
@@ -340,8 +351,8 @@ class Tester():
       print("phases_gt counts:", phases_gt_video.to_numpy(), '\t', sum(phases_gt_video.to_numpy()))
       
       mix = list(zip(phases_preds_video / (60 * samplerate), phases_gt_video / (60 * samplerate), phases_diff_sum))
-      ot = f"\nVideo {video} Phase Report\n" + f"{'':<12} |   T Preds    |    T Targets     ||  Diff\n" + '\n'.join(
-            f"{classToLabel[i]:<12} | {mix[i][0]:<8.2f}min | {mix[i][1]:<8.2f}min || {(mix[i][0] - mix[i][1]):<8.2f}min"
+      ot = f"\nVideo {video} Phase Report\n" + f"{'':<12} \t|   T Preds    |    T Targets     ||  Diff\n" + '\n'.join(
+            f"{classToLabelMap[i]:<12} \t| {mix[i][0]:<8.2f}min | {mix[i][1]:<8.2f}min || {(mix[i][0] - mix[i][1]):<8.2f}min"
             for i in range(N_CLASSES)
         )
       outText.append(ot)
@@ -352,8 +363,8 @@ class Tester():
     phases_diff_avg = phases_diff_sum / len(videos) / (60 * samplerate)
     mix = list(zip(phases_preds_avg, phases_gt_avg, phases_diff_avg))
     
-    otavg = "\n\nOverall Average Phase Report\n" + f"{'':<12} | T Avg Preds  |  T Avg Targets   || Total AE\n" + '\n'.join(
-            f"{classToLabel[i]:<12} | {mix[i][0]:<8.2f}min | {mix[i][1]:<8.2f}min || {(mix[i][2]):<8.2f}min"
+    otavg = "\n\nOverall Average Phase Report\n" + f"{'':<12} \t| T Avg Preds  |  T Avg Targets   || Total AE\n" + '\n'.join(
+            f"{classToLabelMap[i]:<12} \t| {mix[i][0]:<8.2f}min | {mix[i][1]:<8.2f}min || {(mix[i][2]):<8.2f}min"
             for i in range(N_CLASSES)
       )
     print(otavg)
@@ -478,21 +489,27 @@ class StillMetric:
   ''' For now uses torcheval metrics
       Performs metric update and computation based on a frequency provided
   '''
-  def __init__(self, metricName, N_CLASSES, DEVICE, agg="micro"):
+  def __init__(self, metricName, N_CLASSES, DEVICE, labelType, agg="micro"):
     self.name = metricName
-
-    if metricName == "accuracy":
-      self.metric = MulticlassAccuracy(average="micro", num_classes=N_CLASSES, device=DEVICE)
-    elif metricName == "precision":
-      self.metric =  MulticlassPrecision(average=agg, num_classes=N_CLASSES, device=DEVICE)
-    elif metricName == "recall":
-      self.metric = MulticlassRecall(average=agg, num_classes=N_CLASSES, device=DEVICE)
-    elif metricName == "f1score":
-      self.metric = MulticlassF1Score(average=agg, num_classes=N_CLASSES, device=DEVICE)
-    elif metricName == "confusionMatrix":
-      self.metric = MulticlassConfusionMatrix(num_classes=N_CLASSES, device=DEVICE)
+  
+    if labelType.split('-')[0] == "single":
+      if metricName == "accuracy":
+        self.metric = MulticlassAccuracy(average="micro", num_classes=N_CLASSES, device=DEVICE)
+      elif metricName == "precision":
+        self.metric =  MulticlassPrecision(average=agg, num_classes=N_CLASSES, device=DEVICE)
+      elif metricName == "recall":
+        self.metric = MulticlassRecall(average=agg, num_classes=N_CLASSES, device=DEVICE)
+      elif metricName == "f1score":
+        self.metric = MulticlassF1Score(average=agg, num_classes=N_CLASSES, device=DEVICE)
+      elif metricName == "confusionMatrix":
+        self.metric = MulticlassConfusionMatrix(num_classes=N_CLASSES, device=DEVICE)
+      else:
+        raise ValueError("Invalid Metric Name")
+    elif labelType.split('-')[0] == "multi":
+      if metricName == "accuracy":
+        self.metric = MultilabelAccuracy(criteria="hamming", device=DEVICE)
     else:
-      raise ValueError("Invalid Metric Name")
+      raise ValueError(f"Invalid labelType {labelType} for metric {metricName}")
   def reset(self):
     self.metric.reset()
   def score(self):
@@ -501,8 +518,8 @@ class StillMetric:
 class RunningMetric(StillMetric):
   ''' Extends StillMetric to updates on the run
   '''
-  def __init__(self, metricName, N_CLASSES, DEVICE, agg, computeRate, updateFreq=1):
-    super().__init__(metricName, N_CLASSES, DEVICE, agg)
+  def __init__(self, metricName, N_CLASSES, DEVICE, agg, computeRate, labelType, updateFreq=1):
+    super().__init__(metricName, N_CLASSES, DEVICE, labelType, agg)
     self.computeRate = computeRate  # num of batches between computations
     self.updateFreq = updateFreq  # num of batches between updates
   
@@ -514,22 +531,28 @@ class MetricBunch:
   ''' Gets a bunch of still metrics at cheap price
       Accuracy locked at agg==micro for now
   '''
-  def __init__(self, metricSwitches, N_CLASSES, classToLabel, agg, computeRate, DEVICE):  # metricSwitches is a boolean dict switch for getting metrics
+  def __init__(self, metricSwitches, N_CLASSES, labelToClass, agg, computeRate, DEVICE, labelType):  # metricSwitches is a boolean dict switch for getting metrics
     self.metricSwitches = metricSwitches
-    self.classToLabel = classToLabel
+    self.labelToClass = labelToClass
     self.agg = agg
     
-    if self.metricSwitches["accuracy"]:
-      self.accuracy = RunningMetric("accuracy", N_CLASSES, DEVICE, "micro", computeRate)
-    if self.metricSwitches["precision"]:
-      self.precision = RunningMetric("precision", N_CLASSES, DEVICE, agg, computeRate)
-    if self.metricSwitches["recall"]:
-      self.recall = RunningMetric("recall", N_CLASSES, DEVICE, agg, computeRate)
-    if self.metricSwitches["f1score"]:
-      self.f1score = RunningMetric("f1score", N_CLASSES, DEVICE, agg, computeRate)
-    if self.metricSwitches["confusionMatrix"]:
-      self.confusionMatrix = RunningMetric("confusionMatrix", N_CLASSES, DEVICE, agg, computeRate)
-
+    if labelType.split('-')[0] == "single":
+      if self.metricSwitches["accuracy"]:
+        self.accuracy = RunningMetric("accuracy", N_CLASSES, DEVICE, "micro", computeRate, labelType)
+      if self.metricSwitches["precision"]:
+        self.precision = RunningMetric("precision", N_CLASSES, DEVICE, agg, computeRate, labelType)
+      if self.metricSwitches["recall"]:
+        self.recall = RunningMetric("recall", N_CLASSES, DEVICE, agg, computeRate, labelType)
+      if self.metricSwitches["f1score"]:
+        self.f1score = RunningMetric("f1score", N_CLASSES, DEVICE, agg, computeRate, labelType)
+      if self.metricSwitches["confusionMatrix"]:
+        self.confusionMatrix = RunningMetric("confusionMatrix", N_CLASSES, DEVICE, agg, computeRate, labelType)
+    elif labelType.split('-')[0] == "multi":
+      if self.metricSwitches["accuracy"]:
+        self.accuracy = RunningMetric("accuracy", N_CLASSES, DEVICE, "micro", computeRate, labelType)
+    else:
+      raise ValueError(f"Invalid labelType {labelType} for metric bunch")
+    
   def reset(self):
     if self.accuracy: self.accuracy.reset()
     if self.precision: self.precision.reset()
@@ -584,7 +607,7 @@ class MetricBunch:
     try:
       fig, ax = plt.subplots(figsize=(10, 7))
       sns.heatmap(self.confusionMatrix.metric.compute().cpu(), annot=True, fmt='.2f', cmap='Blues',
-                  xticklabels=self.classToLabel.values(), yticklabels=self.classToLabel.values(), ax=ax)
+                  xticklabels=self.labelToClass.keys(), yticklabels=self.labelToClass.keys(), ax=ax)
       ax.set_xlabel('Predicted')
       ax.set_ylabel('True')
       ax.set_title('Confusion Matrix')
