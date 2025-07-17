@@ -1,4 +1,5 @@
 import torch.nn as nn
+import torch.nn.functional as F
 from torcheval.metrics import MulticlassAccuracy, MultilabelAccuracy, MulticlassPrecision, MulticlassRecall, MulticlassF1Score, MulticlassConfusionMatrix
 from src import machine
 import torch
@@ -23,11 +24,13 @@ class Teacher():
   '''
   def __init__(self, TRAIN, EVAL, dataset, DEVICE):
     self.N_CLASSES = dataset.n_classes
+    self.labelType = dataset.labelType
+    self.DATASET_SIZE = dataset.__len__()
     train_metric, valid_metric, test_metrics = self._get_metrics(TRAIN, EVAL, self.N_CLASSES, dataset.labelToClassMap, dataset.labelType, DEVICE)
     criterion = self._get_criterion(TRAIN["criterionId"], dataset.classWeights, DEVICE)
     self.trainer = Trainer(train_metric, criterion, TRAIN["HYPER"], DEVICE)
     self.validater = Validater(valid_metric, criterion, DEVICE)
-    self.tester = Tester(test_metrics, dataset.labels, DEVICE)
+    self.tester = Tester(test_metrics, dataset.labels, self.labelType, DEVICE)
 
     self.save_checkpoints = TRAIN["save_checkpoints"]
     self.highScore = -np.inf
@@ -56,8 +59,8 @@ class Teacher():
 
     for epoch in range(startEpoch, n_epochs):
       print(f"-------------- Epoch {epoch + 1} --------------")
-      train_loss, train_score = self.trainer.train(model, trainloader, optimizer, epoch)
-      valid_loss, valid_score = self.validater.validate(model, validloader, epoch)
+      train_loss, train_score = self.trainer.train(model, trainloader, self.labelType, optimizer, epoch)
+      valid_loss, valid_score = self.validater.validate(model, validloader, self.labelType, epoch)
 
       self.writer.add_scalar("Loss/train", train_loss, epoch + 1)
       self.writer.add_scalar("Loss/valid", valid_loss, epoch + 1)
@@ -89,19 +92,19 @@ class Teacher():
     return model, valid_maxScore, betterState
 
   def evaluate(self, test_bundle, eval_tests, modelId, labelToClassMap, Csr):
-
+    classToLabelMap = {v: k for k, v in labelToClassMap.items()}  # reverse mapping from class to label
     if eval_tests["aprfc"]:
       self.tester._aprfc(self.writer, modelId, Csr.path_events, Csr.path_aprfc)
       # clear GPU memory
       torch.cuda.empty_cache()
       gc.collect()
     if eval_tests["phaseTiming"]:
-      outText = self.tester._phase_timing(test_bundle, self.N_CLASSES, labelToClassMap)
+      outText = self.tester._phase_timing(test_bundle, classToLabelMap)
       # clear GPU memory
       torch.cuda.empty_cache()
       gc.collect()
       if eval_tests["phaseChart"]:
-        self.tester._phase_graph(test_bundle, Csr.path_phaseCharts, modelId, outText)
+        self.tester._phase_graph(test_bundle, Csr.path_phaseCharts, modelId, classToLabelMap,outText)
         # clear GPU memory
         torch.cuda.empty_cache()
         gc.collect()
@@ -118,6 +121,9 @@ class Teacher():
       return nn.CrossEntropyLoss()
     elif CRITERION_ID == "weighted-cross-entropy":
       return nn.CrossEntropyLoss(weight=classWeights.to(DEVICE))
+    elif CRITERION_ID == "binary-cross-entropy-logits":
+      classCounts = 1 / classWeights # inverse frequency
+      return nn.BCEWithLogitsLoss(pos_weight=classWeights.to(DEVICE))
     else:
       raise ValueError("Invalid criterion chosen (crossEntropy, )")
     
@@ -153,7 +159,7 @@ class Trainer():
     self.GAMMA = HYPER["gamma"]
     self.DEVICE = DEVICE
     
-  def train(self, model, trainloader, optimizer, epoch):
+  def train(self, model, trainloader, labelType, optimizer, epoch):
     ''' In: model, data, criterion (loss function), optimizer
         Out: train_loss, train_score
         Note - inputs can be samples (pics) or feature maps
@@ -174,7 +180,6 @@ class Trainer():
       if model.inputType == "fmaps":
         outputs = outputs.permute(0, 2, 1).reshape(-1, outputs.shape[1]) # outputs shape of [n_fmaps, classes]
         targets = targets.reshape(-1) # targets shape of [n_fmaps]
-      
       # print("outputs: ", outputs.shape, "\ttargets: ", targets.shape, '\n')
       loss = self.criterion(outputs, targets) # calculate loss
       loss.backward() # backward pass
@@ -182,7 +187,10 @@ class Trainer():
 
       runningLoss += loss.item() * targets.numel() # accumulate loss by batch size (safer, though most batches are same size)
       totalSamples += targets.numel()  # numel() returns the total number of elements in the tensor
-      outputs = torch.argmax(outputs, dim=1)  # get labels with max prediction values
+      if labelType.split('-')[0] == "single":
+        outputs = torch.argmax(outputs, dim=1)  # get labels with max prediction values
+      else:
+        outputs = torch.sigmoid(outputs)  # get probabilities
       self.train_metric.update(outputs, targets)
       if batch % self.train_metric.computeRate == 0:
         print(f"\t  T [E{epoch + 1} B{batch + 1}]   scr: {self.train_metric.score():.4f}")
@@ -196,7 +204,7 @@ class Validater():
     self.criterion = criterion
     self.DEVICE = DEVICE
 
-  def validate(self, model, validloader, epoch):
+  def validate(self, model, validloader, labelType, epoch):
     ''' In: model, data, criterion (loss function)
         Out: valid_loss, valid_score
     '''
@@ -217,7 +225,10 @@ class Validater():
     
         runningLoss += loss.item() * targets.numel() # accumulate loss by batch size (safer, though most batches are same size)
         totalSamples += targets.numel()
-        outputs = torch.argmax(outputs, dim=1) # get labels with max prediction values
+        if labelType.split('-')[0] == "single":
+          outputs = torch.argmax(outputs, dim=1)  # get labels with max prediction values
+        else:
+          outputs = torch.sigmoid(outputs)  # get probabilities
         self.valid_metric.update(outputs, targets)  # updates with data from new batch
         if batch % self.valid_metric.computeRate == 0:
           print(f"\t  V [E{epoch + 1} B{batch + 1}]   scr: {self.valid_metric.score():.4f}")
@@ -226,12 +237,13 @@ class Validater():
 class Tester():
   ''' Part of the teacher that knows how to test a model knowledge in multiple ways
   '''
-  def __init__(self, metrics, labels, DEVICE):
+  def __init__(self, metrics, labels, labelType, DEVICE):
     self.test_metrics = metrics
     self.DEVICE = DEVICE
     self.labels = labels
+    self.labelType = labelType
   
-  def test(self, model, testloader, export_bundle, path_export=None):
+  def test(self, model, testloader, labelType, export_bundle, path_export=None):
     ''' Test the model - return Preds, labels and sampleIds
     '''
     self.test_metrics.reset()
@@ -248,13 +260,21 @@ class Tester():
           outputs = outputs.permute(0, 2, 1).reshape(-1, outputs.shape[1]) # outputs shape of [n_fmaps, classes]
           targets = targets.reshape(-1) # targets shape of [n_fmaps]
           sampleIds = sampleIds.reshape(-1)
-        _, preds = torch.max(outputs, 1)  # get labels with max prediction values
+        # print(torch.sigmoid(outputs)[:5])
+        if labelType.split('-')[0] == "single":
+          _, preds = torch.max(outputs, 1)  # get labels with max prediction values
+          outputs = torch.argmax(outputs, dim=1)  # get labels with max prediction values
+        else: # force top2 class predictions
+          outputs = torch.sigmoid(outputs)  # convert logits to probabilities
+          top2 = torch.topk(outputs, k=2, dim=1).indices  # get top-2 class indices
+          preds = torch.zeros_like(outputs)
+          for i in range(outputs.size(0)):
+            preds[i, top2[i]] = 1
         predsList.append(preds)
         targetsList.append(targets)
         sampleIdsList.append(sampleIds)
 
         # print("outputs.shape", outputs.shape)
-        outputs = torch.argmax(outputs, dim=1)  # get labels with max prediction values
         # print("pred: ", outputs[:5], '\n', "target: ", targets[:5])
         # print("outputs.shape", outputs.shape)
         # print("targets.min()", targets.min().item(), "targets.max()", targets.max().item())
@@ -316,77 +336,89 @@ class Tester():
 
     writer.close()
     
-  def _phase_timing_i2(self, df, N_CLASSES, labelToClassMap, samplerate=1):
-    classToLabelMap = {v: k for k, v in labelToClassMap.items()}  # reverse mapping from class to label
+  def _phase_timing_i2(self, df, classToLabelMap, samplerate=1):
+    
     outText = []
     lp, lt = len(df["Pred"]), len(df["Target"])
     # N_CLASSES = (max(df["Targets"]) + 1)  # assuming regular int encoding
     # N_CLASSES = len(preds[0]) # assuming one hot encoding
     assert lp == lt, "Targets and Preds Size Incompatibility"
+
+    if self.labelType.split('-')[0] == "multi":
+      df["Pred"] = df["Pred"].apply(lambda x: '-'.join(sorted([classToLabelMap[i] for i, val in enumerate(x) if val])))
+      df["Target"] = df["Target"].apply(lambda x: '-'.join(sorted([classToLabelMap[i] for i, val in enumerate(x) if val])))
+ 
+    targetLabels = sorted(df["Target"].unique())  # ← also here
+    N_CLASSES = len(targetLabels)
+
     videos = df["Video"].unique()
-    phases_preds_sum = np.zeros(N_CLASSES)
-    phases_gt_sum = np.zeros(N_CLASSES)
-    phases_diff_sum = np.zeros(N_CLASSES)
+    totalPredsCount = np.zeros(N_CLASSES)
+    totalTargetsCount = np.zeros(N_CLASSES)
+    totalPhaseDiff = np.zeros(N_CLASSES)
 
     for idx, video in enumerate(videos):
       print()
       df_filtered = df[df["Video"] == video][["Pred", "Target"]]
-      
-      classes_video = pd.Series(df_filtered["Target"].unique())
-      # pd.set_option("display.max_rows", 100)
-      # print(df_filtered["Targets"].iloc[:100])
-      print(classes_video.reindex(range(N_CLASSES), fill_value=-1).values)
-      # Reset for each video
-      
-      phases_preds_video = df_filtered["Pred"].value_counts().reindex(range(N_CLASSES), fill_value=0) # Targets video counts
-      phases_gt_video = df_filtered["Target"].value_counts().reindex(range(N_CLASSES), fill_value=0) # Targets video counts
+      videoLabels = pd.Series(sorted(df_filtered["Target"].unique())).reindex(targetLabels, fill_value=-1).values
+      print(videoLabels)
+      print(targetLabels)
+      # Count occurrences only for labels in targetLabels
+      videoPredsCount = df_filtered["Pred"].value_counts().reindex(targetLabels, fill_value=0)
+      videoTargetsCount = df_filtered["Target"].value_counts().reindex(targetLabels, fill_value=0)
       # ensures every class is accounted for in cumulative count, even with no occurrences
-      phases_preds_sum += phases_preds_video.values
-      phases_gt_sum += phases_gt_video.values
-      phases_diff_sum += np.abs(phases_preds_video.values - phases_gt_video.values)
-      # print(phases_diff_sum)
+      totalPredsCount += videoPredsCount.values
+      totalTargetsCount += videoTargetsCount.values
+      # print(totalPhaseDiff)
       
       # Optionally print counts for each video
-      print("phases_preds counts:", phases_preds_video.values, '\t', sum(phases_preds_video))
-      print("phases_gt counts:", phases_gt_video.to_numpy(), '\t', sum(phases_gt_video.to_numpy()))
-      
-      mix = list(zip(phases_preds_video / (60 * samplerate), phases_gt_video / (60 * samplerate), phases_diff_sum))
-      ot = f"\nVideo {video} Phase Report\n" + f"{'':<12} \t\t|   T Preds    |    T Targets     ||  Diff\n" + '\n'.join(
-            f"{classToLabelMap[i]:<12} \t\t| {mix[i][0]:<8.2f}min | {mix[i][1]:<8.2f}min || {(mix[i][0] - mix[i][1]):<8.2f}min"
-            for i in range(N_CLASSES)
+      print("videoPredsCount:", videoPredsCount.values, '\t', videoPredsCount.sum())
+      print("videoTargetsCount:", videoTargetsCount.values, '\t', videoTargetsCount.sum())
+
+      mix = list(zip(videoPredsCount / (60 * samplerate), videoTargetsCount / (60 * samplerate)))
+      ot = f"\nVideo {video} Phase Report\n" + f"{'':<12} \t\t|   T Preds   | T Targets  ||  Diff\n" + '\n'.join(
+            f"{l:<12} \t\t| {mix[i][0]:<8.2f}min | {mix[i][1]:<8.2f}min || {(mix[i][0] - mix[i][1]):<8.2f}min"
+            for i, l in enumerate(targetLabels)
         )
       outText.append(ot)
       print(ot)
-    # Average Overall Results
-    phases_preds_avg = phases_preds_sum / len(videos) / (60 * samplerate)
-    phases_gt_avg = phases_gt_sum / len(videos) / (60 * samplerate)
-    phases_diff_avg = phases_diff_sum / len(videos) / (60 * samplerate)
-    mix = list(zip(phases_preds_avg, phases_gt_avg, phases_diff_avg))
-    
-    otavg = "\n\nOverall Average Phase Report\n" + f"{'':<12} \t\t| T Avg Preds  |  T Avg Targets   || Total AE\n" + '\n'.join(
-            f"{classToLabelMap[i]:<12} \t\t| {mix[i][0]:<8.2f}min | {mix[i][1]:<8.2f}min || {(mix[i][2]):<8.2f}min"
-            for i in range(N_CLASSES)
+    # Overall Average Report
+    avgPredsCount = totalPredsCount / len(videos) / (60 * samplerate)
+    avgTargetsCount = totalTargetsCount / len(videos) / (60 * samplerate)
+    avgPhaseDiff = totalPhaseDiff / len(videos) / (60 * samplerate)
+    mix = list(zip(avgPredsCount, avgTargetsCount, avgPhaseDiff))
+
+    otavg = "\n\nOverall Average Phase Report\n" + f"{'':<12} \t\t| T Avg Preds | T Avg Targets || Total AE\n" + '\n'.join(
+            f"{l:<12} \t\t| {mix[i][0]:<8.2f}min | {mix[i][1]:<8.2f}min || {(mix[i][2]):<8.2f}min"
+            for i, l in enumerate(targetLabels)
       )
     print(otavg)
     outText.append(otavg)
   # phase_metric([1, 1, 2, 3, 3, 4, 0, 5], [0, 0, 0, 2, 3, 4, 5, 1])
     return outText
 
-  def _phase_timing(self, df, N_CLASSES, classToLabel, samplerate=1):
-    return self._phase_timing_i2(df, N_CLASSES, classToLabel, samplerate=1)
+  def _phase_timing(self, df, classToLabelMap, samplerate=1):
+    return self._phase_timing_i2(df, classToLabelMap, samplerate=1)
 
-  def _phase_graph(self, df, path_phaseCharts, modelId, outText):
+  def _phase_graph(self, df, path_phaseCharts, modelId, classToLabelMap, outText):
       # df = pd.DataFrame({
       #     'SampleName': ['vid1_1', 'vid1_3', 'vid1_2', 'vid2_20', 'vid2_23', 'vid2_40', 'vid2_51', 'vid2_52'],
       #     'Targets': [0, 1, 1, 2, 0, 1, 1, 1],  # Example target labels
       #     'Preds': [0, 1, 0, 2, 1, 4, 3, 2],  # Example predictions (e.g., class indices)
 
       # })
+      if self.labelType.split('-')[0] == "multi":
+        targetLabels = sorted(df["Target"].unique())
+        allLabels = sorted(pd.concat([df["Pred"], df["Target"]]).unique())
+        classToLabelMap = {i: label for i, label in enumerate(allLabels)}
+      # print(df.head())
+      # print(df.tail())
       # Prepare for plotting
       videos = df['Video'].unique()
       num_videos = len(videos)
       print(f'\n\nNumber of videos: {num_videos}')
-      color_map = {0: 'springgreen', 1: 'goldenrod', 2: 'tomato', 3: 'mediumslateblue', 4: 'plum', 5: 'deepskyblue'}
+      palette = plt.cm.get_cmap("tab10", len(allLabels))  # Get a color palette with enough colors for all classes
+      color_map = {label: palette(i) for i, label in enumerate(allLabels)}
+      # color_map = {0: 'springgreen', 1: 'goldenrod', 2: 'tomato', 3: 'mediumslateblue', 4: 'plum', 5: 'deepskyblue'}
       plt.rcParams['font.family'] = 'monospace'
       # for saving all videos to same img
       # fig, axes = plt.subplots(num_videos, 1, figsize=(9, 5), sharex=True) # Create subplots
@@ -405,7 +437,7 @@ class Tester():
           start_positions = np.arange(len(data_video))
           class_values = data_video[stage].values
           ax.broken_barh(list(zip(start_positions, np.ones(len(start_positions)))), (j - 0.4, 0.8), facecolors=[color_map[val] for val in class_values])
-
+        # Set x-ticks to the middle of the bars
         # Add vertical separators
         # ax.axvline(x=len(data_video), color='grey', linestyle='--', linewidth=0.5)
 
@@ -428,9 +460,9 @@ class Tester():
         # Create custom legend
         handles = [plt.Rectangle((0, 0), 1, 1, color=color_map[i]) for i in color_map.keys()]
         labels = [f'{i}' for i in color_map.keys()]
-        ax.legend(handles, labels, loc='upper right', title='Classes')
+        ax.legend(handles, labels, loc='lower right', ncol=1, fontsize=10, bbox_to_anchor=(1.05, 1), borderaxespad=0., title='Classes')
 
-        plt.tight_layout()
+        # plt.tight_layout()
         # plt.show(block=True)
         plt.savefig(os.path.join(path_phaseCharts, f"{modelId}_{video[:4]}_phase-ev.png"))
         plt.close(fig)
@@ -507,7 +539,7 @@ class StillMetric:
         raise ValueError("Invalid Metric Name")
     elif labelType.split('-')[0] == "multi":
       if metricName == "accuracy":
-        self.metric = MultilabelAccuracy(criteria="hamming", device=DEVICE)
+        self.metric = MultilabelAccuracy(threshold=0.5, criteria="exact_match", device=DEVICE)
     else:
       raise ValueError(f"Invalid labelType {labelType} for metric {metricName}")
   def reset(self):
@@ -537,19 +569,17 @@ class MetricBunch:
     self.agg = agg
     
     if labelType.split('-')[0] == "single":
-      if self.metricSwitches["accuracy"]:
-        self.accuracy = RunningMetric("accuracy", N_CLASSES, DEVICE, "micro", computeRate, labelType)
-      if self.metricSwitches["precision"]:
-        self.precision = RunningMetric("precision", N_CLASSES, DEVICE, agg, computeRate, labelType)
-      if self.metricSwitches["recall"]:
-        self.recall = RunningMetric("recall", N_CLASSES, DEVICE, agg, computeRate, labelType)
-      if self.metricSwitches["f1score"]:
-        self.f1score = RunningMetric("f1score", N_CLASSES, DEVICE, agg, computeRate, labelType)
-      if self.metricSwitches["confusionMatrix"]:
-        self.confusionMatrix = RunningMetric("confusionMatrix", N_CLASSES, DEVICE, agg, computeRate, labelType)
+      self.accuracy = RunningMetric("accuracy", N_CLASSES, DEVICE, "micro", computeRate, labelType) if self.metricSwitches["accuracy"] else None
+      self.precision = RunningMetric("precision", N_CLASSES, DEVICE, agg, computeRate, labelType) if self.metricSwitches["precision"] else None
+      self.recall = RunningMetric("recall", N_CLASSES, DEVICE, agg, computeRate, labelType) if self.metricSwitches["recall"] else None
+      self.f1score = RunningMetric("f1score", N_CLASSES, DEVICE, agg, computeRate, labelType) if self.metricSwitches["f1score"] else None
+      self.confusionMatrix = RunningMetric("confusionMatrix", N_CLASSES, DEVICE, agg, computeRate, labelType) if self.metricSwitches["confusionMatrix"] else None
     elif labelType.split('-')[0] == "multi":
-      if self.metricSwitches["accuracy"]:
-        self.accuracy = RunningMetric("accuracy", N_CLASSES, DEVICE, "micro", computeRate, labelType)
+      self.accuracy = RunningMetric("accuracy", N_CLASSES, DEVICE, "micro", computeRate, labelType) if self.metricSwitches["accuracy"] else None
+      self.precision = None
+      self.recall = None
+      self.f1score = None
+      self.confusionMatrix = None
     else:
       raise ValueError(f"Invalid labelType {labelType} for metric bunch")
     
