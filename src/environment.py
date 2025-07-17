@@ -54,7 +54,7 @@ class Classroom():
   '''
   def __init__(self, path_root, TRAIN, DATA, MODEL, id_classroom=None, path_data=None):
     self.path_root = path_root
-    self.path_data = self.path_data = path_data if path_data is not None else path_root
+    self.path_data = path_data if path_data is not None else path_root
     self.path_logs = os.path.join(self.path_root, "logs")
     os.makedirs(self.path_logs, exist_ok=True)
 
@@ -113,7 +113,7 @@ class Classroom():
     
   def match_learningEnvironment(self, TRAIN, DATA):
     classrooms = [c for c in os.listdir(self.path_logs)
-                  if c.startswith(('.', '_'))
+                  if not c.startswith(('.', '_'))
                   and os.path.isdir(os.path.join(self.path_logs, c))
                   and "learning-conditions.yml" in os.listdir(os.path.join(self.path_logs, c))]
     for id_classroom in classrooms:
@@ -153,6 +153,7 @@ class Classroom():
         if os.path.basename(path) == "student-profile.yml" and self.studentStatus == "New": # if file is student-profile.yml, write the model characteristics
           with open(path, "w") as f:
             yaml.dump({"MODEL": MODEL}, f)
+            yaml.dump({"VIDEO_SPLITS": {}}, f)  # Initialize with empty splits
       
       else:  # Otherwise, it's a directory path
         os.makedirs(path, exist_ok=True)

@@ -18,7 +18,7 @@ class PhaseNet(nn.Module):
   def __init__(self, modelDomain, spaceinator, timeinator, classroomId, fold):
     super().__init__()
     self.valid_lastScore = -np.inf
-
+    
     # the modular approach allows to have modules with no conditional on the forward pass
     if modelDomain == "spatial":
       classifier = nn.Linear(spaceinator.featureSize, spaceinator.n_classes)
