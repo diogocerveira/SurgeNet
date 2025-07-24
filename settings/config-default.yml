@@ -41,6 +41,7 @@ TRAIN: # to fix because the top ones should not define a classroom
   skipFolds: []  # 0 for fold 1... after a break (e.g. crash) allows to skip folds and restart from a checkpoint
 
   criterionId: weighted-cross-entropy # weighted-cross-entropy | binary-cross-entropy-logits
+  criterionId: weighted-cross-entropy # weighted-cross-entropy | binary-cross-entropy-logits
   train_metric: accuracy
   valid_metric: accuracy  # guiding and evaluating training
   k_folds: 7 # number of folds for cross-validation
@@ -81,6 +82,7 @@ MODEL:  # for models created/trained in the run
   domain: temporal # spatial, temporal, full
 # spatial
   spaceTransferLearning: fixed-fx # fine-tune | fixed-fx
+  spaceTransferLearning: fixed-fx # fine-tune | fixed-fx
   spaceArch: resnet50
   spacePreweights: default # sfx = spatial feature extraction
   path_spaceModel: #C:/Users/DC/Documents/Programming/python/ucl/ML_SurgeNet/logs/LDSS/run_20241104-00/checkpoints/LDSS-20241104-00-fold6-0.837800.pth # if empty, uses new untrained one
@@ -91,7 +93,7 @@ MODEL:  # for models created/trained in the run
   tf_filter: 3  # size in time (timeframe, # of frames)
   n_blocks: 2  # inside the stage
 # classification
-  n_classes: 6  # normally gets from dataset itself 
+  n_classes:   # normally gets from dataset itself 
 
 EVAL:  # Eval
   eval_from: model  # model | predictions
