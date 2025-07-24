@@ -50,7 +50,7 @@ def learning(**the):
     with open(Csr.path_studentProfile) as f:
       # Add fold info to the student profile yaml file
       data = yaml.safe_load(f)
-      data["VIDEO_SPLITS"][f"Fold{fold + 1}"] = {"train": '-'.join(train_videoIds), "valid": '-'.join(valid_videoIds), "test": '-'.join(test_videoIds)}
+      data["VIDEO_SPLITS"][f"Fold{fold + 1}"] = {"train": ','.join(train_videoIds), "valid": ','.join(valid_videoIds), "test": ','.join(test_videoIds)}
     with open(Csr.path_studentProfile, 'w') as f:
       yaml.dump(data, f)
     if fold in Csr.TRAIN["skipFolds"]:
@@ -63,7 +63,7 @@ def learning(**the):
     timeinator = machine.Timeinator(the["MODEL"], spaceinator.featureSize, dset.n_classes)
     model = machine.PhaseNet(the["MODEL"]["domain"], spaceinator, timeinator, Csr.id, fold + 1)
 
-    dset.path_spaceFeatures = os.path.join(Csr.path_exportedFeatures, f"spacefmaps_f{fold + 1}.pt")
+    dset.path_spaceFeatures, featuresId = teaching.get_path_exportedfeatures(Csr.path_exportedSpaceFeatures, f"spacefmaps_f{fold + 1}")
     trainloader, validloader, testloader = Ctl.batch(dset, model.inputType, Csr.TRAIN["HYPER"]["batchSize"], Csr.TRAIN["HYPER"]["clipSize"], train_idxs=train_idxs, valid_idxs=valid_idxs, test_idxs=test_idxs)
     
     if "train" in the["actions"] or "eval" in the["actions"]:

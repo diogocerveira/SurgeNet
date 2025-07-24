@@ -76,6 +76,8 @@ class Classroom():
 
     # create classroom path before checking for student profile (necessary)
     self.path_classroom = os.path.join(self.path_root, "logs", id_classroom)
+    self.id = id_classroom
+    self.status = classroomStatus
 
     id_student = self.match_studentProfile(MODEL)
     if id_student:  # found match
@@ -92,8 +94,7 @@ class Classroom():
 
     self.path_student = os.path.join(self.path_classroom, id_student)
 
-    self.id = id_classroom
-    self.status = classroomStatus
+    
     self.studentId = id_student
     self.studentStatus = studentStatus
 
@@ -127,6 +128,7 @@ class Classroom():
   def match_studentProfile(self, MODEL):
     students = [m for m in os.listdir(self.path_classroom) if os.path.isdir(os.path.join(self.path_classroom, m))] # list of students in the classroom
     for id_student in students:
+      print(f"Checking student {id_student} in classroom {self.id}")
       with open(os.path.join(self.path_classroom, id_student, "student-profile.yml"), 'r') as f:
         studentProfile = yaml.safe_load(f)
         # if new learning parameters match a previous classroom with same "subject" (id_dataset)
@@ -188,8 +190,9 @@ class Classroom():
     paths_logs["path_process"] = os.path.join(self.path_student, "process")
     paths_logs["path_modeFilter"] = os.path.join(paths_logs["path_process"], "mode-filter")
     paths_logs["path_features"] = os.path.join(paths_logs["path_process"], "features")
-    
-    paths_logs["path_exportedFeatures"] = os.path.os.path.join(self.path_student, "process", "features")
+
+    paths_logs["path_exportedSpaceFeatures"] = os.path.join(self.path_classroom, "spatialphase1", "process", "features")
+
     return paths_logs
 
 

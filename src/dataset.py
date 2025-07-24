@@ -77,9 +77,9 @@ class SampledVideosDataset(Dataset):
       self.labels.iloc[idx, "frameId"] + '.' + self.datatype)
     # Read images and labels
     img = torch.tensor(self.transform(cv2.cvtColor(cv2.imread(path_img), cv2.COLOR_BGR2RGB)))
-    target = torch.tensor(self.labels.loc[idx, "frameLabels"])
+    label = torch.tensor(self.labels.loc[idx, "frameLabels"])
     if self.labelType.split('-')[0] == "multi":
-      target = self._multiHot([target], num_classes=self.n_classes)
+      target = self._multiHot([label], num_classes=self.n_classes)
 
     # print(f"img: {img.shape}, label: {label}, idx: {torch.tensor(idx)}")  # WTFFFF does not print
     return (img, target, torch.tensor(idx))
@@ -98,20 +98,13 @@ class SampledVideosDataset(Dataset):
     # imgs = [iio.imread(p) for p in path_imgs]
     imgs = [cv2.cvtColor(cv2.imread(p), cv2.COLOR_BGR2RGB) for p in path_imgs]
     labels = self.labels.iloc[idxs]["frameLabels"].tolist()
-    # convert natural language multi label to numeric single
-    targets = [[self.labelToClassMap[single] for single in multi.split(',')] for multi in labels]
+    
     if self.transform:
       imgs = [self.transform(img) for img in imgs]
     else:
       imgs = [torch.tensor(img) for img in imgs]
     imgs = torch.stack(imgs)
-    if self.labelType.split('-')[0] == "single":
-      targets = torch.tensor(targets).view(-1)
-    elif self.labelType.split('-')[0] == "multi":
-      # targets = torch.tensor(targets)  # convert to tensor
-      targets = self._multiHot(targets, self.n_classes)  # convert to multi-hot encoding
-    else:
-      raise ValueError("Invalid labelType domain!")
+    targets = self._get_targets(labels, self.labelType.split('-')[0])
     idxs = torch.tensor(idxs)
     # print("idxs: ", idxs[:5])
     # print(self.labels.iloc[idxs[:5]])
@@ -119,6 +112,21 @@ class SampledVideosDataset(Dataset):
     # print(f"imgs: {imgs.shape}, targets: {targets}, idxs: {idxs}")
     return list(zip(imgs, targets, idxs))
   
+  def _get_targets(self, labels, labelTypeLeft):
+    """Convert labels to numeric targets based on the labelType."""
+    # print(self.labelToClassMap)
+    if labelTypeLeft == "single":
+      # Assume labels like ['cutting', 'suturing', ...]
+      targets = [self.labelToClassMap[label.strip()] for label in labels]
+      targets = torch.tensor(targets, dtype=torch.long)
+    elif labelTypeLeft == "multi":
+      # Assume labels like ['cutting,suturing', 'suturing', ...]
+      label_indices = [[self.labelToClassMap[lbl.strip()] for lbl in multi.split(',')] for multi in labels]
+      targets = self._multiHot(label_indices, self.n_classes)
+    else:
+      raise ValueError("Invalid labelType domain!")
+    return targets
+
   def _multiHot(self, seq, n_classes):
     hotSeq = torch.zeros(len(seq), n_classes, dtype=torch.float32)
     for i, indices in enumerate(seq):
@@ -591,40 +599,51 @@ class Cataloguer():
     for split, idxs in enumerate([train_idxs, valid_idxs, test_idxs]):
 
       feats = torch.stack([featuresDict[i][featureLayer] for i in idxs]).squeeze(1) # to [n_frames, features_size] 
-      labels = dset.labels["frameLabels"].values[idxs] # use class column as np array for indexing labels
-      clips, clipLabels, clipIdxs = self._clip_dataitems(feats, labels, idxs, size_clip)  # clips is now [n_clips, n_features, features_size]
+      labels = dset.labels.iloc[idxs]["frameLabels"].tolist() # use class column as np array for indexing labels
+      targets = dset._get_targets(labels, dset.labelType.split('-')[0])  # convert to targets
+      idxs = torch.tensor(idxs, dtype=torch.int64)  # convert to tensor
+      # print(type(targets), targets.dtype)
+      # print(targets[:5])  # show a few samples
+
+      clips, clipTargets, clipIdxs = self._clip_dataitems(feats, targets, idxs, dset.labelType.split('-')[0], size_clip)  # clips is now [n_clips, n_features, features_size]
       
+      # move to cpu for DataLoader
+      clips = clips.cpu()
+      clipTargets = clipTargets.cpu()
+      clipIdxs = clipIdxs.cpu()
       # the dataset zips the tensors together to be feed to a dataloader (unzips them)
-      featset = TensorDataset(clips, clipLabels, clipIdxs)
+      featset = TensorDataset(clips, clipTargets, clipIdxs)
       # print(featset[0][0].shape, featset[0][1].shape, featset[0][2].shape)
       loader[split] = DataLoader(featset, batch_size=size_batch, num_workers=4, shuffle=False)
     exampleBatch = next(iter(loader[0]))
     print(f"\tBatch example shapes:\n\t[space features] {exampleBatch[0].shape}\n\t[labels] {exampleBatch[1].shape}\n\t[idxs] {exampleBatch[2].shape}\n")
     return loader
   
-  def _clip_dataitems(self, feats, labels, idxs, size_clip=3):
+  def _clip_dataitems(self, feats, targets, idxs, labelTypeLeft, size_clip=3):
     # split into groups (clips) with size "size_clip" 
     
     # if not divisible by size_clip, pad the last clip
     if feats.shape[0] % size_clip != 0:
       pad_size = size_clip - (feats.shape[0] % size_clip)
-      tensorPadding = torch.zeros(pad_size, feats.shape[1], dtype=feats.dtype, device=feats.device)
-      labelPadding = np.zeros(pad_size, dtype=np.int64)  # Assuming labels are int64
-      idxPadding = np.array([-1] * pad_size, dtype=np.int64)  # Assuming idxs are int64
-      feats = torch.cat([feats, tensorPadding], dim=0)
-      labels = np.concatenate([labels, labelPadding])
-      idxs = np.concatenate([idxs, idxPadding])
-    # print(f"feats shape: {feats.shape}, labels shape: {labels.shape}, idxs shape: {idxs.shape}")
-    # print(feats.shape, labels.shape, idxs.shape)
+      featsPadding = torch.zeros(pad_size, feats.shape[1], dtype=feats.dtype, device=feats.device)
+      if labelTypeLeft == "single":
+        targetPadding = torch.zeros(pad_size, dtype=targets.dtype, device=targets.device)
+      else:
+        targetPadding = torch.zeros(pad_size, targets.shape[1], dtype=targets.dtype, device=targets.device)
+      idxPadding = torch.full((pad_size,), -1, dtype=idxs.dtype, device=idxs.device)
+      feats = torch.cat([feats, featsPadding], dim=0)
+      targets = torch.cat([targets, targetPadding], dim=0)
+      idxs = torch.cat([idxs, idxPadding], dim=0)
+    # print(f"feats shape: {feats.shape}, targets shape: {targets.shape}, idxs shape: {idxs.shape}")
+    # print(feats.shape, targets.shape, idxs.shape)
     clips = feats.view(-1, feats.shape[1], size_clip)  # reshape to [n_clips, features_size, n_features==size_clip]
-    clipLabels = torch.tensor(labels).view(-1, size_clip)  # reshape to [n_clips, n_features]
-    clipIdxs = torch.tensor(idxs).view(-1, size_clip)  # reshape to [n_clips, n_features]
-    # print(f"clips shape: {clips.shape}, clipLabels shape: {clipLabels.shape}, clipIdxs shape: {clipIdxs.shape}")
-    return clips, clipLabels, clipIdxs
-    
-
-    clips = torch.stack(clips).permute(0, 2, 1)  # now tensor: [n_clips, features_size, n_features==size_clip]
-    print(clips.shape)
+    if labelTypeLeft == "single":
+      clipTargets = targets.view(-1, size_clip)         # [n_clips, size_clip]
+    else:  # multi
+      clipTargets = targets.view(-1, size_clip, targets.shape[1])  # [n_clips, size_clip, n_classes]
+    clipIdxs = idxs.view(-1, size_clip)  # reshape to [n_clips, n_features]
+    # print(f"clips shape: {clips.shape}, clipTargets shape: {clipTargets.shape}, clipIdxs shape: {clipIdxs.shape}")
+    return clips, clipTargets, clipIdxs
 
 class Showcaser:
   def __init__(self):

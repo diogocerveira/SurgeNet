@@ -172,6 +172,7 @@ class Trainer():
     for batch, data in enumerate(trainloader, 0):   # start at batch 0
       inputs, targets = data[0].to(self.DEVICE), data[1].to(self.DEVICE) # data is a list of [inputs, labels]
       # print("inputs: ", inputs.shape, "\ttargets: ", targets.shape, '\n')
+      # print(targets[:5])  # show a few samples
       optimizer.zero_grad() # reset the parameter gradients before backward step
       outputs = model(inputs) # forward pass
       # print(inputs[:5], targets[:5], outputs[:5])
@@ -641,3 +642,14 @@ def get_testState(path_states, modelId):
       return stateDict, stateId
   else:
     raise ValueError(f"Model {modelId} not found in {path_states}")
+
+def get_path_exportedfeatures(path_features, featureName):
+  # problem if 2 models with same id (e.g. last and best state)
+  for featureId in os.listdir(path_features):
+    if featureName in featureId:
+      path_features = os.path.join(path_features, featureId)
+      print(f"    Loading features {featureId}\n")
+      return path_features, featureId
+  else:
+    print(f"Feature {featureName} not found in {path_features}\n")
+    return None, None
