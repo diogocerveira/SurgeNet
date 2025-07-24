@@ -74,48 +74,63 @@ class SampledVideosDataset(Dataset):
   def __getitem__(self, idx):
     """Retrieve a single item from the dataset based on an index"""
     path_img = os.path.join(self.path_samples, self.labels.loc[idx, "videoId"],
-      self.labels.loc[idx, "frameId"] + '.' + self.datatype)
+      self.labels.iloc[idx, "frameId"] + '.' + self.datatype)
     # Read images and labels
-    img = self.transform(cv2.cvtColor(cv2.imread(path_img), cv2.COLOR_BGR2RGB))
-    label = self.labels.loc[idx, "frameLabels"]
-    print("WTF")
+    img = torch.tensor(self.transform(cv2.cvtColor(cv2.imread(path_img), cv2.COLOR_BGR2RGB)))
+    target = torch.tensor(self.labels.loc[idx, "frameLabels"])
+    if self.labelType.split('-')[0] == "multi":
+      target = self._multiHot([target], num_classes=self.n_classes)
+
     # print(f"img: {img.shape}, label: {label}, idx: {torch.tensor(idx)}")  # WTFFFF does not print
-    return (img, label, torch.tensor(idx))
+    return (img, target, torch.tensor(idx))
   def __getitems__(self, idxs):
     """Retrieve items from the dataset based on index or list of indices."""
     # Convert dset idxs to list
     if isinstance(idxs, slice):  # Convert slice to list
       idxs = list(range(*idxs.indices(len(self.labels))))
     elif torch.is_tensor(idxs) or isinstance(idxs, np.ndarray):
-      idxs = torch.tolist()
+      idxs = idxs.tolist()
     # print(idxs[:4])
     # each idx is a int tensor
-    path_imgs = [os.path.join(self.path_samples, self.labels.loc[i, "videoId"],
-        self.labels.loc[i, "frameId"] + '.' + self.datatype) for i in idxs]
+    path_imgs = [os.path.join(self.path_samples, self.labels.iloc[i]["videoId"],
+        self.labels.iloc[i]["frameId"] + '.' + self.datatype) for i in idxs]
     # Read images and labels
     # imgs = [iio.imread(p) for p in path_imgs]
     imgs = [cv2.cvtColor(cv2.imread(p), cv2.COLOR_BGR2RGB) for p in path_imgs]
-    labels = self.labels.loc[idxs, "frameLabels"].tolist()
+    labels = self.labels.iloc[idxs]["frameLabels"].tolist()
     # convert natural language multi label to numeric single
-    labels = [[self.labelToClassMap[single] for single in multi.split(',')] for multi in labels]
+    targets = [[self.labelToClassMap[single] for single in multi.split(',')] for multi in labels]
     if self.transform:
       imgs = [self.transform(img) for img in imgs]
     else:
       imgs = [torch.tensor(img) for img in imgs]
     imgs = torch.stack(imgs)
-    labels = torch.tensor(labels).view(-1) if self.labelType.split('-')[0] == "single" else torch.tensor(labels)
+    if self.labelType.split('-')[0] == "single":
+      targets = torch.tensor(targets).view(-1)
+    elif self.labelType.split('-')[0] == "multi":
+      # targets = torch.tensor(targets)  # convert to tensor
+      targets = self._multiHot(targets, self.n_classes)  # convert to multi-hot encoding
+    else:
+      raise ValueError("Invalid labelType domain!")
     idxs = torch.tensor(idxs)
     # print("idxs: ", idxs[:5])
-    # print("labels: ", labels[:5], '\n')
-    # print(f"imgs: {imgs.shape}, labels: {labels}, idxs: {idxs}")
-    return list(zip(imgs, labels, idxs))
+    # print(self.labels.iloc[idxs[:5]])
+    # print("targets: ", targets[:5], '\n')
+    # print(f"imgs: {imgs.shape}, targets: {targets}, idxs: {idxs}")
+    return list(zip(imgs, targets, idxs))
   
+  def _multiHot(self, seq, n_classes):
+    hotSeq = torch.zeros(len(seq), n_classes, dtype=torch.float32)
+    for i, indices in enumerate(seq):
+      hotSeq[i, indices] = 1.0
+    return hotSeq
+
   def _get_labels(self, path_labels):
     try:
       # print(path_labels, "\n\n", flush=True)
       labels = pd.read_csv(path_labels)
       # print(df.columns)
-      labels.reset_index(drop=True, inplace=True) # Create a new integer index and drop the old index
+      # labels.reset_index(drop=True, inplace=True) # Create a new integer index and drop the old index
       # (Optional) Create a new column for videoId based on the frame column
       labels['videoId'] = labels['frameId'].str.split('_', expand=True)[0]
       # print(df.columns)
@@ -135,7 +150,7 @@ class SampledVideosDataset(Dataset):
         idx = slice(None)  # This is equivalent to selecting all rows
     elif isinstance(idx, tuple):
         idx = slice(*idx)  # Convert tuple to slice
-    return [self.videoToGroup[videoId] for videoId in self.labels["videoId"][idx]]
+    return [self.videoToGroup[videoId] for videoId in self.labels.iloc[idx]["videoId"]]
   
   def _get_idxToVideo(self, listOfIdxs):
     ''' Extract video IDs (check for overlap in sets) - specific to each labels.csv implementation
@@ -151,7 +166,7 @@ class SampledVideosDataset(Dataset):
     for idxs in listOfIdxs: # for each fold indexs
       vidsList = []
       for i, split in enumerate(idxs):  # for each split  (train, valid, test)
-        vidsInSplit = self.labels.loc[split, 'videoId'].unique()  # Get unique videoNames for this subset
+        vidsInSplit = self.labels.iloc[split]["videoId"].unique()  # Get unique videoNames for this subset
         vidsInSplit = [video[:4] for video in vidsInSplit]
         # print(f"split {i}\n", vidsInSplit, '\n')
         vidsList.append(vidsInSplit)
@@ -340,7 +355,11 @@ class Cataloguer():
       if os.stat(path_to).st_size == 0: # Check if the file is empty to write the header
         writer.writeheader()
       # Batch write frames and annotations
-      for frameId, frameLabel in zip(totalFrameIds, totalFrameLabels):
+      sortedZip = sorted( # sort by videoId and then timestamp
+          zip(totalFrameIds, totalFrameLabels),
+          key=lambda x: (x[0].split('_')[0], int(x[0].split('_')[1]))
+          )  # sort by frameId
+      for frameId, frameLabel in sortedZip:
         writer.writerow({'frameId': frameId, 'frameLabels': frameLabel})
 
   def _get_phaseDelimiters(self, path_annot):

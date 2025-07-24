@@ -1,4 +1,5 @@
 import torch.nn as nn
+import torch.nn.functional as F
 from torcheval.metrics import MulticlassAccuracy, MultilabelAccuracy, MulticlassPrecision, MulticlassRecall, MulticlassF1Score, MulticlassConfusionMatrix
 from src import machine
 import torch
@@ -23,6 +24,8 @@ class Teacher():
   '''
   def __init__(self, TRAIN, EVAL, dataset, DEVICE):
     self.N_CLASSES = dataset.n_classes
+    self.labelType = dataset.labelType
+    self.DATASET_SIZE = dataset.__len__()
     train_metric, valid_metric, test_metrics = self._get_metrics(TRAIN, EVAL, self.N_CLASSES, dataset.labelToClassMap, dataset.labelType, DEVICE)
     criterion = self._get_criterion(TRAIN["criterionId"], dataset.classWeights, DEVICE)
     self.trainer = Trainer(train_metric, criterion, TRAIN["HYPER"], DEVICE)
@@ -56,8 +59,8 @@ class Teacher():
 
     for epoch in range(startEpoch, n_epochs):
       print(f"-------------- Epoch {epoch + 1} --------------")
-      train_loss, train_score = self.trainer.train(model, trainloader, optimizer, epoch)
-      valid_loss, valid_score = self.validater.validate(model, validloader, epoch)
+      train_loss, train_score = self.trainer.train(model, trainloader, self.labelType, optimizer, epoch)
+      valid_loss, valid_score = self.validater.validate(model, validloader, self.labelType, epoch)
 
       self.writer.add_scalar("Loss/train", train_loss, epoch + 1)
       self.writer.add_scalar("Loss/valid", valid_loss, epoch + 1)
@@ -118,6 +121,9 @@ class Teacher():
       return nn.CrossEntropyLoss()
     elif CRITERION_ID == "weighted-cross-entropy":
       return nn.CrossEntropyLoss(weight=classWeights.to(DEVICE))
+    elif CRITERION_ID == "binary-cross-entropy-logits":
+      classCounts = 1 / classWeights # inverse frequency
+      return nn.BCEWithLogitsLoss(pos_weight=classWeights.to(DEVICE))
     else:
       raise ValueError("Invalid criterion chosen (crossEntropy, )")
     
@@ -153,7 +159,7 @@ class Trainer():
     self.GAMMA = HYPER["gamma"]
     self.DEVICE = DEVICE
     
-  def train(self, model, trainloader, optimizer, epoch):
+  def train(self, model, trainloader, labelType, optimizer, epoch):
     ''' In: model, data, criterion (loss function), optimizer
         Out: train_loss, train_score
         Note - inputs can be samples (pics) or feature maps
@@ -174,7 +180,6 @@ class Trainer():
       if model.inputType == "fmaps":
         outputs = outputs.permute(0, 2, 1).reshape(-1, outputs.shape[1]) # outputs shape of [n_fmaps, classes]
         targets = targets.reshape(-1) # targets shape of [n_fmaps]
-      
       # print("outputs: ", outputs.shape, "\ttargets: ", targets.shape, '\n')
       loss = self.criterion(outputs, targets) # calculate loss
       loss.backward() # backward pass
@@ -182,7 +187,10 @@ class Trainer():
 
       runningLoss += loss.item() * targets.numel() # accumulate loss by batch size (safer, though most batches are same size)
       totalSamples += targets.numel()  # numel() returns the total number of elements in the tensor
-      outputs = torch.argmax(outputs, dim=1)  # get labels with max prediction values
+      if labelType.split('-')[0] == "single":
+        outputs = torch.argmax(outputs, dim=1)  # get labels with max prediction values
+      else:
+        outputs = torch.sigmoid(outputs)  # get probabilities
       self.train_metric.update(outputs, targets)
       if batch % self.train_metric.computeRate == 0:
         print(f"\t  T [E{epoch + 1} B{batch + 1}]   scr: {self.train_metric.score():.4f}")
@@ -196,7 +204,7 @@ class Validater():
     self.criterion = criterion
     self.DEVICE = DEVICE
 
-  def validate(self, model, validloader, epoch):
+  def validate(self, model, validloader, labelType, epoch):
     ''' In: model, data, criterion (loss function)
         Out: valid_loss, valid_score
     '''
@@ -217,7 +225,10 @@ class Validater():
     
         runningLoss += loss.item() * targets.numel() # accumulate loss by batch size (safer, though most batches are same size)
         totalSamples += targets.numel()
-        outputs = torch.argmax(outputs, dim=1) # get labels with max prediction values
+        if labelType.split('-')[0] == "single":
+          outputs = torch.argmax(outputs, dim=1)  # get labels with max prediction values
+        else:
+          outputs = torch.sigmoid(outputs)  # get probabilities
         self.valid_metric.update(outputs, targets)  # updates with data from new batch
         if batch % self.valid_metric.computeRate == 0:
           print(f"\t  V [E{epoch + 1} B{batch + 1}]   scr: {self.valid_metric.score():.4f}")
@@ -231,7 +242,7 @@ class Tester():
     self.DEVICE = DEVICE
     self.labels = labels
   
-  def test(self, model, testloader, export_bundle, path_export=None):
+  def test(self, model, testloader, labelType, export_bundle, path_export=None):
     ''' Test the model - return Preds, labels and sampleIds
     '''
     self.test_metrics.reset()
@@ -254,7 +265,10 @@ class Tester():
         sampleIdsList.append(sampleIds)
 
         # print("outputs.shape", outputs.shape)
-        outputs = torch.argmax(outputs, dim=1)  # get labels with max prediction values
+        if labelType.split('-')[0] == "single":
+          outputs = torch.argmax(outputs, dim=1)  # get labels with max prediction values
+        else:
+          outputs = torch.sigmoid(outputs)  # get probabilities
         # print("pred: ", outputs[:5], '\n', "target: ", targets[:5])
         # print("outputs.shape", outputs.shape)
         # print("targets.min()", targets.min().item(), "targets.max()", targets.max().item())
@@ -537,19 +551,17 @@ class MetricBunch:
     self.agg = agg
     
     if labelType.split('-')[0] == "single":
-      if self.metricSwitches["accuracy"]:
-        self.accuracy = RunningMetric("accuracy", N_CLASSES, DEVICE, "micro", computeRate, labelType)
-      if self.metricSwitches["precision"]:
-        self.precision = RunningMetric("precision", N_CLASSES, DEVICE, agg, computeRate, labelType)
-      if self.metricSwitches["recall"]:
-        self.recall = RunningMetric("recall", N_CLASSES, DEVICE, agg, computeRate, labelType)
-      if self.metricSwitches["f1score"]:
-        self.f1score = RunningMetric("f1score", N_CLASSES, DEVICE, agg, computeRate, labelType)
-      if self.metricSwitches["confusionMatrix"]:
-        self.confusionMatrix = RunningMetric("confusionMatrix", N_CLASSES, DEVICE, agg, computeRate, labelType)
+      self.accuracy = RunningMetric("accuracy", N_CLASSES, DEVICE, "micro", computeRate, labelType) if self.metricSwitches["accuracy"] else None
+      self.precision = RunningMetric("precision", N_CLASSES, DEVICE, agg, computeRate, labelType) if self.metricSwitches["precision"] else None
+      self.recall = RunningMetric("recall", N_CLASSES, DEVICE, agg, computeRate, labelType) if self.metricSwitches["recall"] else None
+      self.f1score = RunningMetric("f1score", N_CLASSES, DEVICE, agg, computeRate, labelType) if self.metricSwitches["f1score"] else None
+      self.confusionMatrix = RunningMetric("confusionMatrix", N_CLASSES, DEVICE, agg, computeRate, labelType) if self.metricSwitches["confusionMatrix"] else None
     elif labelType.split('-')[0] == "multi":
-      if self.metricSwitches["accuracy"]:
-        self.accuracy = RunningMetric("accuracy", N_CLASSES, DEVICE, "micro", computeRate, labelType)
+      self.accuracy = RunningMetric("accuracy", N_CLASSES, DEVICE, "micro", computeRate, labelType) if self.metricSwitches["accuracy"] else None
+      self.precision = None
+      self.recall = None
+      self.f1score = None
+      self.confusionMatrix = None
     else:
       raise ValueError(f"Invalid labelType {labelType} for metric bunch")
     

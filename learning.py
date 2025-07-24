@@ -47,9 +47,16 @@ def learning(**the):
   for fold, splits in enumerate(Ctl.split(Csr.TRAIN["k_folds"], dset)):
     # iterating folds (trio tuples of idxs [0] and videoIds [1])
     ((train_idxs, valid_idxs, test_idxs), (train_videoIds, valid_videoIds, test_videoIds)) = splits
+    with open(Csr.path_studentProfile) as f:
+      # Add fold info to the student profile yaml file
+      data = yaml.safe_load(f)
+      data["VIDEO_SPLITS"][f"Fold{fold + 1}"] = {"train": '-'.join(train_videoIds), "valid": '-'.join(valid_videoIds), "test": '-'.join(test_videoIds)}
+    with open(Csr.path_studentProfile, 'w') as f:
+      yaml.dump(data, f)
     if fold in Csr.TRAIN["skipFolds"]:
       continue
     print(f"  Fold {fold + 1} splits:\n\ttrain {train_videoIds}\n\tvalid {valid_videoIds}\n\ttest {test_videoIds}\n")
+
     # Create the model
     spaceinator = machine.Spaceinator(the["MODEL"], dset.n_classes)
     print(f"    Feature size of {spaceinator.featureSize} at node '{spaceinator.featureNode}'\n")
@@ -120,7 +127,7 @@ def learning(**the):
           break
         t1 = time.time()
         path_export = os.path.join(Csr.path_predictions, f"preds_{model.id.split('_')[1]}.pt")
-        test_bundle  = Tch.tester.test(model, testloader, the["EVAL"]["export_testBundle"], path_export=path_export)
+        test_bundle  = Tch.tester.test(model, testloader, dset.labelType, the["EVAL"]["export_testBundle"], path_export=path_export)
         t2 = time.time()
         print(f"Testing took {t2 - t1:.2f} seconds")
         print(test_bundle.head())
