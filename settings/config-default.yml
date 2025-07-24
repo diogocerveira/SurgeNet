@@ -1,7 +1,7 @@
 path_root: . #/batataclan
 path_data: #/workspace/raid-diogo/
 seed: 53  # 5 --> 3 or 3 --> 5  DO NOT CHANGE SEED (it messes up with fold training)
-device:
+device: 
 id_classroom: #LDSSi-2507-1 # if empty creates new learning environment, else loads it (dataset-YYMM-DDHH)
 actions:
 - train        # train (spatial, temporal, full)
@@ -10,8 +10,8 @@ actions:
 
 # DATA and TRAIN properties define an unique classroom
 DATA:
-  id_dataset: LDSSi-local  # (LDSS-local, LDSSi-local, TEST-local, cifar10-ext)
-  labelType: multi-phase # time-to-next-phase, single-phase, time-to-video-end, time-since-video-start
+  id_dataset: TEST-local  # (LDSS-local, LDSSi-local, TEST-local, cifar10-ext)
+  labelType: single-phase # time-to-next-phase, single-phase, time-to-video-end, time-since-video-start
   predicateLabels:
     - dissection
     - fixation
@@ -40,7 +40,7 @@ TRAIN: # to fix because the top ones should not define a classroom
   log_events: True
   skipFolds: []  # 0 for fold 1... after a break (e.g. crash) allows to skip folds and restart from a checkpoint
 
-  criterionId: binary-cross-entropy-logits # weighted-cross-entropy
+  criterionId: weighted-cross-entropy # weighted-cross-entropy | binary-cross-entropy-logits
   train_metric: accuracy
   valid_metric: accuracy  # guiding and evaluating training
   k_folds: 7 # number of folds for cross-validation
@@ -80,7 +80,7 @@ MODEL:  # for models created/trained in the run
   type: phase
   domain: spatial # spatial, temporal, full
 # spatial
-  spaceTransferLearning: fine-tune # fine-tune | fixed-fx
+  spaceTransferLearning: fixed-fx # fine-tune | fixed-fx
   spaceArch: resnet50
   spacePreweights: default # sfx = spatial feature extraction
   path_spaceModel: #C:/Users/DC/Documents/Programming/python/ucl/ML_SurgeNet/logs/LDSS/run_20241104-00/checkpoints/LDSS-20241104-00-fold6-0.837800.pth # if empty, uses new untrained one
@@ -91,7 +91,7 @@ MODEL:  # for models created/trained in the run
   tf_filter: 3  # size in time (timeframe, # of frames)
   n_blocks: 2  # inside the stage
 # classification
-  n_classes: 6  # normally gets from dataset itself 
+  n_classes:   # normally gets from dataset itself 
 
 EVAL:  # Eval
   eval_from: model  # model | predictions
