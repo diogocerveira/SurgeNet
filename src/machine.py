@@ -10,6 +10,7 @@ from torch.utils.tensorboard import SummaryWriter
 import copy
 import torchvision.models.feature_extraction as fxs
 import numpy as np
+import math
 
 class PhaseNet(nn.Module):
   ''' Receives [batch_size, in_channels, in_length] 1st guesses
@@ -23,15 +24,21 @@ class PhaseNet(nn.Module):
     if modelDomain == "spatial":
       classifier = nn.Linear(spaceinator.featureSize, spaceinator.n_classes)
       inators = [spaceinator, classifier]
-      inputType = "images"
+      inputType = "images-framed"
     elif modelDomain == "temporal":
-      classifier = nn.Linear(timeinator.featureSize, timeinator.n_classes)
-      inators = [timeinator]
-      inputType = "fmaps"
+      classifier = nn.Linear(64, timeinator.n_classes)
+      inators = [timeinator, classifier]
+      inputType = "fmaps-video"
     elif modelDomain == "full":
       classifier = nn.Linear(timeinator.featureSize, timeinator.n_classes)
       inators = [spaceinator, timeinator, classifier]
-      inputType = "images"
+      inputType = "images-framed"
+    elif modelDomain == "spaceClassifier":
+      inators = [nn.Linear(spaceinator.featureSize, spaceinator.n_classes)]
+      inputType = "fmaps-framed"
+    elif modelDomain == "timeClassifier":
+      inators = [nn.Linear(timeinator.featureSize, timeinator.n_classes)]
+      inputType = "fmaps-clipped"
     else:
       raise ValueError("Invalid domain choice!")
     self.model = nn.Sequential(*inators)
@@ -139,10 +146,6 @@ class Spaceinator(nn.Module):
         break
     elif features.dim() == 1:  # If it's a 1D tensor (features)
       writer.add_image(f"{layer}/{im_id}", features.unsqueeze(0).unsqueeze(0), fold)  # Add row col dims
-  
-  # def classify(self, N_CLASSES):
-    # self.model = get_resnet50(N_CLASSES, model_weights=modelPreWeights, extract_features=False)  # Keeps last classifier layer
-
 
   def _extract(self, images, nodesToExtract):
     # Extract features at specified nodes
@@ -180,39 +183,89 @@ class Timeinator(nn.Module):
     super().__init__()
 
     N_STAGES = MODEL["n_stages"]
-    N_BLOCKS = MODEL["n_blocks"]
-    N_KERNELS = MODEL["n_kernels"]
+    N_BLOCKS = MODEL["n_blocks"] 
+    N_BLOCKS = self.min_blocks_for_rf(17776, 3)
+    N_FILTERS = MODEL["n_filters"]
     TF_FILTER = MODEL["tf_filter"]
     self.n_classes = n_classes
-    self.conv1x1_in = nn.Conv1d(in_channels, N_KERNELS, kernel_size=1)
-    self.stages = nn.ModuleList([copy.deepcopy(_TCStage(N_BLOCKS, N_KERNELS, TF_FILTER)) for s in range(N_STAGES)])
-    self.conv1x1_out = nn.Conv1d(N_KERNELS, self.n_classes, kernel_size=1)
-    self.featureSize = self.n_classes
-
+    self.conv1x1_in = nn.Conv1d(in_channels, N_FILTERS, kernel_size=1)
+    self.predStage = copy.deepcopy(_TCStage(in_channels, N_BLOCKS, N_FILTERS, TF_FILTER, n_classes))  # stage for prediction
+    self.refStages = nn.ModuleList([copy.deepcopy(_TCStage(n_classes, N_BLOCKS, N_FILTERS, TF_FILTER, n_classes)) for s in range(N_STAGES - 1)])
+    self.stages = nn.ModuleList([copy.deepcopy(_TCStage(N_FILTERS, N_BLOCKS, N_FILTERS, TF_FILTER, N_FILTERS)) for s in range(N_STAGES)])
+    # self.conv1x1_out = nn.Conv1d(N_FILTERS, self.n_classes, kernel_size=1)
+    self.featureSize = self.n_classes # (batchSize, n_classes)
+  '''
   def forward(self, x):
-    # print("Before Timeinator Shape: ", x.shape)
-    x = self.conv1x1_in(x)  # adapt number of channels (features) to the number of kernels per filter
-    # print("After conv1x1_in Shape: ", x.shape)
+    # print("Before predStage Shape: ", x.shape)
+    x = x.transpose(1, 2)  # [batch_size, in_length, in_channels] -> [batch_size, in_channels, in_length]
+    # print("After transpose Shape: ", x.shape)
+    x = self.predStage(x) # first pred logits
+    # print("After predStage Shape: ", x.shape)
+    x_acm = x.unsqueeze(0)  # add dimension for accumulation stage results
+    for stage in self.refStages:
+      x = stage(F.softmax(x, dim=1)) # get probabilities from logits
+      x_acm = torch.cat((x_acm, x.unsqueeze(0)), dim=0) # accumulate stage results
+    # print("After conv1x1_out Shape: ", x.shape)
+    # print(list(x_acm)[0], list(x_acm)[-1])  # print accumulated results for debugging
+    return x # x_accm for more in depth (returning last state guess)
+  '''
+  def forward(self, x):
+    # print("Before predStage Shape: ", x.shape)
+    x = x.transpose(1, 2)  # [batch_size, in_length, in_channels] -> [batch_size, in_channels, in_length]
+    x = self.conv1x1_in(x)
+    # print("After transpose Shape: ", x.shape)
     x_acm = x.unsqueeze(0)  # add dimension for accumulation stage results
     for stage in self.stages:
-      x = stage(x)  # apply the stage (blocks of dilated convolutions) - keeps the same number of channels
-      # x = F.softmax(self.conv_out(x), dim=1)  # get predictions from logits
+      x = stage(F.softmax(x, dim=1)) # get probabilities from logits
       x_acm = torch.cat((x_acm, x.unsqueeze(0)), dim=0) # accumulate stage results
-    x = self.conv1x1_out(x)  # adapt number of channels (features) to the number of classes
-    # print("After conv1x1_out Shape: ", x.shape)
+    print("After conv1x1_out Shape: ", x.shape)
+    x = x.squeeze(0).transpose(0, 1)
+    print("After squeeze and transpose Shape: ", x.shape)
+    # print(list(x_acm)[0], list(x_acm)[-1])  # print accumulated results for debugging
     return x # x_accm for more in depth (returning last state guess)
+  def _extract(self, images, nodesToExtract):
+    # Extract features at specified nodes
+    return fx.create_feature_extractor(self.model, return_nodes=nodesToExtract)(images)
+
+  def export_features(self, dataloader, path_export, nodesToExtract, device):
+    # _features features maps to external file
+    self.model.fc = nn.Identity()  # Remove classification layer
+    out_features = defaultdict(dict)  # default: ddict of features (at multiple nodes/layers) for each frame
+    self.model.eval().to(device) 
+    with torch.no_grad():
+      for batch, data in enumerate(dataloader):
+        images, ids = data[0].to(device), [int(id) for id in data[2]]
+        features = self._extract(images, nodesToExtract)
+        for layer in features:
+          # print(f"{layer}: {features[layer].shape}")
+          for imageId, ftrs in zip(ids, features[layer]): # Save features from chosen nodes/layers for each image ID
+            out_features[imageId][layer] = ftrs.unsqueeze(0).to(device)
+            # print(list(out_features.items()))
+            # break
+    # { "image_id": {layer: feature, ... }, ... }
+    torch.save(out_features, path_export)
+    # print(out_features)
+    print(f"* Exported space features as {os.path.basename(path_export)} *\n")
+  def min_blocks_for_rf(self, L, k):
+    a = math.ceil(math.log2(((L - 1) / (2 * (k - 1))) + 1))
+    print(a)
+    return a
 
 class _TCStage(nn.Module):
-  def __init__(self, n_blocks, n_kernels, tf_filter):
+  def __init__(self, in_channels, n_blocks, n_filters, tf_filter, out_channels):
     super().__init__()
-    # self.conv1x1_in = nn.Conv1d(in_channels, n_kernels, kernel_size=1) # adapts fv channel dimension
-    self.blocks = nn.ModuleList([copy.deepcopy(_TCResBlock(n_kernels, n_kernels, tf_filter, 2**b)) for b in range(n_blocks)])
-    # self.conv1x1_out = nn.Conv1d(n_kernels, out_channels, kernel_size=1)
+    self.conv1x1_in = nn.Conv1d(in_channels, n_filters, kernel_size=1) # adapts fv channel dimension
+    self.blocks = nn.ModuleList([copy.deepcopy(_TCResBlock(n_filters, n_filters, tf_filter, 2**b)) for b in range(n_blocks)])
+    self.conv1x1_out = nn.Conv1d(n_filters, out_channels, kernel_size=1)
   def forward(self, x):
-    # x = self.conv1x1_in(x)
+    # print("Before conv1x1_in Shape: ", x.shape)
+    x = self.conv1x1_in(x)
+    # print("After conv1x1_in Shape: ", x.shape)
     for block in self.blocks:
       x = block(x)
-    # x = self.conv1x1_out(x)
+    # print("After blocks Shape: ", x.shape)
+    x = self.conv1x1_out(x)
+    # print("After conv1x1_out Shape: ", x.shape)
     return x
   
 class _TCResBlock(nn.Module):
@@ -226,8 +279,8 @@ class _TCResBlock(nn.Module):
   def forward(self, x):
     # x becomes the residual
     out = F.relu(self.convDilated(x))
-    # out = self.conv1x1(x)
-    # out = self.dropout(x)
+    out = self.conv1x1(x)
+    out = self.dropout(x)
     return out + x
 
 class Classifier(nn.Module):
@@ -239,81 +292,3 @@ class Classifier(nn.Module):
 
   def forward(self, x):
     return self.model(x)
-
-"""
-class Guesser(nn.Module):
-  ''' Receives [batch_size, in_channels, in_length] feature tensors
-      Outputs [batch_size, N_CLASSES, in_length] 1st guesses
-  '''
-  def __init__(self, featureSize, N_CLASSES, N_BLOCKS, N_KERNELS, kernelSize):
-    super().__init__()
-    self.N_BLOCKS = N_BLOCKS
-    self.conv1x1_in = nn.Conv1d(featureSize, N_KERNELS, kernel_size=1) # adapts fv channel dimension
-    
-    ## ALternative Guesser: Using different blocks from Predictor
-    # self.dconv1 = nn.ModuleList((
-    #   nn.Conv1d(N_KERNELS, N_KERNELS, kernelSize, padding=2**(N_BLOCKS - 1 - b), dilation=2**(N_BLOCKS - 1 - b))
-    #             for b in range(N_BLOCKS) ))
-    # self.dconv2 = nn.ModuleList((
-    #   nn.Conv1d(N_KERNELS, N_KERNELS, kernelSize, padding=2**b, dilation=2**b)
-    #             for b in range(N_BLOCKS )))
-    # self.conv_fusion = nn.ModuleList((  # merge two previous
-    #   nn.Conv1d(2 * N_KERNELS, N_KERNELS, kernel_size=1) 
-    #             for _ in range(N_BLOCKS) ))
-    
-    ## Same Guesser: Same blocks as improver
-    self.blocks = nn.ModuleList([copy.deepcopy(_TCResBlock(N_KERNELS, N_KERNELS, kernelSize, 2**b)) for b in range(N_BLOCKS)])
-    # self.dropout = nn.Dropout()
-    self.conv_out = nn.Conv1d(N_KERNELS, N_CLASSES, kernel_size=1)
-
-  def forward(self, x):
-    x = self.conv1x1_in(x)
-    for block in self.blocks:
-      x = block(x)
-    x = self.conv_out(x)
-    return x
-
-class Refiner(nn.Module):
-  ''' Receives [batch_size, N_CLASSES, in_length] 1st guesses
-      Outputs [batch_size, N_CLASSES, in_length] further guesses
-  '''
-  def __init__(self, N_CLASSES, N_STAGES, N_BLOCKS, N_KERNELS, kernelSize):
-    super().__init__()
-    self.N_STAGES = N_STAGES
-    self.conv1x1_in = nn.Conv1d(N_CLASSES, N_KERNELS, kernel_size=1)
-    self.blocks = nn.ModuleList([copy.deepcopy(_TCResBlock(N_KERNELS, N_KERNELS, kernelSize, 2**b)) for b in range(N_BLOCKS)])
-    self.conv_out = nn.Conv1d(N_KERNELS, N_CLASSES, kernel_size=1)
-  
-  def forward(self, x):
-    x = self.conv1x1_in(x)
-    for block in self.blocks:
-      x = block(x)
-    x = self.conv_out(x)
-    return x
-"""
-
-'''
-class FirstNet(nn.Module):
-  def __init__(self):
-    super().__init__()
-    self.conv1 = nn.Conv2d(3, 6, 5)   # 3 channel image input, 6 output features maps (from 6 different filters/kernels?), 5x5 square kernel
-    self.pool = nn.MaxPool2d(2, 2)    # 2x2 pooling window with stride 2
-    self.conv2 = nn.Conv2d(6, 16, 5)
-    # CAREFUL!! Depends on the input size of the image (58x58 for 3x244x244 input)
-# INPUT
-    self.fc1 = nn.Linear(16 * 58 * 58, 120)
-# INPUT
-    self.fc2 = nn.Linear(120, 84)
-    self.fc3 = nn.Linear(84, 10)
-
-  def forward(self, x):
-    x = self.pool(F.relu(self.conv1(x)))
-    x = self.pool(F.relu(self.conv2(x)))
-    # print(x.shape)  # Add this to see the size of x after conv layers and pooling
-    x = torch.flatten(x, 1)  # flatten starting from dimension 1 (batch dimension excluded)
-    # print(x.shape)
-    x = F.relu(self.fc1(x))
-    x = F.relu(self.fc2(x))
-    x = self.fc3(x)
-    return x
-'''

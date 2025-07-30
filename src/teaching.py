@@ -112,7 +112,7 @@ class Teacher():
   def _get_metrics(self, TRAIN, EVAL, N_CLASSES, labelToClass, labelType, DEVICE):
     
     train_metric = RunningMetric(TRAIN["train_metric"], N_CLASSES, DEVICE, EVAL["agg"], EVAL["computeRate"], labelType, EVAL["updateRate"])
-    valid_metric = RunningMetric(TRAIN["valid_metric"], N_CLASSES, DEVICE, EVAL["agg"], EVAL["computeRate"] // 2, labelType, EVAL["updateRate"])
+    valid_metric = RunningMetric(TRAIN["valid_metric"], N_CLASSES, DEVICE, EVAL["agg"], EVAL["computeRate"], labelType, EVAL["updateRate"])
     test_metrics = MetricBunch(EVAL["test_metrics"], N_CLASSES, labelToClass, EVAL["agg"], EVAL["computeRate"], DEVICE, labelType)
     return train_metric, valid_metric, test_metrics
 
@@ -176,12 +176,17 @@ class Trainer():
       optimizer.zero_grad() # reset the parameter gradients before backward step
       outputs = model(inputs) # forward pass
       # print(inputs[:5], targets[:5], outputs[:5])
-      # print(inputs.shape, targets, data[2])
       # print("outputs: ", outputs.shape, "\ttargets: ", targets.shape, '\n')
-      if model.inputType == "fmaps":
-        outputs = outputs.permute(0, 2, 1).reshape(-1, outputs.shape[1]) # outputs shape of [n_fmaps, classes]
+      if model.inputType.split('-')[1] in ["clipped", "video"]:
+        # outputs = outputs.permute(0, 2, 1).reshape(-1, outputs.shape[1]) # declip outputs to shape [n_fmaps, classes]
         targets = targets.reshape(-1) # targets shape of [n_fmaps]
+        # print(pd.Series(targets.cpu().numpy()).value_counts(normalize=True).sort_index())
+        mask = targets != -1  # create a mask non-padding targets
+        outputs = outputs[mask]
+        targets = targets[mask]
+
       # print("outputs: ", outputs.shape, "\ttargets: ", targets.shape, '\n')
+      # print("outputs: ", outputs[:5], "\ttargets: ", targets[:5], '\n')
       loss = self.criterion(outputs, targets) # calculate loss
       loss.backward() # backward pass
       optimizer.step()    # a single optimization step
@@ -218,12 +223,16 @@ class Validater():
         outputs = model(inputs)
         # print(inputs[:5], targets[:5], outputs[:5])
         # print("outputs: ", outputs.shape, "\ttargets: ", targets.shape, '\n')
-        if model.inputType == "fmaps":
-          outputs = outputs.permute(0, 2, 1).reshape(-1, outputs.shape[1]) # outputs shape of [n_fmaps, classes]
+        if model.inputType.split('-')[1] in ["clipped", "video"]:
+          # outputs = outputs.permute(0, 2, 1).reshape(-1, outputs.shape[1]) # declip outputs to shape [n_fmaps, classes]
           targets = targets.reshape(-1) # targets shape of [n_fmaps]
+          mask = targets != -1  # create a mask non-padding targets
+          outputs = outputs[mask]
+          targets = targets[mask]
+
         # print("outputs: ", outputs.shape, "\ttargets: ", targets.shape, '\n')
         loss = self.criterion(outputs, targets)
-    
+        
         runningLoss += loss.item() * targets.numel() # accumulate loss by batch size (safer, though most batches are same size)
         totalSamples += targets.numel()
         if labelType.split('-')[0] == "single":
@@ -256,10 +265,15 @@ class Tester():
         inputs, targets, sampleIds = data[0].to(self.DEVICE), data[1].to(self.DEVICE), data[2].to(self.DEVICE)
         outputs = model(inputs)
         # print(inputs[:5], '\n', targets[:5], '\n', outputs[:5])
-        if model.inputType == "fmaps":
-          outputs = outputs.permute(0, 2, 1).reshape(-1, outputs.shape[1]) # outputs shape of [n_fmaps, classes]
+        if model.inputType.split('-')[1] in ["clipped", "video"]:
+          # outputs = outputs.permute(0, 2, 1).reshape(-1, outputs.shape[1]) # "flatten" clips to shape [n_fmaps, classes]
           targets = targets.reshape(-1) # targets shape of [n_fmaps]
           sampleIds = sampleIds.reshape(-1)
+          mask = targets != -1  # create a mask non-padding targets
+          outputs = outputs[mask]
+          targets = targets[mask]
+          sampleIds = sampleIds[mask]
+        # print("outputs: ", outputs.shape, "\ttargets: ", targets.shape, '\n')
         _, preds = torch.max(outputs, 1)  # get labels with max prediction values
         predsList.append(preds)
         targetsList.append(targets)
@@ -460,7 +474,7 @@ class Tester():
                   bbox=dict(boxstyle="round,pad=0.3", edgecolor="black", facecolor="white"))
       plt.tight_layout()
       plt.show(block=True)
-      plt.savefig(os.path.join(path_phaseCharts, f"{modelId}_oa-avg-phase-ev.png"))
+      # plt.savefig(os.path.join(path_phaseCharts, f"{modelId}_oa-avg-phase-ev.png"))
       plt.close()
 
       t2 = time.time()

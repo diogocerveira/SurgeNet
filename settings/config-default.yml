@@ -40,17 +40,17 @@ TRAIN: # to fix because the top ones should not define a classroom
   log_events: True
   skipFolds: []  # 0 for fold 1... after a break (e.g. crash) allows to skip folds and restart from a checkpoint
 
-  criterionId: weighted-cross-entropy # weighted-cross-entropy | binary-cross-entropy-logits
-  criterionId: weighted-cross-entropy # weighted-cross-entropy | binary-cross-entropy-logits
+  criterionId: weighted-cross-entropy # cross-entropy | weighted-cross-entropy | binary-cross-entropy-logits
   train_metric: accuracy
   valid_metric: accuracy  # guiding and evaluating training
   k_folds: 7 # number of folds for cross-validation
   minDelta: 0.001  # minimum delta to save a better state
   patience: 5  # number of epochs to wait for a better state before stopping training
   HYPER:  # traditional hyperparameters
-    n_epochs: 100
-    batchSize: 8
-    clipSize: 500  # amount of frames (sec) per clip when temporal training
+    n_epochs: 25
+    spaceBatchSize: 16
+    timeBatchSize: 1  # batch size for temporal training
+    clipSize: 10346  # amount of frames (sec) per clip when temporal training
     learningRate: 0.0005  # learning rate
     momentum: 0.9
     gamma: 0.1
@@ -63,6 +63,7 @@ PROCESS:  # Process
   sampleFormat: png
   filter_annotated: True
   resize: False
+  crop: False
   path_rawVideos: 
   path_sample:
 
@@ -73,23 +74,23 @@ PROCESS:  # Process
   export_modedPreds: True  # if apply-mode-filter == True
   
   fx_spatial: True
-  fx_load_models: True  #loads the spatial model to extract features if not training
   featureLayer:
   - flatten
-
+  fx_temporal: True
+  fx_load_models: True  #loads models to extract features if not training
+  
 MODEL:  # for models created/trained in the run
   type: phase
-  domain: temporal # spatial, temporal, full
+  domain: temporal # spatial, temporal, full, classifier
 # spatial
-  spaceTransferLearning: fixed-fx # fine-tune | fixed-fx
   spaceTransferLearning: fixed-fx # fine-tune | fixed-fx
   spaceArch: resnet50
   spacePreweights: default # sfx = spatial feature extraction
   path_spaceModel: #C:/Users/DC/Documents/Programming/python/ucl/ML_SurgeNet/logs/LDSS/run_20241104-00/checkpoints/LDSS-20241104-00-fold6-0.837800.pth # if empty, uses new untrained one
 # temporal
   timeArch: tcn # locked for now
-  n_stages: 3
-  n_kernels: 64  # number of convolution kernels per filter == number of channels
+  n_stages: 2
+  n_filters: 64  # number of convolution kernels per filter == number of channels
   tf_filter: 3  # size in time (timeframe, # of frames)
   n_blocks: 2  # inside the stage
 # classification
@@ -113,4 +114,4 @@ EVAL:  # Eval
     confusionMatrix: True
   agg: macro  # overall, accuracy is locked to micro (see utils.py)
   updateRate: 1  # updates metrics with new data every batch
-  computeRate: 15  # computes the metrics
+  computeRate: 1  # computes the metrics
