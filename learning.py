@@ -18,19 +18,22 @@ def learning(**the):
   print(f"A. [classroom] {Csr.id} ({Csr.status})\n   [model] {Csr.studentId} ({Csr.studentStatus})")
   print(f"   For {tuple(the['actions'])}\n")
   # dataset.py (dataset, data handling)
-  Ctl = dataset.Cataloguer(Csr.DATA, Csr.path_annots)
+  Ctl = dataset.Cataloguer(Csr.DATA, Csr.path_annots, the["device"])
   if "process" in the["actions"]:
     if the["PROCESS"]["sample"]:  # video to image frames
       Ctl.sample(the["PROCESS"]["path_rawVideos"], the["PROCESS"]["path_sample"], samplerate=the["PROCESS"]["samplerate"], sampleFormat=the["PROCESS"]["sampleFormat"], processing="", filter_annotated=the["PROCESS"]["filter_annotated"])
       print(f"   [sample] {the['PROCESS']['path_sample']} ({the['PROCESS']['samplerate']} fps)")
     if the["PROCESS"]["resize"]:  # video to image frames
       #Ctl.resize_frames(the["PROCESS"]["path_sample"], f"{the['PROCESS']['path_sample'][:-4]}-025", dim_to=(480, 270))
-      Ctl.resize_frames(the["PROCESS"]["path_sample"], "/home/spaceship/Desktop/Diogo/surgenet/data/LDSS-local/png-025", dim_to=(480, 270))
+      Ctl.resize_frames(Csr.path_samples, "/home/spaceship/Desktop/Diogo/surgenet/data/LDSS-local/png-025", dim_to=(480, 270))
       print(f"   [resize] {the['PROCESS']['path_sample']} ({the['PROCESS']['samplerate']} fps)")
+    if the["PROCESS"]["crop"]:
+      Ctl.crop_frames(Csr.path_samples, Csr.path_samples)
+      print(f"   [crop] {Csr.path_samples}")
     if the["PROCESS"]["label"]:  # label (csv file) image frames
       Ctl.label(Csr.path_samples, Csr.path_labels, Csr.DATA["labelType"])
       print(f"   A new labels.csv was created {Csr.path_labels}")
-      
+
   dset = Ctl.build_dataset(Csr.DATA["id_dataset"].split('-')[1], Csr.path_samples, Csr.path_labels) # for now the dataset is still used from inside the cataloguer
   print(f"B. [dataset] {the['DATA']['id_dataset']} (#{len(dset)})")
   print(f"   [label] {Csr.DATA['labelType']}")
@@ -40,7 +43,7 @@ def learning(**the):
   # teaching.py (metrics, train validation, test)
   Tch = teaching.Teacher(Csr.TRAIN, the["EVAL"], dset, the["device"])
   print(f"C. [training] {Csr.TRAIN['train_point']} on [device] {the['device']}")
-  print(f"   [folds] #{Csr.TRAIN['k_folds']} [epochs] #{Csr.TRAIN['HYPER']['n_epochs']} [batch size] {Csr.TRAIN['HYPER']['batchSize']}\n")
+  print(f"   [folds] #{Csr.TRAIN['k_folds']} [epochs] #{Csr.TRAIN['HYPER']['n_epochs']} [batch sizes] s{Csr.TRAIN['HYPER']['spaceBatchSize']} / t{Csr.TRAIN['HYPER']['timeBatchSize']}\n")
   highScore = 0.0
 
   # Index split of the dataset (virtual)
@@ -64,7 +67,7 @@ def learning(**the):
     model = machine.PhaseNet(the["MODEL"]["domain"], spaceinator, timeinator, Csr.id, fold + 1)
 
     dset.path_spaceFeatures, featuresId = teaching.get_path_exportedfeatures(Csr.path_exportedSpaceFeatures, f"spacefmaps_f{fold + 1}")
-    trainloader, validloader, testloader = Ctl.batch(dset, model.inputType, Csr.TRAIN["HYPER"]["batchSize"], Csr.TRAIN["HYPER"]["clipSize"], train_idxs=train_idxs, valid_idxs=valid_idxs, test_idxs=test_idxs)
+    trainloader, validloader, testloader = Ctl.batch(dset, model.inputType, Csr.TRAIN["HYPER"], train_idxs=train_idxs, valid_idxs=valid_idxs, test_idxs=test_idxs)
     
     if "train" in the["actions"] or "eval" in the["actions"]:
       Tch.writer = SummaryWriter(log_dir=os.path.join(Csr.path_events, model.id.split('_')[1])) # object for logging stats
@@ -89,7 +92,22 @@ def learning(**the):
         fx_stateDict, fx_stateId = teaching.get_testState(Csr.path_states, model.id)
         spaceinator.load_state_dict(fx_stateDict, strict=False)
       path_export = os.path.join(Csr.path_features, f"spacefmaps_{fx_stateId.split('_')[1]}.pt")
-      spaceinator.export_features(DataLoader(dset, batch_size=Csr.TRAIN["HYPER"]["batchSize"]), path_export, the["PROCESS"]["featureLayer"], the["device"])
+      spaceinator.export_features(DataLoader(dset, batch_size=Csr.TRAIN["HYPER"]["spaceBatchSize"]), path_export, the["PROCESS"]["featureLayer"], the["device"])
+      t2 = time.time()
+      print(f"Exporting features took {(t2 - t1) // 3600} hours and {(((t2 - t1) % 3600) / 60):.1f} minutes!")
+      # clear GPU memory
+      torch.cuda.empty_cache()
+      gc.collect()
+    if the["PROCESS"]["fx_temporal"] and "process" in the["actions"]:
+      t1 = time.time()
+      if "train" in the["actions"]:
+        timeinator.load_state_dict(trainedModel.state_dict(), strict=False)
+        fx_stateId = trainedModel.id
+      elif the["PROCESS"]["fx_load_models"]:
+        fx_stateDict, fx_stateId = teaching.get_testState(Csr.path_states, model.id)
+        timeinator.load_state_dict(fx_stateDict, strict=False)
+      path_export = os.path.join(Csr.path_features, f"timefmaps_{fx_stateId.split('_')[1]}.pt")
+      timeinator.export_features(DataLoader(dset, batch_size=Csr.TRAIN["HYPER"]["timeBatchSize"]), path_export, the["PROCESS"]["featureLayer"], the["device"])
       t2 = time.time()
       print(f"Exporting features took {(t2 - t1) // 3600} hours and {(((t2 - t1) % 3600) / 60):.1f} minutes!")
       # clear GPU memory
@@ -130,7 +148,7 @@ def learning(**the):
         test_bundle  = Tch.tester.test(model, testloader, dset.labelType, the["EVAL"]["export_testBundle"], path_export=path_export)
         t2 = time.time()
         print(f"Testing took {t2 - t1:.2f} seconds")
-        print(test_bundle.head())
+        # print(test_bundle.head())
       else:
         raise ValueError("Invalid evalFrom choice!")
       
