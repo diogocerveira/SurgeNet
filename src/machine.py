@@ -24,28 +24,28 @@ class Phasinator(nn.Module):
     if modelDomain == "spatial":
       classifier = nn.Linear(spaceinator.featureSize, spaceinator.n_classes)
       inators = [spaceinator, classifier]
-      inputType = "images-framed"
+      inputType = "images-frame"
     elif modelDomain == "temporal":
       classifier = nn.Linear(timeinator.featureSize, timeinator.n_classes)
       inators = [timeinator, classifier]
-      inputType = "fmaps-clipped"
+      inputType = "fmaps-clip"
     elif modelDomain == "temporal-frames":
       classifier = nn.Linear(timeinator.featureSize, timeinator.n_classes)
       inators = [timeinator, classifier]
-      inputType = "fmaps-clipped"
+      inputType = "fmaps-clip"
     elif modelDomain == "tecno-like":
       inators = [timeinator]
-      inputType = "fmaps-clipped"
+      inputType = "fmaps-clip"
     elif modelDomain == "full":
       classifier = nn.Linear(timeinator.featureSize, timeinator.n_classes)
       inators = [spaceinator, timeinator, classifier]
-      inputType = "images-framed"
+      inputType = "images-frame"
     elif modelDomain == "spaceClassifier":
       inators = [nn.Linear(spaceinator.featureSize, spaceinator.n_classes)]
-      inputType = "fmaps-framed"
+      inputType = "fmaps-frame"
     elif modelDomain == "timeClassifier":
       inators = [nn.Linear(timeinator.featureSize, timeinator.n_classes)]
-      inputType = "fmaps-clipped"
+      inputType = "fmaps-clip"
     else:
       raise ValueError("Invalid domain choice!")
     self.model = nn.Sequential(*inators)

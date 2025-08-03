@@ -2,7 +2,7 @@ path_root: . #/batataclan
 path_data: #/workspace/raid-diogo/
 seed: 53  # 5 --> 3 or 3 --> 5  DO NOT CHANGE SEED (it messes up with fold training)
 device:
-id_classroom: LDSS-2508-1 # if empty creates new learning environment, else loads it (dataset-YYMM-DDHH)
+id_classroom: LDSS-2507-sFT # if empty creates new learning environment, else loads it (dataset-YYMM-DDHH)
 actions:
 - train        # train (spatial, temporal, full)
 # - process       # process (sample-n-label, mode-filter, extractFeatures)
@@ -11,7 +11,7 @@ actions:
 # DATA and TRAIN properties define an unique classroom
 DATA:
   id_dataset: LDSS-local  # (LDSS-local, LDSSi-local, TEST-local, cifar10-ext)
-  labelType: multi-phase # time-to-next-phase, single-phase, time-to-video-end, time-since-video-start
+  labelType: single-phase # time-to-next-phase, single-phase, time-to-video-end, time-since-video-start
   actionLabels:
     - dissection
     - fixation
@@ -29,6 +29,8 @@ DATA:
     # - Fixation of the implant to the promontory
     # - Reperitonealisation
   preprocessing: basic  # basic, resnet, augmentation
+  multiClips: False
+  multiClipStride: 3  # stride for multi-clip mode (e.g. 1, 2, 3)
   datatype: png-image #, jpeg-image, feature-dict
 
 TRAIN: # to fix because the top ones should not define a classroom
@@ -41,7 +43,7 @@ TRAIN: # to fix because the top ones should not define a classroom
   log_events: True
   skipFolds: [0, 1]  # 0 for fold 1... after a break (e.g. crash) allows to skip folds and restart from a checkpoint
 
-  criterionId: binary-cross-entropy-logits # cross-entropy | weighted-cross-entropy | binary-cross-entropy-logits
+  criterionId: weighted-cross-entropy # cross-entropy | weighted-cross-entropy | binary-cross-entropy-logits
   train_metric: accuracy
   valid_metric: accuracy  # guiding and evaluating training
   k_folds: 7 # number of folds for cross-validation
@@ -83,7 +85,7 @@ PROCESS:  # Process
   
 MODEL:  # for models created/trained in the run
   type: phase
-  domain: spatial # spatial, temporal, full, classifier
+  domain: temporal # spatial, temporal, full, classifier
 # spatial
   spaceTransferLearning: fine-tune # fine-tune | fixed-fx
   spaceArch: resnet50
