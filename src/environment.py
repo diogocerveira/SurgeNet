@@ -128,7 +128,7 @@ class Classroom():
   def match_studentProfile(self, MODEL):
     students = [m for m in os.listdir(self.path_classroom) if os.path.isdir(os.path.join(self.path_classroom, m))] # list of students in the classroom
     for id_student in students:
-      print(f"Checking student {id_student} in classroom {self.id}")
+      # print(f"Checking student {id_student} in classroom {self.id}")
       with open(os.path.join(self.path_classroom, id_student, "student-profile.yml"), 'r') as f:
         studentProfile = yaml.safe_load(f)
         # if new learning parameters match a previous classroom with same "subject" (id_dataset)
@@ -184,7 +184,7 @@ class Classroom():
     paths_logs["path_phaseCharts"] = os.path.join(paths_logs["path_eval"], "phase-charts")
     paths_logs["path_phaseTiming"] = os.path.join(paths_logs["path_eval"], "phase-timing")
     paths_logs["path_train"] = os.path.join(self.path_student, "train")
-    paths_logs["path_predictions"] = os.path.join(paths_logs["path_train"], "predictions")
+    paths_logs["path_predictions"] = os.path.join(paths_logs["path_eval"], "predictions")
     paths_logs["path_events"] = os.path.join(paths_logs["path_train"], "events")
     paths_logs["path_states"] = os.path.join(paths_logs["path_train"], "models")
     paths_logs["path_process"] = os.path.join(self.path_student, "process")

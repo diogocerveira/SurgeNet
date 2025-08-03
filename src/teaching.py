@@ -7,6 +7,9 @@ import numpy as np
 import torch.optim as optim
 import os
 import matplotlib.pyplot as plt
+from matplotlib.offsetbox import TextArea, AnchoredOffsetbox
+import matplotlib.cm as cm
+import matplotlib.colors as mcolors
 import seaborn as sns
 import pickle
 import time
@@ -23,14 +26,15 @@ class Teacher():
       Pipeline: (train -> validate) x n_epochs -> test
   '''
   def __init__(self, TRAIN, EVAL, dataset, DEVICE):
-    self.N_CLASSES = dataset.n_classes
+    self.N_PHASES = dataset.n_classes
+    self.PHASES = dataset.phases
     self.labelType = dataset.labelType
     self.DATASET_SIZE = dataset.__len__()
-    train_metric, valid_metric, test_metrics = self._get_metrics(TRAIN, EVAL, self.N_CLASSES, dataset.labelToClassMap, dataset.labelType, DEVICE)
+    train_metric, valid_metric, test_metrics = self._get_metrics(TRAIN, EVAL, self.N_PHASES, dataset.labelToClassMap, dataset.labelType, DEVICE)
     criterion = self._get_criterion(TRAIN["criterionId"], dataset.classWeights, DEVICE)
     self.trainer = Trainer(train_metric, criterion, TRAIN["HYPER"], DEVICE)
     self.validater = Validater(valid_metric, criterion, DEVICE)
-    self.tester = Tester(test_metrics, dataset.labels, DEVICE)
+    self.tester = Tester(test_metrics, dataset.labels, self.PHASES, dataset.labelToClassMap, DEVICE)
 
     self.save_checkpoints = TRAIN["save_checkpoints"]
     self.highScore = -np.inf
@@ -91,7 +95,7 @@ class Teacher():
       gc.collect()
     return model, valid_maxScore, betterState
 
-  def evaluate(self, test_bundle, eval_tests, modelId, labelToClassMap, Csr):
+  def evaluate(self, test_bundle, eval_tests, modelId, Csr):
 
     if eval_tests["aprfc"]:
       self.tester._aprfc(self.writer, modelId, Csr.path_events, Csr.path_aprfc)
@@ -99,7 +103,7 @@ class Teacher():
       torch.cuda.empty_cache()
       gc.collect()
     if eval_tests["phaseTiming"]:
-      outText = self.tester._phase_timing(test_bundle, self.N_CLASSES, labelToClassMap)
+      outText  = self.tester._phase_timing(test_bundle, Csr.path_phaseTiming, modelId)
       # clear GPU memory
       torch.cuda.empty_cache()
       gc.collect()
@@ -109,11 +113,11 @@ class Teacher():
         torch.cuda.empty_cache()
         gc.collect()
 
-  def _get_metrics(self, TRAIN, EVAL, N_CLASSES, labelToClass, labelType, DEVICE):
+  def _get_metrics(self, TRAIN, EVAL, N_PHASES, labelToClass, labelType, DEVICE):
     
-    train_metric = RunningMetric(TRAIN["train_metric"], N_CLASSES, DEVICE, EVAL["agg"], EVAL["computeRate"], labelType, EVAL["updateRate"])
-    valid_metric = RunningMetric(TRAIN["valid_metric"], N_CLASSES, DEVICE, EVAL["agg"], EVAL["computeRate"], labelType, EVAL["updateRate"])
-    test_metrics = MetricBunch(EVAL["test_metrics"], N_CLASSES, labelToClass, EVAL["agg"], EVAL["computeRate"], DEVICE, labelType)
+    train_metric = RunningMetric(TRAIN["train_metric"], N_PHASES, DEVICE, EVAL["agg"], EVAL["computeRate"], labelType, EVAL["updateRate"])
+    valid_metric = RunningMetric(TRAIN["valid_metric"], N_PHASES, DEVICE, EVAL["agg"], EVAL["computeRate"], labelType, EVAL["updateRate"])
+    test_metrics = MetricBunch(EVAL["test_metrics"], N_PHASES, labelToClass, EVAL["agg"], EVAL["computeRate"], DEVICE, labelType)
     return train_metric, valid_metric, test_metrics
 
   def _get_criterion(self, CRITERION_ID, classWeights, DEVICE):
@@ -162,9 +166,7 @@ class Trainer():
   def train(self, model, trainloader, labelType, optimizer, epoch):
     ''' In: model, data, criterion (loss function), optimizer
         Out: train_loss, train_score
-        Note - inputs can be samples (pics) or feature maps
-               Targets == labels
-               outputs can be predictions or logits?
+        Note - inputs can be samples (pics) or feature maps / outputs are logits and then pred/probabilities
     '''
     self.train_metric.reset()  # resets states, typically called between epochs
     runningLoss, totalSamples = 0.0, 0
@@ -177,27 +179,34 @@ class Trainer():
       outputs = model(inputs) # forward pass
       # print(inputs[:5], targets[:5], outputs[:5])
       # print("outputs: ", outputs.shape, "\ttargets: ", targets.shape, '\n')
-      if model.inputType.split('-')[1] in ["clipped", "video"]:
-        # outputs = outputs.permute(0, 2, 1).reshape(-1, outputs.shape[1]) # declip outputs to shape [n_fmaps, classes]
-        targets = targets.reshape(-1) # targets shape of [n_fmaps]
-        # print(pd.Series(targets.cpu().numpy()).value_counts(normalize=True).sort_index())
-        mask = targets != -1  # create a mask non-padding targets
+      if model.inputType.split('-')[1] == "clipped":
+        outputs = outputs.reshape(-1, outputs.shape[-1])
+        if labelType.split('-')[0] == "single":
+          targets = targets.reshape(-1)
+          mask = targets != -1
+          assert isinstance(self.criterion, torch.nn.CrossEntropyLoss), "Use CrossEntropyLoss for single-label tasks"
+        else:  # multi
+          targets = targets.reshape(-1, targets.shape[-1])
+          mask = targets[:, 1] != -1  # assuming class=-1 means padding
+          assert isinstance(self.criterion, torch.nn.BCEWithLogitsLoss), "Use BCEWithLogitsLoss for multi-label tasks"
+        # print("outputs: ", outputs.shape, "\ttargets: ", targets.shape, '\n')
         outputs = outputs[mask]
         targets = targets[mask]
 
       # print("outputs: ", outputs.shape, "\ttargets: ", targets.shape, '\n')
-      # print("outputs: ", outputs[:5], "\ttargets: ", targets[:5], '\n')
+      # print("outputs: ", outputs[:5], "\ttargets: ", targets[:5], '\n')  
       loss = self.criterion(outputs, targets) # calculate loss
       loss.backward() # backward pass
       optimizer.step()    # a single optimization step
 
-      runningLoss += loss.item() * targets.numel() # accumulate loss by batch size (safer, though most batches are same size)
-      totalSamples += targets.numel()  # numel() returns the total number of elements in the tensor
       if labelType.split('-')[0] == "single":
         outputs = torch.argmax(outputs, dim=1)  # get labels with max prediction values
       else:
-        outputs = torch.sigmoid(outputs)  # get probabilities
+        outputs = torch.sigmoid(outputs)  # get probabilities for Multi label accuracy
       self.train_metric.update(outputs, targets)
+
+      runningLoss += loss.item() * targets.numel() # accumulate loss by batch size (safer, though most batches are same size)
+      totalSamples += targets.numel()  # numel() returns the total number of elements in the tensor
       if batch % self.train_metric.computeRate == 0:
         print(f"\t  T [E{epoch + 1} B{batch + 1}]   scr: {self.train_metric.score():.4f}")
     return runningLoss / totalSamples, self.train_metric.score()
@@ -223,10 +232,17 @@ class Validater():
         outputs = model(inputs)
         # print(inputs[:5], targets[:5], outputs[:5])
         # print("outputs: ", outputs.shape, "\ttargets: ", targets.shape, '\n')
-        if model.inputType.split('-')[1] in ["clipped", "video"]:
-          # outputs = outputs.permute(0, 2, 1).reshape(-1, outputs.shape[1]) # declip outputs to shape [n_fmaps, classes]
-          targets = targets.reshape(-1) # targets shape of [n_fmaps]
-          mask = targets != -1  # create a mask non-padding targets
+        if model.inputType.split('-')[1] == "clipped":
+          outputs = outputs.reshape(-1, outputs.shape[-1])
+          if labelType.split('-')[0] == "single":
+            targets = targets.reshape(-1)
+            mask = targets != -1
+            assert isinstance(self.criterion, torch.nn.CrossEntropyLoss), "Use CrossEntropyLoss for single-label tasks"
+          else:  # multi
+            targets = targets.reshape(-1, targets.shape[-1])
+            mask = targets[:, 1] != -1  # assuming class=-1 means padding
+            assert isinstance(self.criterion, torch.nn.BCEWithLogitsLoss), "Use BCEWithLogitsLoss for multi-label tasks"
+          # print("outputs: ", outputs.shape, "\ttargets: ", targets.shape, '\n')
           outputs = outputs[mask]
           targets = targets[mask]
 
@@ -238,7 +254,7 @@ class Validater():
         if labelType.split('-')[0] == "single":
           outputs = torch.argmax(outputs, dim=1)  # get labels with max prediction values
         else:
-          outputs = torch.sigmoid(outputs)  # get probabilities
+          outputs = torch.sigmoid(outputs)  # get probabilities for Multi label accuracy
         self.valid_metric.update(outputs, targets)  # updates with data from new batch
         if batch % self.valid_metric.computeRate == 0:
           print(f"\t  V [E{epoch + 1} B{batch + 1}]   scr: {self.valid_metric.score():.4f}")
@@ -247,10 +263,12 @@ class Validater():
 class Tester():
   ''' Part of the teacher that knows how to test a model knowledge in multiple ways
   '''
-  def __init__(self, metrics, labels, DEVICE):
+  def __init__(self, metrics, labels, PHASES, labelToClassMap, DEVICE):
     self.test_metrics = metrics
     self.DEVICE = DEVICE
     self.labels = labels
+    self.PHASES = PHASES
+    self.labelToClassMap = labelToClassMap  # map from label to class index
   
   def test(self, model, testloader, labelType, export_bundle, path_export=None):
     ''' Test the model - return Preds, labels and sampleIds
@@ -265,25 +283,35 @@ class Tester():
         inputs, targets, sampleIds = data[0].to(self.DEVICE), data[1].to(self.DEVICE), data[2].to(self.DEVICE)
         outputs = model(inputs)
         # print(inputs[:5], '\n', targets[:5], '\n', outputs[:5])
-        if model.inputType.split('-')[1] in ["clipped", "video"]:
-          # outputs = outputs.permute(0, 2, 1).reshape(-1, outputs.shape[1]) # "flatten" clips to shape [n_fmaps, classes]
-          targets = targets.reshape(-1) # targets shape of [n_fmaps]
+        if model.inputType.split('-')[1] == "clipped":
+          outputs = outputs.reshape(-1, outputs.shape[-1])
+          if labelType.split('-')[0] == "single":
+            targets = targets.reshape(-1)
+            mask = targets != -1
+          else:  # multi
+            targets = targets.reshape(-1, targets.shape[-1])
+            mask = targets[:, 1] != -1  # assuming class=-1 means padding
           sampleIds = sampleIds.reshape(-1)
-          mask = targets != -1  # create a mask non-padding targets
+          # print("outputs: ", outputs.shape, "\ttargets: ", targets.shape, '\n')
           outputs = outputs[mask]
           targets = targets[mask]
           sampleIds = sampleIds[mask]
-        # print("outputs: ", outputs.shape, "\ttargets: ", targets.shape, '\n')
-        _, preds = torch.max(outputs, 1)  # get labels with max prediction values
-        predsList.append(preds)
-        targetsList.append(targets)
-        sampleIdsList.append(sampleIds)
+          # print("outputs: ", outputs.shape, "\ttargets: ", targets.shape, '\n')
 
         # print("outputs.shape", outputs.shape)
         if labelType.split('-')[0] == "single":
           outputs = torch.argmax(outputs, dim=1)  # get labels with max prediction values
+          preds = outputs
         else:
           outputs = torch.sigmoid(outputs)  # get probabilities
+          topk = torch.topk(outputs, k=2, dim=1).indices
+          preds = torch.zeros_like(outputs)
+          preds.scatter_(1, topk, 1)
+          # print(preds[:5], targets[:5])
+
+        predsList.append(preds)
+        targetsList.append(targets)
+        sampleIdsList.append(sampleIds)
         # print("pred: ", outputs[:5], '\n', "target: ", targets[:5])
         # print("outputs.shape", outputs.shape)
         # print("targets.min()", targets.min().item(), "targets.max()", targets.max().item())
@@ -295,15 +323,17 @@ class Tester():
     sampleIdsList = torch.cat(sampleIdsList).cpu().tolist()
 
     # print(f"Preds: {predsList}\n Targets: {targetsList}\n SampleIds: {sampleIdsList}")
-    test_bundle = self._get_bundle(predsList, targetsList, sampleIdsList)
+    test_bundle = self._get_bundle(predsList, targetsList, sampleIdsList, labelType)
     if export_bundle:
-      with open(path_export, 'wb') as f:
+      # print("here", path_export)
+      test_bundle.to_csv(path_export + ".csv", index=False)
+      with open(path_export + ".pt", 'wb') as f:
         pickle.dump(test_bundle, f)
     # print(len(predsList), len(targetsList), len(sampleIdsList))
     # print(f"SampleIds Type: {type(sampleIdsList[0])}, Content: {sampleIdsList[:5]}")
     return test_bundle
 
-  def _get_bundle(self, preds, targets, sampleIds):
+  def _get_bundle(self, preds, targets, sampleIds, labelType):
     # for now requires ordered parameters
      # 1. Create base DataFrame
     bundle = pd.DataFrame({
@@ -311,6 +341,17 @@ class Tester():
         "Target": targets,
         "SampleId": sampleIds
     })
+    # Convert preds and targets to phases
+    # print(bundle.head(5))  # Show first 5 rows of the bundle
+    classToLabelMap = {v: k for k, v in self.labelToClassMap.items()}
+    # print(classToLabelMap)
+    if labelType.split('-')[0] == "multi":
+      bundle["Pred"] = bundle["Pred"].apply(lambda x: self.multihotToLabel(x, classToLabelMap))
+      bundle["Target"] = bundle["Target"].apply(lambda x: self.multihotToLabel(x, classToLabelMap))
+    elif labelType.split('-')[0] == "single":
+      bundle["Pred"] = bundle["Pred"].apply(lambda x: classToLabelMap[x])
+      bundle["Target"] = bundle["Target"].apply(lambda x: classToLabelMap[x])
+    # print(bundle.head(5))  # Show first 5 rows of the bundle
     # 2. Extract Video and Timestamp from self.labels
     label_info = self.labels.copy()
     label_info[['Video', 'Timestamp']] = label_info['frameId'].str.split('_', expand=True)
@@ -325,8 +366,17 @@ class Tester():
     bundle = bundle.sort_values(by=['Video', 'Timestamp']).reset_index(drop=True)
     # 6. Optional: assign absolute frame order
     bundle['AbsoluteFrameIndex'] = bundle.groupby('Video').cumcount()
+    # print(bundle.head(5))  # Show first 5 rows of the bundle
     return bundle
-  
+  def multihotToLabel(self, multihot, classToLabelMap, sep=','):
+    # print(f"Multihot: {multihot}")  # Debugging line to check multihot input
+    multihot = np.array(multihot)  # ensure multihot is a numpy array
+    indices = np.where(multihot == 1.0)[0]  # indices where class is active
+    # print(f"Indices: {indices}")  # Debugging line to check indices
+    labels = sorted([classToLabelMap[int(i)] for i in indices])
+    # print(f"Labels: {labels}")  # Debugging line to check labels
+    return sep.join(labels)
+
   def _aprfc(self, writer, modelId, path_events, path_aprfc):
     # self.test_metrics.display()
     fold = int(modelId.split("_")[1][1]) # get fold number from modelId
@@ -345,31 +395,33 @@ class Tester():
 
     writer.close()
     
-  def _phase_timing_i2(self, df, N_CLASSES, labelToClassMap, samplerate=1):
-    classToLabelMap = {v: k for k, v in labelToClassMap.items()}  # reverse mapping from class to label
+  def _phase_timing_i2(self, df, path_phaseTiming, modelId, samplerate=1):
+    # print(self.PHASES)
+    phaseLabelToIntMap = {phase: i for i, phase in enumerate(self.PHASES)}
+    phaseIntToLabelMap = {i: phase for i, phase in enumerate(self.PHASES)}
+    print(phaseLabelToIntMap)
     outText = []
     lp, lt = len(df["Pred"]), len(df["Target"])
     # N_CLASSES = (max(df["Targets"]) + 1)  # assuming regular int encoding
     # N_CLASSES = len(preds[0]) # assuming one hot encoding
     assert lp == lt, "Targets and Preds Size Incompatibility"
+    N_PHASES = len(self.PHASES)
     videos = df["Video"].unique()
-    phases_preds_sum = np.zeros(N_CLASSES)
-    phases_gt_sum = np.zeros(N_CLASSES)
-    phases_diff_sum = np.zeros(N_CLASSES)
+    phases_preds_sum = np.zeros(N_PHASES)
+    phases_gt_sum = np.zeros(N_PHASES)
+    phases_diff_sum = np.zeros(N_PHASES)
 
     for idx, video in enumerate(videos):
       print()
-      df_filtered = df[df["Video"] == video][["Pred", "Target"]]
-      
-      classes_video = pd.Series(df_filtered["Target"].unique())
-      # pd.set_option("display.max_rows", 100)
-      # print(df_filtered["Targets"].iloc[:100])
-      print(classes_video.reindex(range(N_CLASSES), fill_value=-1).values)
-      # Reset for each video
-      
-      phases_preds_video = df_filtered["Pred"].value_counts().reindex(range(N_CLASSES), fill_value=0) # Targets video counts
-      phases_gt_video = df_filtered["Target"].value_counts().reindex(range(N_CLASSES), fill_value=0) # Targets video counts
-      # ensures every class is accounted for in cumulative count, even with no occurrences
+      df_filtered = df[df["Video"] == video][["Pred", "Target"]].copy()
+      # print(df_filtered.head(5))
+      df_filtered["Target"] = df_filtered["Target"].apply(lambda x: phaseLabelToIntMap[x])
+      df_filtered["Pred"] = df_filtered["Pred"].apply(lambda p: phaseLabelToIntMap[p] if p in self.PHASES else -1)
+      # print("Filtered DataFrame:\n", df_filtered.head(5))
+      # Count only valid classes (ignore -1)
+      phases_preds_video = df_filtered[df_filtered["Pred"] != -1]["Pred"].value_counts().reindex(range(N_PHASES), fill_value=0)
+      phases_gt_video = df_filtered["Target"].value_counts().reindex(range(N_PHASES), fill_value=0)
+
       phases_preds_sum += phases_preds_video.values
       phases_gt_sum += phases_gt_video.values
       phases_diff_sum += np.abs(phases_preds_video.values - phases_gt_video.values)
@@ -377,109 +429,150 @@ class Tester():
       
       # Optionally print counts for each video
       print("phases_preds counts:", phases_preds_video.values, '\t', sum(phases_preds_video))
-      print("phases_gt counts:", phases_gt_video.to_numpy(), '\t', sum(phases_gt_video.to_numpy()))
-      
+      print("phases_gt counts:", phases_gt_video.values, '\t', sum(phases_gt_video))
+      print(phaseIntToLabelMap)
       mix = list(zip(phases_preds_video / (60 * samplerate), phases_gt_video / (60 * samplerate), phases_diff_sum))
-      ot = f"\nVideo {video} Phase Report\n" + f"{'':<12} \t\t|   T Preds    |    T Targets     ||  Diff\n" + '\n'.join(
-            f"{classToLabelMap[i]:<12} \t\t| {mix[i][0]:<8.2f}min | {mix[i][1]:<8.2f}min || {(mix[i][0] - mix[i][1]):<8.2f}min"
-            for i in range(N_CLASSES)
+      ot = f"\nVideo {video[:4]} Phase Report\n" + f"{'':<12} \t|   T Preds   |  T Targets  ||  Diff\n" + '\n'.join(
+            f"{phaseIntToLabelMap[i]:<12} \t| {mix[i][0]:<8.2f}min | {mix[i][1]:<8.2f}min || {(mix[i][0] - mix[i][1]):<8.2f}min"
+            for i in range(N_PHASES)
         )
       outText.append(ot)
-      print(ot)
+      print(ot, '\n')
+      self._export_textImg(ot, path_phaseTiming, f"{modelId}_{video[:4]}-phaseTiming")
     # Average Overall Results
     phases_preds_avg = phases_preds_sum / len(videos) / (60 * samplerate)
     phases_gt_avg = phases_gt_sum / len(videos) / (60 * samplerate)
     phases_diff_avg = phases_diff_sum / len(videos) / (60 * samplerate)
     mix = list(zip(phases_preds_avg, phases_gt_avg, phases_diff_avg))
     
-    otavg = "\n\nOverall Average Phase Report\n" + f"{'':<12} \t\t| T Avg Preds  |  T Avg Targets   || Total AE\n" + '\n'.join(
-            f"{classToLabelMap[i]:<12} \t\t| {mix[i][0]:<8.2f}min | {mix[i][1]:<8.2f}min || {(mix[i][2]):<8.2f}min"
-            for i in range(N_CLASSES)
+    otavg = "\n\nOverall Average Phase Report\n" + f"{'':<12} \t| T Avg Preds |T Avg Targets|| Total AE\n" + '\n'.join(
+            f"{phaseIntToLabelMap[i]:<12} \t| {mix[i][0]:<8.2f}min | {mix[i][1]:<8.2f}min || {(mix[i][2]):<8.2f}min"
+            for i in range(N_PHASES)
       )
-    print(otavg)
+    # print(otavg)
+    # self._export_textImg(otavg, path_phaseTiming, f"{modelId}_overall-phaseTiming")
     outText.append(otavg)
   # phase_metric([1, 1, 2, 3, 3, 4, 0, 5], [0, 0, 0, 2, 3, 4, 5, 1])
     return outText
 
-  def _phase_timing(self, df, N_CLASSES, classToLabel, samplerate=1):
-    return self._phase_timing_i2(df, N_CLASSES, classToLabel, samplerate=1)
+  def _export_textImg(self, outText, path_to, name):
+    from matplotlib import rcParams
+    rcParams['font.family'] = 'monospace'
+    # Clean text
+    outText = outText.replace('\t', '    ').replace('\u200b', '')
+    fig, ax = plt.subplots()
+    ax.axis('off')
+    # Create TextArea with monospaced font
+    ta = TextArea(outText, textprops=dict(fontsize=10, linespacing=1.4))
+    # Anchor it to top-left
+    box = AnchoredOffsetbox(
+      loc='upper left',
+      child=ta,
+      pad=0.5,
+      frameon=True,
+      bbox_to_anchor=(0, 1),
+      bbox_transform=ax.transAxes,
+      borderpad=0.2
+    )
+    ax.add_artist(box)
+    save_path = os.path.join(path_to, f"{name}.png")
+    plt.savefig(save_path, dpi=300, bbox_inches='tight', pad_inches=0.2)
+    plt.close()
+
+  def _phase_timing(self, df, path_phaseTiming, modelId, samplerate=1):
+    return self._phase_timing_i2(df, path_phaseTiming, modelId, samplerate=samplerate)
 
   def _phase_graph(self, df, path_phaseCharts, modelId, outText):
-      # df = pd.DataFrame({
-      #     'SampleName': ['vid1_1', 'vid1_3', 'vid1_2', 'vid2_20', 'vid2_23', 'vid2_40', 'vid2_51', 'vid2_52'],
-      #     'Targets': [0, 1, 1, 2, 0, 1, 1, 1],  # Example target labels
-      #     'Preds': [0, 1, 0, 2, 1, 4, 3, 2],  # Example predictions (e.g., class indices)
-
-      # })
-      # Prepare for plotting
-      videos = df['Video'].unique()
-      num_videos = len(videos)
-      print(f'\n\nNumber of videos: {num_videos}')
-      color_map = {0: 'springgreen', 1: 'goldenrod', 2: 'tomato', 3: 'mediumslateblue', 4: 'plum', 5: 'deepskyblue'}
-      plt.rcParams['font.family'] = 'monospace'
-      # for saving all videos to same img
-      # fig, axes = plt.subplots(num_videos, 1, figsize=(9, 5), sharex=True) # Create subplots
-      # if num_videos == 1: axes = [axes] # prevent errors if only 1 video
-      t1 = time.time()
-      # Plotting
-      for idx, video in enumerate(videos):
-
-        data_video = df[df['Video'] == video][["Target", "Pred"]]
-        fig, (ax, ax_text) = plt.subplots(nrows=2, gridspec_kw={'height_ratios': [3, 1]}, figsize=(9, 6))
-          
-        # ax = axes[idx]  # for saving all videos to same image
+    # df = pd.DataFrame({
+    #   'SampleName': ['vid1_1', 'vid1_3', 'vid1_2', 'vid2_20', 'vid2_23', 'vid2_40', 'vid2_51', 'vid2_52'],
+    #   'Targets': [0, 1, 1, 2, 0, 1, 1, 1],  # Example target labels
+    #   'Preds': [0, 1, 0, 2, 1, 4, 3, 2],  # Example predictions (e.g., class indices)
+    # })
+    # Prepare for plotting
+    videos = df['Video'].unique()
+    num_videos = len(videos)
+    print(f'\n\nNumber of videos: {num_videos}')
+    # color_map = {0: 'springgreen', 1: 'goldenrod', 2: 'tomato', 3: 'mediumslateblue', 4: 'plum', 5: 'deepskyblue'}
+    colormap, ordered_phases = self.get_phase_colormap_with_unknowns(df)
+    plt.rcParams['font.family'] = 'monospace'
+    # for saving all videos to same img
+    # fig, axes = plt.subplots(num_videos, 1, figsize=(9, 5), sharex=True) # Create subplots
+    # if num_videos == 1: axes = [axes] # prevent errors if only 1 video
+    t1 = time.time()
+    # Plotting
+    for idx, video in enumerate(videos):
+      data_video = df[df['Video'] == video][["Target", "Pred"]]
+      fig, (ax, ax_text) = plt.subplots(nrows=2, gridspec_kw={'height_ratios': [3, 1]}, figsize=(9, 6))
         
-        # Prepare the bar data
-        for j, stage in enumerate(data_video.columns):
-          start_positions = np.arange(len(data_video))
-          class_values = data_video[stage].values
-          ax.broken_barh(list(zip(start_positions, np.ones(len(start_positions)))), (j - 0.4, 0.8), facecolors=[color_map[val] for val in class_values])
+      # ax = axes[idx]  # for saving all videos to same image
+      # Prepare the bar data
+      for j, stage in enumerate(data_video.columns):
+        start_positions = np.arange(len(data_video))
+        class_values = data_video[stage].values
+        # print(class_values)
+        ax.broken_barh(list(zip(start_positions, np.ones(len(start_positions)))), (j - 0.4, 0.8), facecolors=[colormap[val] for val in class_values])
+      # Add vertical separators
+      # ax.axvline(x=len(data_video), color='grey', linestyle='--', linewidth=0.5)
+      # Set labels
+      ax.set_yticks(np.arange(len(data_video.columns)))  # Middle of the two rows
+      ax.set_yticklabels(data_video.columns)
+      ax.set_xticks([])
+      ax.set_xlabel("Time Steps")
+      ax.set_title(f"Video: {video}")
 
-        # Add vertical separators
-        # ax.axvline(x=len(data_video), color='grey', linestyle='--', linewidth=0.5)
-
-        # Set labels
-        ax.set_yticks(np.arange(len(data_video.columns)))  # Middle of the two rows
-        ax.set_yticklabels(data_video.columns)
-        ax.set_xticks([])
-        ax.set_xlabel("Time Steps")
-        ax.set_title(f"Video: {video}")
-
-        # Add the summary paragraph below the graph
-        ax_text.axis('off')  # Hide axis for the text box
-        ot = outText[idx].replace('\t', '     ').replace('\u200b', '')  # Removes hidden tabs and zero-width spaces
-
-        # print(ot)
-        ax_text.text(0, 0.5, ot, transform=ax_text.transAxes, fontsize=11, 
-                    verticalalignment='center', horizontalalignment='left',
-                    bbox=dict(boxstyle="round,pad=0.3", edgecolor="black", facecolor="white"))
-      
-        # Create custom legend
-        handles = [plt.Rectangle((0, 0), 1, 1, color=color_map[i]) for i in color_map.keys()]
-        labels = [f'{i}' for i in color_map.keys()]
-        ax.legend(handles, labels, loc='upper right', title='Classes')
-
-        plt.tight_layout()
-        # plt.show(block=True)
-        plt.savefig(os.path.join(path_phaseCharts, f"{modelId}_{video[:4]}_phase-ev.png"))
-        plt.close(fig)
-
-      plt.figure()
-      fig, ax_text = plt.subplots(figsize=(6, 2))
+      # Add the summary paragraph below the graph
       ax_text.axis('off')  # Hide axis for the text box
-      ot = outText[-1].replace('\t', '      ').replace('\u200b', '')  # Removes hidden tabs and zero-width spaces
+      ot = outText[idx].replace('\t', '     ').replace('\u200b', '')  # Removes hidden tabs and zero-width spaces
+
       # print(ot)
       ax_text.text(0, 0.5, ot, transform=ax_text.transAxes, fontsize=11, 
                   verticalalignment='center', horizontalalignment='left',
                   bbox=dict(boxstyle="round,pad=0.3", edgecolor="black", facecolor="white"))
-      plt.tight_layout()
-      plt.show(block=True)
-      # plt.savefig(os.path.join(path_phaseCharts, f"{modelId}_oa-avg-phase-ev.png"))
-      plt.close()
+    
+    # Create custom legend handles and labels as before
+    handles = [plt.Rectangle((0, 0), 1, 1, color=colormap[i]) for i in colormap.keys()]
+    labels = [f'{i}' for i in colormap.keys()]
 
-      t2 = time.time()
-      print(f"Video graphing took {t2 - t1:.2f} seconds")
-      print(f"\nSaved phase metric graphs to {path_phaseCharts}")
+    # Legend outside axes, anchored to figure bottom-right
+    legend = fig.legend(
+        handles, labels,
+        loc='lower right',                   # Align legend's lower right corner
+        bbox_to_anchor=(0.98, 0.02),        # Just inside figure bottom right (x,y)
+        bbox_transform=fig.transFigure,     # coords relative to figure, not axes
+        borderaxespad=0.5,
+        fontsize=9,
+        title='Classes',
+        frameon=True
+    )
+    plt.tight_layout()  # can keep to adjust spacing nicely
+    plt.savefig(os.path.join(path_phaseCharts, f"{modelId}_{video[:4]}_phase-ev.png"), bbox_inches='tight')
+    plt.close(fig)
+
+    t2 = time.time()
+    print(f"Video graphing took {t2 - t1:.2f} seconds")
+    print(f"\nSaved phase metric graphs to {path_phaseCharts}")
+
+  def get_phase_colormap_with_unknowns(self, df):
+    known_set = set(self.PHASES)
+    # Gather all predicted and target phases
+    preds = df["Pred"].dropna().tolist()
+    targets = df["Target"].dropna().tolist()
+    all_phases = set(preds + targets)
+    # Split known and unknown phases
+    known = [p for p in all_phases if p in known_set]
+    unknown = sorted([p for p in all_phases if p not in known_set])  # sort to keep color order consistent
+
+    # Final ordered phase list
+    full_phases = known + unknown
+    n = len(full_phases)
+    # Choose colormap based on count
+    base_cmap = cm.get_cmap('Set3', n) if n <= 20 else cm.get_cmap('nipy_spectral', n)
+    # Map each phase string to a hex color
+    colormap = {
+      phase: mcolors.to_hex(base_cmap(i))
+      for i, phase in enumerate(full_phases)
+    }
+    return colormap, full_phases
 
 class EarlyStopper:
   ''' Controls the validation loss progress to keep it going down and improve times
@@ -518,27 +611,26 @@ class StillMetric:
   ''' For now uses torcheval metrics
       Performs metric update and computation based on a frequency provided
   '''
-  def __init__(self, metricName, N_CLASSES, DEVICE, labelType, agg="micro"):
+  def __init__(self, metricName, N_PHASES, DEVICE, labelType, agg="micro"):
     self.name = metricName
   
-    if labelType.split('-')[0] == "single":
-      if metricName == "accuracy":
-        self.metric = MulticlassAccuracy(average="micro", num_classes=N_CLASSES, device=DEVICE)
-      elif metricName == "precision":
-        self.metric =  MulticlassPrecision(average=agg, num_classes=N_CLASSES, device=DEVICE)
-      elif metricName == "recall":
-        self.metric = MulticlassRecall(average=agg, num_classes=N_CLASSES, device=DEVICE)
-      elif metricName == "f1score":
-        self.metric = MulticlassF1Score(average=agg, num_classes=N_CLASSES, device=DEVICE)
-      elif metricName == "confusionMatrix":
-        self.metric = MulticlassConfusionMatrix(num_classes=N_CLASSES, device=DEVICE)
+    
+    if metricName == "accuracy":
+      if labelType.split('-')[0] == "single":
+        self.metric = MulticlassAccuracy(average="micro", num_classes=N_PHASES, device=DEVICE)
       else:
-        raise ValueError("Invalid Metric Name")
-    elif labelType.split('-')[0] == "multi":
-      if metricName == "accuracy":
-        self.metric = MultilabelAccuracy(criteria="hamming", device=DEVICE)
+        self.metric = MultilabelAccuracy(device=DEVICE) # criteria="hamming"
+    elif metricName == "precision":
+      self.metric =  MulticlassPrecision(average=agg, num_classes=N_PHASES, device=DEVICE)
+    elif metricName == "recall":
+      self.metric = MulticlassRecall(average=agg, num_classes=N_PHASES, device=DEVICE)
+    elif metricName == "f1score":
+      self.metric = MulticlassF1Score(average=agg, num_classes=N_PHASES, device=DEVICE)
+    elif metricName == "confusionMatrix":
+      self.metric = MulticlassConfusionMatrix(num_classes=N_PHASES, device=DEVICE)
     else:
-      raise ValueError(f"Invalid labelType {labelType} for metric {metricName}")
+      raise ValueError("Invalid Metric Name")
+
   def reset(self):
     self.metric.reset()
   def score(self):
@@ -547,8 +639,8 @@ class StillMetric:
 class RunningMetric(StillMetric):
   ''' Extends StillMetric to updates on the run
   '''
-  def __init__(self, metricName, N_CLASSES, DEVICE, agg, computeRate, labelType, updateFreq=1):
-    super().__init__(metricName, N_CLASSES, DEVICE, labelType, agg)
+  def __init__(self, metricName, N_PHASES, DEVICE, agg, computeRate, labelType, updateFreq=1):
+    super().__init__(metricName, N_PHASES, DEVICE, labelType, agg)
     self.computeRate = computeRate  # num of batches between computations
     self.updateFreq = updateFreq  # num of batches between updates
   
@@ -560,19 +652,19 @@ class MetricBunch:
   ''' Gets a bunch of still metrics at cheap price
       Accuracy locked at agg==micro for now
   '''
-  def __init__(self, metricSwitches, N_CLASSES, labelToClass, agg, computeRate, DEVICE, labelType):  # metricSwitches is a boolean dict switch for getting metrics
+  def __init__(self, metricSwitches, N_PHASES, labelToClass, agg, computeRate, DEVICE, labelType):  # metricSwitches is a boolean dict switch for getting metrics
     self.metricSwitches = metricSwitches
     self.labelToClass = labelToClass
     self.agg = agg
     
     if labelType.split('-')[0] == "single":
-      self.accuracy = RunningMetric("accuracy", N_CLASSES, DEVICE, "micro", computeRate, labelType) if self.metricSwitches["accuracy"] else None
-      self.precision = RunningMetric("precision", N_CLASSES, DEVICE, agg, computeRate, labelType) if self.metricSwitches["precision"] else None
-      self.recall = RunningMetric("recall", N_CLASSES, DEVICE, agg, computeRate, labelType) if self.metricSwitches["recall"] else None
-      self.f1score = RunningMetric("f1score", N_CLASSES, DEVICE, agg, computeRate, labelType) if self.metricSwitches["f1score"] else None
-      self.confusionMatrix = RunningMetric("confusionMatrix", N_CLASSES, DEVICE, agg, computeRate, labelType) if self.metricSwitches["confusionMatrix"] else None
+      self.accuracy = RunningMetric("accuracy", N_PHASES, DEVICE, "micro", computeRate, labelType) if self.metricSwitches["accuracy"] else None
+      self.precision = RunningMetric("precision", N_PHASES, DEVICE, agg, computeRate, labelType) if self.metricSwitches["precision"] else None
+      self.recall = RunningMetric("recall", N_PHASES, DEVICE, agg, computeRate, labelType) if self.metricSwitches["recall"] else None
+      self.f1score = RunningMetric("f1score", N_PHASES, DEVICE, agg, computeRate, labelType) if self.metricSwitches["f1score"] else None
+      self.confusionMatrix = RunningMetric("confusionMatrix", N_PHASES, DEVICE, agg, computeRate, labelType) if self.metricSwitches["confusionMatrix"] else None
     elif labelType.split('-')[0] == "multi":
-      self.accuracy = RunningMetric("accuracy", N_CLASSES, DEVICE, "micro", computeRate, labelType) if self.metricSwitches["accuracy"] else None
+      self.accuracy = RunningMetric("accuracy", N_PHASES, DEVICE, "micro", computeRate, labelType) if self.metricSwitches["accuracy"] else None
       self.precision = None
       self.recall = None
       self.f1score = None
@@ -662,8 +754,8 @@ def get_path_exportedfeatures(path_features, featureName):
   for featureId in os.listdir(path_features):
     if featureName in featureId:
       path_features = os.path.join(path_features, featureId)
-      print(f"    Loading features {featureId}\n")
+      print(f"    Found feature path! ({featureId})")
       return path_features, featureId
   else:
-    print(f"Feature {featureName} not found in {path_features}\n")
+    print(f"Feature path ({featureName}) not found in {path_features}\n")
     return None, None

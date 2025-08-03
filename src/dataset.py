@@ -18,6 +18,9 @@ from torcheval.metrics import MulticlassAccuracy, MulticlassPrecision, Multiclas
 import csv
 import cv2
 from collections import Counter
+from PIL import Image
+import torchvision.transforms.functional as TF
+import imageio.v3 as iio
 
 import matplotlib
 matplotlib.use('Agg')
@@ -54,6 +57,8 @@ class SampledVideosDataset(Dataset):
     
     self.labelToClassMap = self.get_labelToClassMap(self.labels)
     self.n_classes = len(self.labelToClassMap)
+    self.phases = sorted(set(self.labels["frameLabels"]))
+    print(f"Phases (#{len(self.phases)}): ", self.phases)
     self.classWeights = self.get_labelWeights(self.labels)
     print(f"Class weights: {self.classWeights}\n")
      # check if the class distribution is balanced
@@ -81,7 +86,7 @@ class SampledVideosDataset(Dataset):
     label = torch.tensor(self.labels.loc[idx, "frameLabels"])
     if self.labelType.split('-')[0] == "multi":
       target = self._multiHot([label], num_classes=self.n_classes)
-
+    print("WARNING!! Wrong pipe\n\n")
     # print(f"img: {img.shape}, label: {label}, idx: {torch.tensor(idx)}")  # WTFFFF does not print
     return (img, target, torch.tensor(idx))
   def __getitems__(self, idxs):
@@ -99,40 +104,48 @@ class SampledVideosDataset(Dataset):
     # imgs = [iio.imread(p) for p in path_imgs]
     imgs = [cv2.cvtColor(cv2.imread(p), cv2.COLOR_BGR2RGB) for p in path_imgs]
     labels = self.labels.iloc[idxs]["frameLabels"].tolist()
-    self.export_images(imgs[:5], prefix='before_transform')
+    # self.export_images_raw(imgs[:5], prefix='before_transform')
     if self.transform:
       imgs = [self.transform(img) for img in imgs]
     else:
       imgs = [torch.tensor(img) for img in imgs]
+    # print(f"Image shape: {imgs[0].shape}")  # should be [3, 224, 224]
+    # self.export_images_tensor(imgs[:5], prefix='after_transform')
     imgs = torch.stack(imgs)
     targets = self._get_targets(labels, self.labelType.split('-')[0])
     idxs = torch.tensor(idxs)
-
-    self.export_images(imgs[:5], prefix='after_transform')
-    
+    # assert 1 == 0
     # print("idxs: ", idxs[:5])
     # print(self.labels.iloc[idxs[:5]])
     # print("targets: ", targets[:5], '\n')
     # print(f"imgs: {imgs.shape}, targets: {targets}, idxs: {idxs}")
     return list(zip(imgs, targets, idxs))
-  
-  def export_images(self, imgs, output_dir='exported_images', prefix='img'):
-    """Export images to a specified directory with a prefix."""
-    os.makedirs(output_dir, exist_ok=True)
+
+
+  def export_images_raw(self, imgs, prefix="raw", outdir="./debug_images"):
+    os.makedirs(outdir, exist_ok=True)
     for i, img in enumerate(imgs):
-      img_path = os.path.join(output_dir, f"{prefix}_{i}.png")
-      # if numpy array
-      if isinstance(img, np.ndarray):
-        plt.imsave(img_path, img)
-      elif isinstance(img, torch.Tensor):
-        if img.dim() == 3:
-          img = img.permute(1, 2, 0)
-          plt.imsave(img_path, img.numpy())
+      path = os.path.join(outdir, f"{prefix}_{i}.png")
+      iio.imwrite(path, np.asarray(img))  # assumes RGB
+  def export_images_tensor(self, tensors, prefix="tensor", outdir="./debug_images"):
+    normValues = ((0.416, 0.270, 0.271), (0.196, 0.157, 0.156))
+    os.makedirs(outdir, exist_ok=True)
     
-      print(f"Exported {img_path}")
+    for i, tensor in enumerate(tensors):
+      img = tensor.clone()
+      # Per-tensor min-max normalize for visualization
+      img -= img.min()
+      img /= img.max()
+      img = (img * 255).to(torch.uint8)
+      img = TF.to_pil_image(img)
+      
+      # other
+      # img = tensor.clone().clamp(min=0)  # zero out all negative values
+      # img = img / img.max()              # normalize [0, 1]
+      # img = (img * 255).to(torch.uint8)
+      # img = TF.to_pil_image(img)
 
-    
-
+      img.save(os.path.join(outdir, f"{prefix}_{i}.png"))
 
   def _get_targets(self, labels, labelTypeLeft):
     """Convert labels to numeric targets based on the labelType."""
@@ -219,14 +232,22 @@ class SampledVideosDataset(Dataset):
     ''' Get inverse class weights from dataset labels '''
     labels_counts = Counter()
     for multi in labels["frameLabels"]:
-        single = [l.strip() for l in multi.split(',')]  # comma separated labels
-        labels_counts.update(single)
+      single = [l.strip() for l in multi.split(',')]
+      labels_counts.update(single)  # keys are strings
+
+    # Map to class indices
+    counts_array = np.zeros(self.n_classes)
+    for label, count in labels_counts.items():
+      class_idx = self.labelToClassMap[label]
+      counts_array[class_idx] = count
+
     # Convert to frequencies
-    cw = pd.Series(labels_counts) / self.__len__()  # class frequencies
-    inv_cw = 1.0 / cw  # Inverse frequency weights
-    # Normalize weights so sum equals number of classes (optional)
-    inv_cw = inv_cw / inv_cw.sum() * len(inv_cw)
-    return torch.tensor(inv_cw.values, dtype=torch.float32)
+    cw = counts_array / self.__len__()  # class frequency
+    inv_cw = 1.0 / cw
+    inv_cw = inv_cw / inv_cw.sum() * self.n_classes  # normalize
+
+    return torch.tensor(inv_cw, dtype=torch.float32)
+
   
   def get_labelToClassMap(self, labels):
     ''' Convert to list of natural language labels into list of int number labels, saving a map class->label in classToLabelMap dict map '''
@@ -235,7 +256,10 @@ class SampledVideosDataset(Dataset):
     for multi in set(labels["frameLabels"]):
       for single in multi.split(','):
         uniqueLabels.add(single)
+    # print(uniqueLabels)
+    # print(sorted(list(uniqueLabels)))
     labelToClassMap = {l:i for i, l in enumerate(sorted(list(uniqueLabels)))}
+    # print(labelToClassMap)
     classes = [tuple([labelToClassMap[single] for single in multi.split(',')]) for multi in labels["frameLabels"]]
     # print(classes[:5])
     self.classToLabelMap = {i: l for i, l in enumerate(sorted(list(uniqueLabels)))}
@@ -254,7 +278,7 @@ class Cataloguer():
     self.path_annots = path_annots
     self.preprocessingType = DATA["preprocessing"]
     self.labelType = DATA["labelType"]
-    self.predicateLabelsPossible = DATA["predicateLabels"]
+    self.actionLabelsPossible = DATA["actionLabels"]
     self.objectLabelsPossible = DATA["objectLabels"]
     self.DEVICE = DEVICE
     # updated when dataset is built
@@ -425,6 +449,7 @@ class Cataloguer():
           )  # sort by frameId
       for frameId, frameLabel in sortedZip:
         writer.writerow({'frameId': frameId, 'frameLabels': frameLabel})
+        # print(frameLabel, end='\n')
 
   def _get_phaseDelimiters(self, path_annot):
     ''' extract annotated video frames from annotation file as (timestamp, label))
@@ -453,22 +478,21 @@ class Cataloguer():
     for proto in protolabels:
       found = []
       
-      for label in self.predicateLabelsPossible:
+      for label in self.actionLabelsPossible:
         if label.lower() in proto.lower():
           found.append(self._get_sigla(label))
-          break  # assuming only 1 predicate per label
+          break  # assuming only 1 action per label
           # print(label)
-      else:  # if no predicate found, append "Other"
-        found.append("0therPred")  # sort to have a consistent order
+      else:  # if no action found, append "Other"
+        found.append("0Act")  # sort to have a consistent order
       for label in self.objectLabelsPossible:
         if label.lower() in proto.lower():
           found.append(self._get_sigla(label))
           break  # assuming only 1 object per label
           # print(label)
       else:
-        found.append("0TherObj")
-      
-      # found = sorted(found)  # sort the labels to have a consistent order
+        found.append("0Obj")
+      found = sorted(found)  # sort the labels to have a consistent order
       if self.labelType.split('-')[0] == "single":
         found = '-'.join(found) # labels as strings like A-B-C
       elif self.labelType.split('-')[0] == "multi":
@@ -476,7 +500,6 @@ class Cataloguer():
       else:
         raise ValueError("Invalid labelType domain!")
       labels.append(found)
-      # print(found)
     return labels
 
   def _get_sigla(self, text):
@@ -515,9 +538,9 @@ class Cataloguer():
           break
       else: # appending anything if not a labelled phase
         if self.labelType.split('-')[0] == "single":
-          otherLabel = "0therPred-0TherObj"  # if no phase, append both Other labels
+          otherLabel = "0Act-0Obj"  # if no phase, append both Other labels
         elif self.labelType.split('-')[0] == "multi":
-          otherLabel = "0therPred,0TherObj"
+          otherLabel = "0Act,0Obj"
         else:
           raise ValueError("Invalid labelType domain!")
         framesLabel.append(otherLabel)  # if no phase, append both Other labels
@@ -528,24 +551,30 @@ class Cataloguer():
   def _get_preprocessing(self, preprocessingType):
     ''' Get torch group of tranforms directly applied to torch Dataset object'''
     if preprocessingType == "basic":
+      normValues = ((0.416, 0.270, 0.271), (0.196, 0.157, 0.156))
       transform = transforms.Compose([
+        transforms.ToImage(), # only for v2
+        transforms.Resize((224, 224), antialias=True),
+        transforms.ToDtype(torch.float32, scale=True),
+        transforms.Normalize(normValues[0], normValues[1])
+      ])
+    elif preprocessingType == "resnet":
+      transform = transforms.Compose([
+        transforms.ToImage(),
+        transforms.Resize((224, 224), antialias=True),  # squishes if needed
+        transforms.ToDtype(torch.float32, scale=True),                          # [0, 255] → [0.0, 1.0]
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], # ImageNet channel stats
+                            std=[0.229, 0.224, 0.225])
+      ])
+    elif preprocessingType == "aug":
+      transform = transforms.Compose([
+        # from 0-255 Image/numpy.ndarray to 0.0-1.0 torch.FloatTensor
         transforms.Resize((224, 224), antialias=True),
         transforms.ToImage(), # only for v2
         transforms.ToDtype(torch.float32, scale=True),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-        # transforms.CenterCrop(),
-        # transforms.ToTensor(),
-        # transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-        ])
-    elif preprocessingType == "aug":
-      transform = transforms.Compose([
-      # from 0-255 Image/numpy.ndarray to 0.0-1.0 torch.FloatTensor
-      transforms.Resize((224, 224), antialias=True),
-      transforms.ToImage(), # only for v2
-      transforms.ToDtype(torch.float32, scale=True),
-      transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),   # (mean) (std) for each channel New = (Prev - mean) / stf
-      transforms.RandomRotation((-90, 90)),
-      transforms.ColorJitter(10, 2)
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),   # (mean) (std) for each channel New = (Prev - mean) / stf
+        transforms.RandomRotation((-90, 90)),
+        transforms.ColorJitter(10, 2)
       ])
     elif not preprocessingType:
       # make identity transform
@@ -556,7 +585,27 @@ class Cataloguer():
     else:
       raise ValueError("Invalid preprocessingType key")
     return transform
-  
+
+  def get_mean_std(self, dataset):
+    loader = DataLoader(dataset, batch_size=64, shuffle=False, num_workers=4)
+
+    mean = 0.
+    std = 0.
+    total = 0
+
+    for imgs, _, _ in loader:
+      # imgs: [B, C, H, W]
+      B = imgs.size(0)
+      imgs = imgs.view(B, imgs.size(1), -1)  # [B, C, H*W]
+      mean += imgs.mean(2).sum(0)  # → [C]
+      std += imgs.std(2).sum(0)
+      total += B
+
+    mean /= total
+    std /= total
+    return mean.tolist(), std.tolist()
+
+
   def build_dataset(self, DATA_SCOPE, path_samples=None, path_labels=None):
     ''' Get the Dataset objects according to the DATA_SCOPE'''
     transform = self._get_preprocessing(self.preprocessingType)
@@ -625,7 +674,7 @@ class Cataloguer():
       if inputTypeRight == "framed":  # classifier training on space features
         return self._batch_framed(dset, HYPER["spaceBatchSize"], train_idxs, valid_idxs, test_idxs)
       elif inputTypeRight == "clipped": # temporal model training on space features
-        return self._batch_clips(dset, HYPER["timeBatchSize"], HYPER["clipSize"], train_idxs, valid_idxs, test_idxs)
+        return self._batch_clip(dset, HYPER["timeBatchSize"], HYPER["clipSize"], train_idxs, valid_idxs, test_idxs)
       elif inputTypeRight == "video": # temporal model training on single videos as each padded "batch"
         return self._batch_videos(dset, HYPER["timeBatchSize"], train_idxs, valid_idxs, test_idxs)
     else:
@@ -636,7 +685,7 @@ class Cataloguer():
     try:
       if dset.DATA_SCOPE == "local":
         if np.any(train_idxs):
-          loaders["trainloader"] = DataLoader(dataset=dset, batch_size=size_batch, num_workers=2, sampler=torch.utils.data.SubsetRandomSampler(train_idxs))
+          loaders["trainloader"] = DataLoader(dataset=dset, batch_size=size_batch, num_workers=0, sampler=torch.utils.data.SubsetRandomSampler(train_idxs))
         if np.any(valid_idxs):
           loaders["validloader"] = DataLoader(dataset=dset, batch_size=size_batch, num_workers=2, sampler=torch.utils.data.SubsetRandomSampler(valid_idxs))
         if np.any(test_idxs):
@@ -683,9 +732,86 @@ class Cataloguer():
     exampleBatch = next(iter(loader[0]))
     print(f"\tBatch example shapes:\n\t[space features] {exampleBatch[0].shape}\n\t[labels] {exampleBatch[1].shape}\n\t[idxs] {exampleBatch[2].shape}\n")
     return loader
-  
+
+  def _batch_clip(self, dset, size_batch, clip_size=0, train_idxs=None, valid_idxs=None, test_idxs=None):
+    assert os.path.exists(dset.path_spaceFeatures), f"No exported space features found in {dset.path_spaceFeatures}!"
+    featuresDict = torch.load(dset.path_spaceFeatures, weights_only=False, map_location=self.DEVICE)
+    firstKey = next(iter(featuresDict))
+    availableLayers = list(featuresDict[firstKey].keys())
+    featureLayer = availableLayers[-1]
+    print(f"  Available feature layers: {availableLayers} / Using last layer: {featureLayer}\n")
+
+    # Get per-video frame indices + split grouping
+    groupedIdxs, splitVidsInt = self.get_vidsIdxsAndSplits(dset, train_idxs, valid_idxs, test_idxs)
+    # Compute global max length if using full videos
+    maxFrames = max(len(frames) for frames in groupedIdxs.values()) if clip_size == 0 else None
+    loader = [[], [], []]
+    for split, vidsInt in splitVidsInt.items():
+      splitFeats, splitTargets, splitIdxs = [], [], []
+
+      for vid in vidsInt:
+        frameIdxs = groupedIdxs[vid]
+        n_frames = len(frameIdxs)
+        # Load data
+        vidFeats = torch.stack([featuresDict[i][featureLayer] for i in frameIdxs]).squeeze(1)  # [T, F]
+        vidLabels = dset.labels.iloc[frameIdxs]["frameLabels"].tolist()
+        vidTargets = dset._get_targets(vidLabels, dset.labelType.split('-')[0]).to(self.DEVICE)
+        vidIdxs = torch.tensor(frameIdxs, dtype=torch.int64, device=self.DEVICE)
+        # Determine padding length
+        if clip_size == 0:
+          pad_len = maxFrames - n_frames
+        else:
+          pad_len = (clip_size - (n_frames % clip_size)) % clip_size
+        # Pad features
+        if pad_len > 0:
+          featureDim = vidFeats.shape[1]
+          vidFeats = torch.cat([vidFeats, torch.zeros(pad_len, featureDim, device=self.DEVICE)], dim=0)
+          if len(vidTargets.shape) == 1:
+            targetPadding = torch.full((pad_len,), -1, dtype=torch.int64, device=self.DEVICE)
+          else:
+            targetPadding = torch.zeros(pad_len, vidTargets.shape[1], dtype=vidTargets.dtype, device=self.DEVICE)
+            targetPadding[:, 1] = -1
+          vidTargets = torch.cat([vidTargets, targetPadding], dim=0)
+          vidIdxs = torch.cat([vidIdxs, torch.full((pad_len,), -1, dtype=torch.int64, device=self.DEVICE)], dim=0)
+        # Store either whole video or clips
+        if clip_size == 0:
+          splitFeats.append(vidFeats)          # [T, F]
+          splitTargets.append(vidTargets)      # [T] or [T, C]
+          splitIdxs.append(vidIdxs)            # [T]
+        else:
+          num_clips = vidFeats.shape[0] // clip_size
+          F = vidFeats.shape[1]
+          C = vidTargets.shape[1] if len(vidTargets.shape) > 1 else None
+          splitFeats.extend(vidFeats.view(num_clips, clip_size, F))
+          if C: # multi-label case
+            splitTargets.extend(vidTargets.view(num_clips, clip_size, C))
+          else:
+            splitTargets.extend(vidTargets.view(num_clips, clip_size))
+          splitIdxs.extend(vidIdxs.view(num_clips, clip_size))
+      # Stack and create loader
+      feats = torch.stack(splitFeats).cpu()
+      targets = torch.stack(splitTargets).cpu()
+      idxs = torch.stack(splitIdxs).cpu()
+
+      featset = TensorDataset(feats, targets, idxs)
+      loader[split] = DataLoader(featset, batch_size=size_batch, num_workers=2, shuffle=True)
+    if loader[0]:
+      exampleBatch = next(iter(loader[0]))
+      print(f"\tBatch example shapes:\n\t[space features] {exampleBatch[0].shape}\n\t[labels] {exampleBatch[1].shape}\n\t[idxs] {exampleBatch[2].shape}")
+      if clip_size == 0:
+        print(f"    Batch contains {exampleBatch[0].shape[0]} video(s), each with up to {exampleBatch[0].shape[1]} frames\n")
+      else:
+        print(f"    Batch contains {exampleBatch[0].shape[0]} clip(s), each with {clip_size} frames\n")
+
+    return loader
+
+
+
+
+
   def _batch_videos(self, dset, size_batch, train_idxs=None, valid_idxs=None, test_idxs=None):
     assert os.path.exists(dset.path_spaceFeatures), f"No exported space features found in {dset.path_spaceFeatures}!"
+    # print(f"Batching videos from {dset.path_spaceFeatures} with batch size {size_batch}")
     featuresDict = torch.load(dset.path_spaceFeatures, weights_only=False, map_location=self.DEVICE)
     firstKey = next(iter(featuresDict))
     availableLayers = list(featuresDict[firstKey].keys())
@@ -757,16 +883,13 @@ class Cataloguer():
     groupedIdxs = {}
     splitVidsInt = {0: set(), 1: set(), 2: set()}
     idxMap = {0: train_idxs, 1: valid_idxs, 2: test_idxs}
-
     for split, idxs in idxMap.items():
       if idxs is None or len(idxs) == 0:
         continue
-
       groups = dset._get_grouping(idxs)
       for idx, videoInt in zip(idxs, groups):
         groupedIdxs.setdefault(videoInt, []).append(idx)
         splitVidsInt[split].add(videoInt)
-
     return groupedIdxs, splitVidsInt
 
 
@@ -826,6 +949,8 @@ class Cataloguer():
     clipIdxs = idxs.view(-1, size_clip)  # reshape to [n_clips, n_features]
     # print(f"clips shape: {clips.shape}, clipTargets shape: {clipTargets.shape}, clipIdxs shape: {clipIdxs.shape}")
     return clips, clipTargets, clipIdxs
+
+
 
 class Showcaser:
   def __init__(self):

@@ -39,12 +39,15 @@ def learning(**the):
   print(f"   [label] {Csr.DATA['labelType']}")
   print(f"   [preprocessing] {Ctl.preprocessingType}")
   print(f"   [classes] #{dset.n_classes} ({'Balanced' if dset.BALANCED else 'Unbalanced'}) {list(dset.labelToClassMap.keys())}\n")
-  
+  print(f"""   note: labels are formed automatically and sorted alphabetically,
+      resulting in a different order from the annotations file. Fix-Vau comes before Fix-Pro!\n""")
+
   # teaching.py (metrics, train validation, test)
   Tch = teaching.Teacher(Csr.TRAIN, the["EVAL"], dset, the["device"])
   print(f"C. [training] {Csr.TRAIN['train_point']} on [device] {the['device']}")
   print(f"   [folds] #{Csr.TRAIN['k_folds']} [epochs] #{Csr.TRAIN['HYPER']['n_epochs']} [batch sizes] s{Csr.TRAIN['HYPER']['spaceBatchSize']} / t{Csr.TRAIN['HYPER']['timeBatchSize']}\n")
   highScore = 0.0
+  # print(Ctl.get_mean_std(dset))
 
   # Index split of the dataset (virtual)
   for fold, splits in enumerate(Ctl.split(Csr.TRAIN["k_folds"], dset)):
@@ -64,11 +67,11 @@ def learning(**the):
     spaceinator = machine.Spaceinator(the["MODEL"], dset.n_classes)
     print(f"    Feature size of {spaceinator.featureSize} at node '{spaceinator.featureNode}'\n")
     timeinator = machine.Timeinator(the["MODEL"], spaceinator.featureSize, dset.n_classes)
-    model = machine.PhaseNet(the["MODEL"]["domain"], spaceinator, timeinator, Csr.id, fold + 1)
+    model = machine.Phasinator(the["MODEL"]["domain"], spaceinator, timeinator, Csr.id, fold + 1)
 
     dset.path_spaceFeatures, featuresId = teaching.get_path_exportedfeatures(Csr.path_exportedSpaceFeatures, f"spacefmaps_f{fold + 1}")
     trainloader, validloader, testloader = Ctl.batch(dset, model.inputType, Csr.TRAIN["HYPER"], train_idxs=train_idxs, valid_idxs=valid_idxs, test_idxs=test_idxs)
-    
+
     if "train" in the["actions"] or "eval" in the["actions"]:
       Tch.writer = SummaryWriter(log_dir=os.path.join(Csr.path_events, model.id.split('_')[1])) # object for logging stats
 
@@ -131,12 +134,12 @@ def learning(**the):
           else: # load model from 
             if the["EVAL"]["path_model"]: # chose before running
               test_stateDict, test_stateId = torch.load(the["EVAL"]["path_model"], weights_only=False, map_location=the["device"])
-              Tch.evaluate(test_bundle, the["EVAL"], fold + 1, Csr, Ctl.N_CLASSES, Ctl.classToLabel,
-                Csr.DATA["extradata"], Csr.path_eval, Csr.path_aprfc, Csr.path_phaseCharts, the["TEST"]["path_preds"])
+              Tch.evaluate(test_bundle, the["EVAL"], fold + 1, Csr, Ctl.N_CLASSES, Csr.DATA["extradata"],
+                  Csr.path_eval, Csr.path_aprfc, Csr.path_phaseCharts, the["TEST"]["path_preds"])
               print("Breaking testing loop on 'Fold 1' because a path_model was provided without 'train' action.")
               break
             else: # choose from the states folder (corresponding to fold)
-              test_stateDict = teaching.get_testState(Csr.path_states, model.id)
+              test_stateDict, stateId = teaching.get_testState(Csr.path_states, model.id)
               # path_model = environment.choose_in_path(Csr.path_models)
               # stateDict = torch.load(path_model, weights_only=False, map_location=the["device"])
             model.load_state_dict(test_stateDict, strict=False)
@@ -144,7 +147,7 @@ def learning(**the):
           print(f"Error loading model state for testing: {e}\n")
           break
         t1 = time.time()
-        path_export = os.path.join(Csr.path_predictions, f"preds_{model.id.split('_')[1]}.pt")
+        path_export = os.path.join(Csr.path_predictions, f"preds_{model.id.split('_')[1]}")
         test_bundle  = Tch.tester.test(model, testloader, dset.labelType, the["EVAL"]["export_testBundle"], path_export=path_export)
         t2 = time.time()
         print(f"Testing took {t2 - t1:.2f} seconds")
@@ -172,7 +175,7 @@ def learning(**the):
             print(f"No predictions (test_bundle) provided for processing: {e}")
             continue
       
-      Tch.evaluate(test_bundle, the["EVAL"]["eval_tests"], model.id, dset.labelToClassMap, Csr)
+      Tch.evaluate(test_bundle, the["EVAL"]["eval_tests"], model.id, Csr)
 
     try: # not defined if only processing
       Tch.writer.close()
