@@ -2,15 +2,15 @@ path_root: . #/batataclan
 path_data: #/workspace/raid-diogo/
 seed: 53  # 5 --> 3 or 3 --> 5  DO NOT CHANGE SEED (it messes up with fold training)
 device:
-id_classroom: LDSS-2507-sFT # if empty creates new learning environment, else loads it (dataset-YYMM-DDHH)
+id_classroom:  # if empty creates new learning environment, else loads it (dataset-YYMM-DDHH)
 actions:
 - train        # train (spatial, temporal, full)
-# - process       # process (sample-n-label, mode-filter, extractFeatures)
+- process       # process (sample-n-label, mode-filter, extractFeatures)
 - eval         # eval (aprfc, phaseTiming, phaseChart)
 
 # DATA and TRAIN properties define an unique classroom
 DATA:
-  id_dataset: LDSS-local  # (LDSS-local, LDSSi-local, TEST-local, cifar10-ext)
+  id_dataset: TEST-local  # (LDSS-local, LDSSi-local, TEST-local, cifar10-ext)
   labelType: single-phase # time-to-next-phase, single-phase, time-to-video-end, time-since-video-start
   actionLabels:
     - dissection
@@ -41,7 +41,7 @@ TRAIN: # to fix because the top ones should not define a classroom
   save_betterState: True
   save_lastState: False
   log_events: True
-  skipFolds: [0, 1]  # 0 for fold 1... after a break (e.g. crash) allows to skip folds and restart from a checkpoint
+  skipFolds: [2, 3, 4, 5, 6]  # 0 for fold 1... after a break (e.g. crash) allows to skip folds and restart from a checkpoint
 
   criterionId: weighted-cross-entropy # cross-entropy | weighted-cross-entropy | binary-cross-entropy-logits
   train_metric: accuracy
@@ -50,10 +50,10 @@ TRAIN: # to fix because the top ones should not define a classroom
   minDelta: 0.001  # minimum delta to save a better state
   patience: 5  # number of epochs to wait for a better state before stopping training
   HYPER:  # traditional hyperparameters
-    n_epochs: 25
+    n_epochs: 2
     spaceBatchSize: 16
     timeBatchSize: 16  # batch size for temporal training
-    clipSize: 0  # amount of frames (sec) per clip when temporal training
+    clipSize: 5  # amount of frames (sec) per clip when temporal training
     learningRate: 0.0005  # learning rate
     momentum: 0.9
     gamma: 0.1
@@ -79,6 +79,7 @@ PROCESS:  # Process
   fx_spatial: True
   featureLayer:
   - flatten
+  - layer4.2.relu_2
   # - layer2.3.relu_2
   fx_temporal: False
   fx_load_models: True  #loads models to extract features if not training
@@ -87,17 +88,18 @@ MODEL:  # for models created/trained in the run
   type: phase
   domain: temporal # spatial, temporal, full, classifier
 # spatial
-  spaceTransferLearning: fine-tune # fine-tune | fixed-fx
+  spaceTransferLearning: fixed-fx # fine-tune | fixed-fx
   spaceArch: resnet50
   spacePreweights: default # sfx = spatial feature extraction
   path_spaceModel: #C:/Users/DC/Documents/Programming/python/ucl/ML_SurgeNet/logs/LDSS/run_20241104-00/checkpoints/LDSS-20241104-00-fold6-0.837800.pth # if empty, uses new untrained one
 # temporal
-  timeArch: phatima # tecno | phatima
-  n_stages: 3
-  n_filters: 64  # number of convolution kernels per filter == number of channels
+  timeArch: tecno # tecno | phatima
+  n_stages: 2
+  n_filters: 32  # number of convolution kernels per filter == number of channels
   tf_filter: 3  # size in time (timeframe, # of frames)
   n_blocks: 2 # inside the stage
 # classification
+  classifierType: # space | time
   n_classes:   # normally gets from dataset itself 
 
 EVAL:  # Eval

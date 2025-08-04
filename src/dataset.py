@@ -806,73 +806,73 @@ class Cataloguer():
         print(f"    Batch contains {exampleBatch[0].shape[0]} clip(s), each with {clip_size} frames\n")
     return loader
 
-def _batch_multiClipFeats(self, dset, size_batch, clip_size, stride=None, train_idxs=None, valid_idxs=None, test_idxs=None):
-  assert clip_size > 0, "clip_size must be > 0 in multi-clip mode"
-  stride = stride or clip_size
-  assert os.path.exists(dset.path_spaceFeatures), f"No features at {dset.path_spaceFeatures}!"
+  def _batch_multiClipFeats(self, dset, size_batch, clip_size, stride=None, train_idxs=None, valid_idxs=None, test_idxs=None):
+    assert clip_size > 0, "clip_size must be > 0 in multi-clip mode"
+    stride = stride or clip_size
+    assert os.path.exists(dset.path_spaceFeatures), f"No features at {dset.path_spaceFeatures}!"
 
-  featuresDict = torch.load(dset.path_spaceFeatures, weights_only=False, map_location=self.DEVICE)
-  featureLayer = list(featuresDict[next(iter(featuresDict))].keys())[-1]
-  print(f"  [multiClip] Using feature layer: {featureLayer}\n")
+    featuresDict = torch.load(dset.path_spaceFeatures, weights_only=False, map_location=self.DEVICE)
+    featureLayer = list(featuresDict[next(iter(featuresDict))].keys())[-1]
+    print(f"  [multiClip] Using feature layer: {featureLayer}\n")
 
-  groupedIdxs, splitVidsInt = self.get_vidsIdxsAndSplits(dset, train_idxs, valid_idxs, test_idxs)
-  loader = [[], [], []]
+    groupedIdxs, splitVidsInt = self.get_vidsIdxsAndSplits(dset, train_idxs, valid_idxs, test_idxs)
+    loader = [[], [], []]
 
-  for split, vidsInt in splitVidsInt.items():
-    featsList, targetsList, idxsList = [], [], []
+    for split, vidsInt in splitVidsInt.items():
+      featsList, targetsList, idxsList = [], [], []
 
-    for vid in vidsInt:
-      frameIdxs = groupedIdxs[vid]
-      n_frames = len(frameIdxs)
-      if n_frames < clip_size:
-        continue  # skip short videos
+      for vid in vidsInt:
+        frameIdxs = groupedIdxs[vid]
+        n_frames = len(frameIdxs)
+        if n_frames < clip_size:
+          continue  # skip short videos
 
-      vidFeats = torch.stack([featuresDict[i][featureLayer] for i in frameIdxs]).squeeze(1)
-      vidLabels = dset.labels.iloc[frameIdxs]["frameLabels"].tolist()
-      vidTargets = dset._get_targets(vidLabels, dset.labelType.split('-')[0]).to(self.DEVICE)
-      vidIdxs = torch.tensor(frameIdxs, dtype=torch.int64, device=self.DEVICE)
+        vidFeats = torch.stack([featuresDict[i][featureLayer] for i in frameIdxs]).squeeze(1)
+        vidLabels = dset.labels.iloc[frameIdxs]["frameLabels"].tolist()
+        vidTargets = dset._get_targets(vidLabels, dset.labelType.split('-')[0]).to(self.DEVICE)
+        vidIdxs = torch.tensor(frameIdxs, dtype=torch.int64, device=self.DEVICE)
 
-      for start in range(0, n_frames - clip_size + 1, stride):
-        end = start + clip_size
-        featsList.append(vidFeats[start:end])
-        targetsList.append(vidTargets[start:end])
-        idxsList.append(vidIdxs[start:end])
+        for start in range(0, n_frames - clip_size + 1, stride):
+          end = start + clip_size
+          featsList.append(vidFeats[start:end])
+          targetsList.append(vidTargets[start:end])
+          idxsList.append(vidIdxs[start:end])
 
-    if not featsList:
-      loader[split] = None
-      continue
+      if not featsList:
+        loader[split] = None
+        continue
 
-    feats = torch.stack(featsList).cpu()
-    targets = torch.stack(targetsList).cpu()
-    idxs = torch.stack(idxsList).cpu()
-    dataset = TensorDataset(feats, targets, idxs)
-    loader[split] = DataLoader(dataset, batch_size=size_batch, num_workers=2, shuffle=True)
+      feats = torch.stack(featsList).cpu()
+      targets = torch.stack(targetsList).cpu()
+      idxs = torch.stack(idxsList).cpu()
+      dataset = TensorDataset(feats, targets, idxs)
+      loader[split] = DataLoader(dataset, batch_size=size_batch, num_workers=2, shuffle=True)
 
-  if loader[0]:
-    xb = next(iter(loader[0]))
-    print(f"\t[multiClip] Example batch:\n\t[features] {xb[0].shape} | [labels] {xb[1].shape} | [idxs] {xb[2].shape}")
-    print(f"\t{xb[0].shape[0]} clips × {clip_size} frames\n")
+    if loader[0]:
+      xb = next(iter(loader[0]))
+      print(f"\t[multiClip] Example batch:\n\t[features] {xb[0].shape} | [labels] {xb[1].shape} | [idxs] {xb[2].shape}")
+      print(f"\t{xb[0].shape[0]} clips × {clip_size} frames\n")
 
-  return loader
+    return loader
 
 
-def get_vidsIdxsAndSplits(self, dset, train_idxs=None, valid_idxs=None, test_idxs=None):
-  '''
-  Returns:
-    - groupedIdxs: dict {videoInt: [frameIdxs]} — all videos with their frame indices
-    - splitVidsInt: dict {0|1|2: set(videoIds)} — videoIds per split (0=train, 1=valid, 2=test)
-  '''
-  groupedIdxs = {}
-  splitVidsInt = {0: set(), 1: set(), 2: set()}
-  idxMap = {0: train_idxs, 1: valid_idxs, 2: test_idxs}
-  for split, idxs in idxMap.items():
-    if idxs is None or len(idxs) == 0:
-      continue
-    groups = dset._get_grouping(idxs)
-    for idx, videoInt in zip(idxs, groups):
-      groupedIdxs.setdefault(videoInt, []).append(idx)
-      splitVidsInt[split].add(videoInt)
-  return groupedIdxs, splitVidsInt
+  def get_vidsIdxsAndSplits(self, dset, train_idxs=None, valid_idxs=None, test_idxs=None):
+    '''
+    Returns:
+      - groupedIdxs: dict {videoInt: [frameIdxs]} — all videos with their frame indices
+      - splitVidsInt: dict {0|1|2: set(videoIds)} — videoIds per split (0=train, 1=valid, 2=test)
+    '''
+    groupedIdxs = {}
+    splitVidsInt = {0: set(), 1: set(), 2: set()}
+    idxMap = {0: train_idxs, 1: valid_idxs, 2: test_idxs}
+    for split, idxs in idxMap.items():
+      if idxs is None or len(idxs) == 0:
+        continue
+      groups = dset._get_grouping(idxs)
+      for idx, videoInt in zip(idxs, groups):
+        groupedIdxs.setdefault(videoInt, []).append(idx)
+        splitVidsInt[split].add(videoInt)
+    return groupedIdxs, splitVidsInt
 
 class Showcaser:
   def __init__(self):
