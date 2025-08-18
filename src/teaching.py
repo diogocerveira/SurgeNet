@@ -206,9 +206,8 @@ class Trainer():
       optimizer.zero_grad() # reset the parameter gradients before backward step
       outputs = model(inputs) # forward pass
       # print(inputs[:5], targets[:5], outputs[:5])
-      # print("outputs: ", outputs.shape, "\ttargets: ", targets.shape, '\n')
-      if model.inputType.split('-')[1] == "clipped":
-        outputs = outputs.reshape(-1, outputs.shape[-1])
+      print("outputs: ", outputs.shape, "\ttargets: ", targets.shape, '\n')
+      if model.inputType.split('-')[1] == "clip":
         if labelType.split('-')[0] == "single":
           targets = targets.reshape(-1)
           mask = targets != -1
@@ -217,16 +216,24 @@ class Trainer():
           targets = targets.reshape(-1, targets.shape[-1])
           mask = targets[:, 1] != -1  # assuming class=-1 means padding
           assert isinstance(self.criterion, torch.nn.BCEWithLogitsLoss), "Use BCEWithLogitsLoss for multi-label tasks"
-        # print("outputs: ", outputs.shape, "\ttargets: ", targets.shape, '\n')
-        outputs = outputs[mask]
         targets = targets[mask]
-
-      # print("outputs: ", outputs.shape, "\ttargets: ", targets.shape, '\n')
-      # print("outputs: ", outputs[:5], "\ttargets: ", targets[:5], '\n')  
-      loss = self.criterion(outputs, targets) # calculate loss
+        if model.domain == "temporal" and model.arch == "tecno":
+          outputs = [
+            outputs[s].reshape(-1, outputs.shape[-1])[mask]  # same as operation below
+            for s in range(outputs.shape[0])
+          ]  # reshape to (B*T, C) for each stage
+        else:
+          outputs = outputs.reshape(-1, outputs.shape[-1])[mask]
+    
+      if model.domain == "temporal" and model.arch == "tecno":
+        loss = sum(self.criterion(stageOut, targets) for stageOut in outputs)
+        outputs = outputs[-1]  # use the last stage outputs for metric calculation
+      else:
+        loss = self.criterion(outputs, targets)
       loss.backward() # backward pass
       optimizer.step()    # a single optimization step
-
+      print("outputs: ", outputs.shape, "\ttargets: ", targets.shape, '\n')
+      # print("outputs: ", outputs[:5], "\ttargets: ", targets[:5], '\n')
       if labelType.split('-')[0] == "single":
         outputs = torch.argmax(outputs, dim=1)  # get labels with max prediction values
       else:
@@ -260,8 +267,7 @@ class Validater():
         outputs = model(inputs)
         # print(inputs[:5], targets[:5], outputs[:5])
         # print("outputs: ", outputs.shape, "\ttargets: ", targets.shape, '\n')
-        if model.inputType.split('-')[1] == "clipped":
-          outputs = outputs.reshape(-1, outputs.shape[-1])
+        if model.inputType.split('-')[1] == "clip":
           if labelType.split('-')[0] == "single":
             targets = targets.reshape(-1)
             mask = targets != -1
@@ -270,13 +276,21 @@ class Validater():
             targets = targets.reshape(-1, targets.shape[-1])
             mask = targets[:, 1] != -1  # assuming class=-1 means padding
             assert isinstance(self.criterion, torch.nn.BCEWithLogitsLoss), "Use BCEWithLogitsLoss for multi-label tasks"
-          # print("outputs: ", outputs.shape, "\ttargets: ", targets.shape, '\n')
-          outputs = outputs[mask]
           targets = targets[mask]
+          if model.domain == "temporal" and model.arch == "tecno":
+            outputs = [
+              outputs[s].reshape(-1, outputs.shape[-1])[mask]  # same as operation below
+              for s in range(outputs.shape[0])
+            ]  # reshape to (B*T, C) for each stage
+          else:
+            outputs = outputs.reshape(-1, outputs.shape[-1])[mask]
 
         # print("outputs: ", outputs.shape, "\ttargets: ", targets.shape, '\n')
-        loss = self.criterion(outputs, targets)
-        
+        if model.domain == "temporal" and model.arch == "tecno":
+          loss = sum(self.criterion(stageOut, targets) for stageOut in outputs)
+          outputs = outputs[-1]  # use the last stage outputs for metric calculation
+        else:
+          loss = self.criterion(outputs, targets)
         runningLoss += loss.item() * targets.numel() # accumulate loss by batch size (safer, though most batches are same size)
         totalSamples += targets.numel()
         if labelType.split('-')[0] == "single":
@@ -311,7 +325,9 @@ class Tester():
         inputs, targets, sampleIds = data[0].to(self.DEVICE), data[1].to(self.DEVICE), data[2].to(self.DEVICE)
         outputs = model(inputs)
         # print(inputs[:5], '\n', targets[:5], '\n', outputs[:5])
-        if model.inputType.split('-')[1] == "clipped":
+        if model.domain == "temporal" and model.arch == "tecno":
+          outputs = outputs[-1]  # use the last stage outputs for metric calculation
+        if model.inputType.split('-')[1] == "clip":
           outputs = outputs.reshape(-1, outputs.shape[-1])
           if labelType.split('-')[0] == "single":
             targets = targets.reshape(-1)
