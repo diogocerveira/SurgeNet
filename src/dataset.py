@@ -42,7 +42,7 @@ class SampledVideosDataset(Dataset):
     self.path_samples = path_samples
     self.datatype = "png"
     self.path_labels = path_labels
-    self.labels = self._get_labels(path_labels) # frameId, videoInt, frame_label
+    self.labels = self._get_labels(path_labels) # frameId, videoId, frame_label
     # print(self.labels.index)
     self.transform = transform
     # NOT WORKING
@@ -52,8 +52,8 @@ class SampledVideosDataset(Dataset):
     self.path_spaceFeatures = None
     self.path_timeFeatures = None
 
-    self.videoNames = self.labels["videoInt"].unique()  # Extract unique video identifiers
-    self.videoToGroup = {videoInt: idx for idx, videoInt in enumerate(self.videoNames)}
+    self.videoNames = self.labels["videoId"].unique()  # Extract unique video identifiers
+    self.videoToGroup = {videoId: idx for idx, videoId in enumerate(self.videoNames)}
     
     self.labelToClassMap = self.get_labelToClassMap(self.labels)
     self.n_classes = len(self.labelToClassMap)
@@ -79,7 +79,7 @@ class SampledVideosDataset(Dataset):
   
   def __getitem__(self, idx):
     """Retrieve a single item from the dataset based on an index"""
-    path_img = os.path.join(self.path_samples, self.labels.loc[idx, "videoInt"],
+    path_img = os.path.join(self.path_samples, self.labels.loc[idx, "videoId"],
       self.labels.iloc[idx, "frameId"] + '.' + self.datatype)
     # Read images and labels
     img = torch.tensor(self.transform(cv2.cvtColor(cv2.imread(path_img), cv2.COLOR_BGR2RGB)))
@@ -98,7 +98,7 @@ class SampledVideosDataset(Dataset):
       idxs = idxs.tolist()
     # print(idxs[:4])
     # each idx is a int tensor
-    path_imgs = [os.path.join(self.path_samples, self.labels.iloc[i]["videoInt"],
+    path_imgs = [os.path.join(self.path_samples, self.labels.iloc[i]["videoId"],
         self.labels.iloc[i]["frameId"] + '.' + self.datatype) for i in idxs]
     # Read images and labels
     # imgs = [iio.imread(p) for p in path_imgs]
@@ -170,17 +170,23 @@ class SampledVideosDataset(Dataset):
 
   def _get_labels(self, path_labels):
     try:
-      # print(path_labels, "\n\n", flush=True)
       labels = pd.read_csv(path_labels)
-      # print(df.columns)
-      # labels.reset_index(drop=True, inplace=True) # Create a new integer index and drop the old index
-      # (Optional) Create a new column for videoInt based on the frame column
-      labels['videoInt'] = labels['frameId'].str.split('_', expand=True)[0]
-      # print(df.columns)
-      # self._write_labels_csv(df, "deg.csv")
+
+      labels['videoId'] = labels['frameId'].str.split('_', expand=True)[0]
+      labels['timestamp'] = labels['frameId'].str.split('_', expand=True)[1].astype(int)
+
+      # Debug: Print max timestamp per video
+      # max_timestamps = labels.groupby('videoId')['timestamp'].max()
+      # print("[DEBUG] Max timestamp per videoId:\n", max_timestamps, "\n", flush=True)
+      # Normalize timestamp
+      labels['normalizedTimestamp'] = labels.groupby('videoId')['timestamp'].transform(lambda x: x / x.max())
+      # Debug: Show one example comparison
+      # print("[DEBUG] Example (raw vs normalized):\n", labels[['videoId', 'timestamp', 'normalizedTimestamp']].head(), "\n", flush=True)
       return labels
-    except:
-      raise ValueError("\nInvalid path_labels/labels.csv file (might suggest inexistent or a problematic dataset)")
+    except Exception as e:
+      print(f"[ERROR] Failed during label processing: {e}", flush=True)
+      raise
+
   def _update_labels(self, path_labels):
     self.labels = self._get_labels(path_labels)
   
@@ -193,13 +199,13 @@ class SampledVideosDataset(Dataset):
         idx = slice(None)  # This is equivalent to selecting all rows
     elif isinstance(idx, tuple):
         idx = slice(*idx)  # Convert tuple to slice
-    return [self.videoToGroup[videoInt] for videoInt in self.labels.iloc[idx]["videoInt"]]
+    return [self.videoToGroup[videoId] for videoId in self.labels.iloc[idx]["videoId"]]
   
   def _get_idxToVideo(self, listOfIdxs):
     ''' Extract video IDs (check for overlap in sets) - specific to each labels.csv implementation
         List of idxs [[tr_i, va_i, te_i], ...] --> List of videos [[vidsx, vidsy, vidsz], ...]
     '''
-    # Load the CSV and extract videoInt
+    # Load the CSV and extract videoId
     # AFFECTed THE ORIGINAL
     # df = self.labels
     # df.drop(["frameId", "frameLabels"], axis=1, inplace=True)  # Optional: Drop unnecessary columns if not needed
@@ -209,7 +215,7 @@ class SampledVideosDataset(Dataset):
     for idxs in listOfIdxs: # for each fold indexs
       vidsList = []
       for i, split in enumerate(idxs):  # for each split  (train, valid, test)
-        vidsInSplit = self.labels.iloc[split]["videoInt"].unique()  # Get unique videoNames for this subset
+        vidsInSplit = self.labels.iloc[split]["videoId"].unique()  # Get unique videoNames for this subset
         vidsInSplit = [video[:4] for video in vidsInSplit]
         # print(f"split {i}\n", vidsInSplit, '\n')
         vidsList.append(vidsInSplit)
@@ -293,29 +299,29 @@ class Cataloguer():
     print(f"\n{os.path.splitext(path_videos)[0]} for {len(availableVideos)} videos!")
     print(f"Sample rate of {samplerate} fps")
     skip = 0
-    for videoInt in availableVideos:
+    for videoId in availableVideos:
       if skip > 0:
         skip -= 1
-        print(videoInt)
+        print(videoId)
         continue
-      #videoInt = os.path.splitext(videoInt)[0]  # remove extension
-      path_video = os.path.join(path_videos, videoInt)
+      #videoId = os.path.splitext(videoId)[0]  # remove extension
+      path_video = os.path.join(path_videos, videoId)
       #metadata = iio.immeta(path_video, plugin="pyav")  
       #fps = metadata["fps"]
       #nframes = int(metadata["duration"] * fps)
-      #print(f"\niio - Sampling {videoInt} ({nframes} frames at {fps} fps), period of {int(fps / samplerate)}")
+      #print(f"\niio - Sampling {videoId} ({nframes} frames at {fps} fps), period of {int(fps / samplerate)}")
       
       # print(f"FPS: {fps}, Nframes: {nframes}, Period: {period}")
       if filter_annotated:
-        path_annot = os.path.join(path_annots, f"{os.path.splitext(videoInt)[0]}.json")
+        path_annot = os.path.join(path_annots, f"{os.path.splitext(videoId)[0]}.json")
         if not os.path.exists(path_annot):
           continue
       try:
-        videoInt = videoInt[:4]  # keep only 1st 4 chars of the video name
+        videoId = videoId[:4]  # keep only 1st 4 chars of the video name
       except:
-        videoInt = os.path.splitext(videoInt)[0]  # if smaller name only remove ext
-      shutil.copy(path_annot, os.path.join(self.path_annots, f"{videoInt}.json"))
-      path_frames = os.path.join(path_to, videoInt)
+        videoId = os.path.splitext(videoId)[0]  # if smaller name only remove ext
+      shutil.copy(path_annot, os.path.join(self.path_annots, f"{videoId}.json"))
+      path_frames = os.path.join(path_to, videoId)
       os.makedirs(path_frames, exist_ok=True)
       
       start_time = time.time()
@@ -323,7 +329,7 @@ class Cataloguer():
       fps = cap.get(cv2.CAP_PROP_FPS)
       nframes = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
       period = round(fps / samplerate)
-      print(f"\ncv2 - Sampling {videoInt} ({nframes} frames at {fps} fps), period of {period} frames")
+      print(f"\ncv2 - Sampling {videoId} ({nframes} frames at {fps} fps), period of {period} frames")
       # Get the first frame to determine the size
       ret, firstFrame = cap.read()
       if ret:
@@ -331,12 +337,12 @@ class Cataloguer():
         height, width = firstFrame.shape[:2]  # Get the original dimensions of the frame
         newWidth = int(width * factor)
         newHeight = int(height * factor)
-        print(f"Pre-resizing video {videoInt} to {newWidth}x{newHeight} (factor of {factor})")
+        print(f"Pre-resizing video {videoId} to {newWidth}x{newHeight} (factor of {factor})")
       for i in range(0, nframes, period):
         cap.set(cv2.CAP_PROP_POS_FRAMES, i) # Set the current frame position
         ret, frameImg = cap.read()
         if ret:
-          frameId = f"{videoInt}_{int(i / fps * 1000)}"  # remember basename is the file name itself / converting index to its timestamp (ms)
+          frameId = f"{videoId}_{int(i / fps * 1000)}"  # remember basename is the file name itself / converting index to its timestamp (ms)
           path_frame = os.path.join(path_frames, f"{frameId}.{sampleFormat}")
           resizedFrameImg = cv2.resize(frameImg, (newWidth, newHeight))
           cv2.imwrite(path_frame, resizedFrameImg)
@@ -410,9 +416,9 @@ class Cataloguer():
     '''
     totalFrameIds = []
     totalFrameLabels = []
-    for videoInt in os.listdir(path_from): # sampled videos (folder of frames)
-      path_annot = os.path.join(self.path_annots, f"{videoInt}.json")
-      path_video = os.path.join(path_from, videoInt)
+    for videoId in os.listdir(path_from): # sampled videos (folder of frames)
+      path_annot = os.path.join(self.path_annots, f"{videoId}.json")
+      path_video = os.path.join(path_from, videoId)
       if os.path.exists(path_annot):  # if video is annotated (to make a better check)
         phaseDelimiters = self._get_phaseDelimiters(path_annot)
 
@@ -430,11 +436,11 @@ class Cataloguer():
         # print(frameLabels)
         totalFrameLabels.extend(frameLabels)
         # print(len(totalFrameClasses), len(totalFrameIds))
-      elif videoInt.startswith(('.', '_')):  # hidden file are disregarded
-        print(f"   Skipping hidden file {videoInt}\n")
+      elif videoId.startswith(('.', '_')):  # hidden file are disregarded
+        print(f"   Skipping hidden file {videoId}\n")
         continue
       else:
-        print(f"   Warning: Skipping annotation for {videoInt} ({path_annot} not found)")
+        print(f"   Warning: Skipping annotation for {videoId} ({path_annot} not found)")
 
     # Prepare CSV file
     with open(path_to, 'w', newline='') as file_csv:  # newline='' maximizes compatibility with other os
@@ -443,7 +449,7 @@ class Cataloguer():
       if os.stat(path_to).st_size == 0: # Check if the file is empty to write the header
         writer.writeheader()
       # Batch write frames and annotations
-      sortedZip = sorted( # sort by videoInt and then timestamp
+      sortedZip = sorted( # sort by videoId and then timestamp
           zip(totalFrameIds, totalFrameLabels),
           key=lambda x: (x[0].split('_')[0], int(x[0].split('_')[1]))
           )  # sort by frameId
@@ -548,10 +554,10 @@ class Cataloguer():
       # print("label(s): ", phaseDelimiters[i][1], '\n')
     return framesLabel
   
-  def _get_preprocessing(self, preprocessingType):
+  def _get_preprocessing(self, preprocessingType, normValues=None):
     ''' Get torch group of tranforms directly applied to torch Dataset object'''
+    normValues = ((0.416, 0.270, 0.271), (0.196, 0.157, 0.156))
     if preprocessingType == "basic":
-      normValues = ((0.416, 0.270, 0.271), (0.196, 0.157, 0.156))
       transform = transforms.Compose([
         transforms.ToImage(), # only for v2
         transforms.Resize((224, 224), antialias=True),
@@ -566,15 +572,19 @@ class Cataloguer():
         transforms.Normalize(mean=[0.485, 0.456, 0.406], # ImageNet channel stats
                             std=[0.229, 0.224, 0.225])
       ])
-    elif preprocessingType == "aug":
+    elif preprocessingType == "augmentation":
       transform = transforms.Compose([
         # from 0-255 Image/numpy.ndarray to 0.0-1.0 torch.FloatTensor
-        transforms.Resize((224, 224), antialias=True),
         transforms.ToImage(), # only for v2
+        transforms.Resize((224, 224), antialias=True),
         transforms.ToDtype(torch.float32, scale=True),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),   # (mean) (std) for each channel New = (Prev - mean) / stf
+        transforms.Normalize(normValues[0], normValues[1]),
         transforms.RandomRotation((-90, 90)),
-        transforms.ColorJitter(10, 2)
+        # transforms.RandomHorizontalFlip(p=0.5),  # 50% chance to flip horizontally
+        # transforms.RandomVerticalFlip(p=0.5),    # 50% chance to flip vertically
+        transforms.RandomResizedCrop((224, 224), scale=(0.8, 1.0), ratio=(0.75, 1.333)),
+        tranforms.RandomCrop((224, 224), padding=4, padding_mode='reflect'),  # pad and crop to 224x224
+        # transforms.ColorJitter(10, 2)
       ])
     elif not preprocessingType:
       # make identity transform
@@ -859,7 +869,7 @@ class Cataloguer():
   def get_vidsIdxsAndSplits(self, dset, train_idxs=None, valid_idxs=None, test_idxs=None):
     '''
     Returns:
-      - groupedIdxs: dict {videoInt: [frameIdxs]} — all videos with their frame indices
+      - groupedIdxs: dict {videoId: [frameIdxs]} — all videos with their frame indices
       - splitVidsInt: dict {0|1|2: set(videoIds)} — videoIds per split (0=train, 1=valid, 2=test)
     '''
     groupedIdxs = {}
@@ -869,9 +879,9 @@ class Cataloguer():
       if idxs is None or len(idxs) == 0:
         continue
       groups = dset._get_grouping(idxs)
-      for idx, videoInt in zip(idxs, groups):
-        groupedIdxs.setdefault(videoInt, []).append(idx)
-        splitVidsInt[split].add(videoInt)
+      for idx, videoId in zip(idxs, groups):
+        groupedIdxs.setdefault(videoId, []).append(idx)
+        splitVidsInt[split].add(videoId)
     return groupedIdxs, splitVidsInt
 
 class Showcaser:

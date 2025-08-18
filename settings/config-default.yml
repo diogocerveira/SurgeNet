@@ -28,6 +28,7 @@ DATA:
     # - Fixation of the implant to the vault
     # - Fixation of the implant to the promontory
     # - Reperitonealisation
+  durationValues: True
   preprocessing: basic  # basic, resnet, augmentation
   multiClips: False
   multiClipStride: 3  # stride for multi-clip mode (e.g. 1, 2, 3)
@@ -78,7 +79,7 @@ PROCESS:  # Process
   path_bundle: True
   export_modedPreds: True  # if apply-mode-filter == True
   
-  fx_spatial: True
+  fx_spatial: False
   featureLayer:
   - flatten
   - layer4.2.relu_2
@@ -88,7 +89,7 @@ PROCESS:  # Process
   
 MODEL:  # for models created/trained in the run
   type: phase
-  domain: temporal # spatial, temporal, full, classifier
+  domain: spatial # spatial, temporal, full, classifier
 # spatial
   spaceTransferLearning: fine-tune # fine-tune | feat-xtract
   spaceArch: resnet50

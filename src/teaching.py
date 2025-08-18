@@ -64,8 +64,8 @@ class Teacher():
 
     for epoch in range(startEpoch, n_epochs):
       print(f"-------------- Epoch {epoch + 1} --------------")
-      train_loss, train_score = self.trainer.train(model, trainloader, self.labelType, optimizer, epoch)
-      valid_loss, valid_score = self.validater.validate(model, validloader, self.labelType, epoch)
+      train_loss, train_score = self.trainer.train(model, trainloader, self.labelType, labels, optimizer, epoch)
+      valid_loss, valid_score = self.validater.validate(model, validloader, self.labelType, labels, epoch)
 
       self.writer.add_scalar("Loss/train", train_loss, epoch + 1)
       self.writer.add_scalar("Loss/valid", valid_loss, epoch + 1)
@@ -169,12 +169,12 @@ class Trainer():
     self.DEVICE = DEVICE
   
   def _get_optimizer(self, optimizerId, lr, momentum):
-  if optimizerId == "adam":
-    return optim.Adam(lr=lr)
-  elif optimizerId == "sgd":
-    return optim.SGD(lr=lr, momentum=momentum)
-  else:
-    raise ValueError("Invalid optimizer chosen (adam, sgd)")
+    if optimizerId == "adam":
+      return optim.Adam(lr=lr)
+    elif optimizerId == "sgd":
+      return optim.SGD(lr=lr, momentum=momentum)
+    else:
+      raise ValueError("Invalid optimizer chosen (adam, sgd)")
   def _get_scheduler(self, schedulerId, stepSize, gamma):
     if schedulerId == "step":
       scheduler =  optim.lr_scheduler.StepLR(optimizer, step_size=stepSize, gamma=gamma)
@@ -200,10 +200,15 @@ class Trainer():
     runningLoss, totalSamples = 0.0, 0
     model.train().to(self.DEVICE)
     for batch, data in enumerate(trainloader, 0):   # start at batch 0
-      inputs, targets = data[0].to(self.DEVICE), data[1].to(self.DEVICE) # data is a list of [inputs, labels]
+      inputs, targets, idxs = data[0].to(self.DEVICE), data[1].to(self.DEVICE), data[2].to(self.DEVICE) # data is a list of [inputs, labels]
       # print("inputs: ", inputs.shape, "\ttargets: ", targets.shape, '\n')
       # print(targets[:5])  # show a few samples
       optimizer.zero_grad() # reset the parameter gradients before backward step
+      if model.domain == "spatdur":
+        durationValues = torch.tensor(labels.loc[idxs.numpy(), 'normalizedTimestamp'].values,
+            dtype=torch.float32).to(self.DEVICE)
+        inputs = (inputs, durationValues)  # ← tuple of tensors
+
       outputs = model(inputs) # forward pass
       # print(inputs[:5], targets[:5], outputs[:5])
       print("outputs: ", outputs.shape, "\ttargets: ", targets.shape, '\n')
@@ -254,7 +259,7 @@ class Validater():
     self.criterion = criterion
     self.DEVICE = DEVICE
 
-  def validate(self, model, validloader, labelType, epoch):
+  def validate(self, model, validloader, labelType, labels, epoch):
     ''' In: model, data, criterion (loss function)
         Out: valid_loss, valid_score
     '''
@@ -263,7 +268,11 @@ class Validater():
     model.eval()
     with torch.no_grad(): # don't calculate gradients (for learning only)
       for batch, data in enumerate(validloader, 0):
-        inputs, targets = data[0].to(self.DEVICE), data[1].to(self.DEVICE)
+        inputs, targets, idxs = data[0].to(self.DEVICE), data[1].to(self.DEVICE), data[2].to(self.DEVICE)
+        if model.domain == "spatdur":
+          durationValues = torch.tensor(labels.loc[idxs.numpy(), 'normalizedTimestamp'].values,
+              dtype=torch.float32).to(self.DEVICE)
+          inputs = (inputs, durationValues)  # ← tuple of tensors
         outputs = model(inputs)
         # print(inputs[:5], targets[:5], outputs[:5])
         # print("outputs: ", outputs.shape, "\ttargets: ", targets.shape, '\n')
@@ -312,7 +321,7 @@ class Tester():
     self.PHASES = PHASES
     self.labelToClassMap = labelToClassMap  # map from label to class index
   
-  def test(self, model, testloader, labelType, export_bundle, path_export=None):
+  def test(self, model, testloader, labelType, labels, export_bundle, path_export=None):
     ''' Test the model - return Preds, labels and sampleIds
     '''
     self.test_metrics.reset()
@@ -322,7 +331,11 @@ class Tester():
     model.eval().to(self.DEVICE); print("\n\tTesting...")
     with torch.no_grad():
       for batch, data in enumerate(testloader):
-        inputs, targets, sampleIds = data[0].to(self.DEVICE), data[1].to(self.DEVICE), data[2].to(self.DEVICE)
+        inputs, targets, idxs = data[0].to(self.DEVICE), data[1].to(self.DEVICE), data[2].to(self.DEVICE)
+        if model.domain == "spatdur":
+          durationValues = torch.tensor(labels.loc[idxs.numpy(), 'normalizedTimestamp'].values,
+              dtype=torch.float32).to(self.DEVICE)
+          inputs = (inputs, durationValues)  # ← tuple of tensors
         outputs = model(inputs)
         # print(inputs[:5], '\n', targets[:5], '\n', outputs[:5])
         if model.domain == "temporal" and model.arch == "tecno":
@@ -335,11 +348,11 @@ class Tester():
           else:  # multi
             targets = targets.reshape(-1, targets.shape[-1])
             mask = targets[:, 1] != -1  # assuming class=-1 means padding
-          sampleIds = sampleIds.reshape(-1)
+          idxs = idxs.reshape(-1)
           # print("outputs: ", outputs.shape, "\ttargets: ", targets.shape, '\n')
           outputs = outputs[mask]
           targets = targets[mask]
-          sampleIds = sampleIds[mask]
+          idxs = idxs[mask]
           # print("outputs: ", outputs.shape, "\ttargets: ", targets.shape, '\n')
 
         # print("outputs.shape", outputs.shape)
@@ -355,7 +368,7 @@ class Tester():
 
         predsList.append(preds)
         targetsList.append(targets)
-        sampleIdsList.append(sampleIds)
+        sampleIdsList.append(idxs)
         # print("pred: ", outputs[:5], '\n', "target: ", targets[:5])
         # print("outputs.shape", outputs.shape)
         # print("targets.min()", targets.min().item(), "targets.max()", targets.max().item())

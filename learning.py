@@ -77,7 +77,7 @@ def learning(**the):
 
     # TRAIN
     if "train" in the["actions"]:
-      trainedModel, valid_maxScore, betterState = Tch.teach(model, trainloader, validloader, Csr.TRAIN["HYPER"]["n_epochs"], Csr.path_states, Csr.TRAIN["path_resumeModel"])
+      trainedModel, valid_maxScore, betterState = Tch.teach(model, trainloader, validloader, Csr.TRAIN["HYPER"]["n_epochs"], Csr.path_states, dset.labels, Csr.TRAIN["path_resumeModel"])
       if Csr.TRAIN["save_betterState"]:
         trainedModel.id = f"{trainedModel.id}-{valid_maxScore:.2f}" # update model id with the best validation score
         torch.save(betterState, os.path.join(Csr.path_states, trainedModel.id))
@@ -148,7 +148,7 @@ def learning(**the):
           break
         t1 = time.time()
         path_export = os.path.join(Csr.path_predictions, f"preds_{model.id.split('_')[1]}")
-        test_bundle  = Tch.tester.test(model, testloader, dset.labelType, the["EVAL"]["export_testBundle"], path_export=path_export)
+        test_bundle  = Tch.tester.test(model, testloader, dset.labelType, dset.labels, the["EVAL"]["export_testBundle"], path_export=path_export)
         t2 = time.time()
         print(f"Testing took {t2 - t1:.2f} seconds")
         # print(test_bundle.head())
@@ -174,7 +174,7 @@ def learning(**the):
           except Exception as e:
             print(f"No predictions (test_bundle) provided for processing: {e}")
             continue
-      
+
       Tch.evaluate(test_bundle, the["EVAL"]["eval_tests"], model.id, Csr)
 
     try: # not defined if only processing

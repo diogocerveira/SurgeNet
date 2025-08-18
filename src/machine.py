@@ -22,29 +22,34 @@ class Phasinator(nn.Module):
     
     # the modular approach allows to have modules with no conditional on the forward pass
     if modelDomain == "spatial":
-      classifier = nn.Linear(spaceinator.featureSize, spaceinator.n_classes)
+      classifier = Classifier(spaceinator.featureSize, spaceinator.n_classes)
+      inators = [spaceinator, classifier]
+      inputType = "images-frame"
+      arch = spaceinator.arch
+    elif modelDomain == "spatdur":
+      classifier = Classifier(spaceinator.featureSize + 1, spaceinator.n_classes, add_durationValues=True)
       inators = [spaceinator, classifier]
       inputType = "images-frame"
       arch = spaceinator.arch
     elif modelDomain == "temporal":
       if timeinator.arch == "phatima":
-        classifier = nn.Linear(timeinator.featureSize, timeinator.n_classes)
+        classifier = Classifier(timeinator.featureSize, timeinator.n_classes)
         inators = [timeinator, classifier]
       elif timeinator.arch == "tecno":
         inators = [timeinator]
       inputType = "fmaps-clip"
       arch = timeinator.arch
     elif modelDomain == "full":
-      classifier = nn.Linear(timeinator.featureSize, timeinator.n_classes)
+      classifier = Classifier(timeinator.featureSize, timeinator.n_classes)
       inators = [spaceinator, timeinator, classifier]
       inputType = "images-frame"
       arch = "full"
     elif modelDomain == "classifier-space":
-      inators = [nn.Linear(spaceinator.featureSize, spaceinator.n_classes)]
+      inators = [Classifier(spaceinator.featureSize, spaceinator.n_classes)]
       inputType = "fmaps-frame"
       arch = "linear"
     elif modelDomain == "classifier-time":
-      inators = [nn.Linear(timeinator.featureSize, timeinator.n_classes)]
+      inators = [Classifier(timeinator.featureSize, timeinator.n_classes)]
       inputType = "fmaps-clip"
       arch = "linear"
     else:
@@ -57,6 +62,13 @@ class Phasinator(nn.Module):
 
   def forward(self, x_batch):
     # print("Input shape: ", x_batch.shape)
+    # print(f"[DEBUG Phasinator] input type: {type(x_batch)}")
+    # if isinstance(x_batch, tuple):
+    #   print(f"[DEBUG Phasinator] tuple lengths: {len(x_batch)}")
+    #   print(f"[DEBUG Phasinator] first element shape: {x_batch[0].shape}")
+    #   print(f"[DEBUG Phasinator] second element shape: {x_batch[1].shape}")
+    # else:
+    #   print(f"[DEBUG Phasinator] input shape: {x_batch.shape}")
     x_batch = self.inators(x_batch)
     # print("Output shape: ", x_batch.shape)
     return x_batch
@@ -75,7 +87,7 @@ class Spaceinator(nn.Module):
     self.model = self._get_model(self.arch, preweights, transferMode, MODEL["path_spaceModel"])  # to implement my own in model.py 
     self.featureSize = self.model.fc.in_features
     self.featureNode = fxs.get_graph_node_names(self.model)[0][-2] # -2 is the flatten node (virtual layer)
-
+    self.neuron = nn.Linear(1, 1)
     if self.domain == "temporal" and MODEL["path_spaceModel"]:
       self.exportedFeatures = torch.load(MODEL["path_spaceModel"], weights_only=False, map_location="cpu")
     
@@ -83,9 +95,21 @@ class Spaceinator(nn.Module):
     # print(fxs.get_graph_node_names(self.model)[0])
     
   def forward(self, x):
-    x = self.model(x)
-    # print("After Spaceinator Shape: ", x.shape)
+    if self.domain == "spatdur":
+      x, durationValues = x  # Unpack: x → [B, C, H, W], durationValues → [B]
+      # print(f"[DEBUG] Duration values shape before unsqueeze: {durationValues.shape}", flush=True)
+    # print(f"Spaceinator input shape: {x.shape}", flush=True)
+
+    x = self.model(x)  # → [B, 2048]
+    # print("spaceinator output shape: ", x.shape)
+    # print(f"[DEBUG] Feature map after model: {x.shape}", flush=True)
+    if self.domain == "spatdur":      # Add duration as new feature
+      x = (x, durationValues)
+      # print(f"[DEBUG] Concatenated features + duration: {x.shape}", flush=True)
+      
     return x
+
+
   
   def _get_model(self, arch, preweights, transferMode, path_model):
     # Choose model architecture - backbones
@@ -180,6 +204,7 @@ class Spaceinator(nn.Module):
   @staticmethod
   def get_defaultDict(): # torch.save() can't pickle whatever if nested defaultdict uses lambda (dedicated function instead) 
     return defaultdict(None)
+
 
 class Timeinator(nn.Module):
   ''' 1D Convolutional network object, able to be trained for feature extraction,
@@ -378,11 +403,21 @@ class _ProjectionResBlock(nn.Module):
     return out + x
 
 class Classifier(nn.Module):
-  def __init__(self, FEATURE_SIZE, N_CLASSES):
+  def __init__(self, FEATURE_SIZE, N_CLASSES, add_durationValues=False):
     super().__init__()
-    self.fc = nn.Linear(FEATURE_SIZE, N_CLASSES) # 2048 for resnet50
-    self.softmax = nn.Softmax(dim=1) # dim 0 is batch position and dim 1 is the logits
-    self.model = nn.Sequential(self.fc, self.softmax)
-
+    self.add_durationValues = add_durationValues
+    self.linear = nn.Linear(FEATURE_SIZE, N_CLASSES)
+    self.mlp = nn.Sequential( # 5 positive phases
+        nn.Linear(1, 5),
+        nn.ReLU(),
+        nn.Linear(5, 1)
+      )
   def forward(self, x):
-    return self.model(x)
+    if self.add_durationValues:
+      x, durationValues = x  # Unpack: x → [B, C, H, W], durationValues → [B]
+      # print("x.shape: ", x.shape, "durationValues.shape: ", durationValues.shape)
+      durationValues = self.mlp(durationValues.unsqueeze(1))  # [B] → [B, 1]
+      # print("durationValues.shape: ", durationValues.shape)
+      x = torch.cat((x, durationValues), dim=1)
+    x = self.linear(x)  # → [B, N_CLASSES]
+    return x
