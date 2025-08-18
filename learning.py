@@ -70,7 +70,7 @@ def learning(**the):
     model = machine.Phasinator(the["MODEL"]["domain"], spaceinator, timeinator, Csr.id, fold + 1)
 
     dset.path_spaceFeatures, featuresId = teaching.get_path_exportedfeatures(Csr.path_exportedSpaceFeatures, f"spacefmaps_f{fold + 1}")
-    trainloader, validloader, testloader = Ctl.batch(dset, model.inputType, Csr.TRAIN["HYPER"], train_idxs=train_idxs, valid_idxs=valid_idxs, test_idxs=test_idxs)
+    trainloader, validloader, testloader = Ctl.batch(dset, model.inputType, Csr.TRAIN["HYPER"], Csr.DATA["multiClips"], Csr.DATA["multiClipStride"], train_idxs=train_idxs, valid_idxs=valid_idxs, test_idxs=test_idxs)
 
     if "train" in the["actions"] or "eval" in the["actions"]:
       Tch.writer = SummaryWriter(log_dir=os.path.join(Csr.path_events, model.id.split('_')[1])) # object for logging stats
@@ -189,7 +189,8 @@ def learning(**the):
 
 if __name__ == "__main__":
   # Load default parameters from config.yml
-  with open(os.path.join("settings", "config-default.yml"), "r") as file:
+  configId = "config-default.yml"
+  with open(os.path.join("settings", configId), "r") as file:
     config = yaml.safe_load(file)
   # Set up argparse fir CLASSROOMtime overriding
   parser = argparse.ArgumentParser(description="Override config parameters at CLASSROOMtime")

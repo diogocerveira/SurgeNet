@@ -24,28 +24,28 @@ class Phasinator(nn.Module):
     if modelDomain == "spatial":
       classifier = nn.Linear(spaceinator.featureSize, spaceinator.n_classes)
       inators = [spaceinator, classifier]
-      inputType = "images-framed"
+      inputType = "images-frame"
     elif modelDomain == "temporal":
       classifier = nn.Linear(timeinator.featureSize, timeinator.n_classes)
       inators = [timeinator, classifier]
-      inputType = "fmaps-clipped"
+      inputType = "fmaps-clip"
     elif modelDomain == "temporal-frames":
       classifier = nn.Linear(timeinator.featureSize, timeinator.n_classes)
       inators = [timeinator, classifier]
-      inputType = "fmaps-clipped"
+      inputType = "fmaps-clip"
     elif modelDomain == "tecno-like":
       inators = [timeinator]
-      inputType = "fmaps-clipped"
+      inputType = "fmaps-clip"
     elif modelDomain == "full":
       classifier = nn.Linear(timeinator.featureSize, timeinator.n_classes)
       inators = [spaceinator, timeinator, classifier]
-      inputType = "images-framed"
+      inputType = "images-frame"
     elif modelDomain == "spaceClassifier":
       inators = [nn.Linear(spaceinator.featureSize, spaceinator.n_classes)]
-      inputType = "fmaps-framed"
+      inputType = "fmaps-frame"
     elif modelDomain == "timeClassifier":
       inators = [nn.Linear(timeinator.featureSize, timeinator.n_classes)]
-      inputType = "fmaps-clipped"
+      inputType = "fmaps-clip"
     else:
       raise ValueError("Invalid domain choice!")
     self.model = nn.Sequential(*inators)
@@ -95,11 +95,11 @@ class Spaceinator(nn.Module):
     
     # transfer learning mode
     n_features = model.fc.in_features  # 2048 for resnet50
-    if transferMode == "fixed-fx":
+    if transferMode == "feat-xtract":
       for param in model.parameters():  # freeze all layers
         param.requires_grad = False
         # parameters of newly constructed modules have requires_grad=True by default
-    elif transferMode == "fine-tune":  
+    elif transferMode == "fine-tune":
       pass
     else:
       raise ValueError("Invalid transfer learning mode!")
@@ -128,7 +128,7 @@ class Spaceinator(nn.Module):
     return model
   
   def _get_preweights(self, preweights):
-    if preweights == "default":
+    if preweights == "image-net":
       return ResNet50_Weights.DEFAULT # https://pytorch.org/vision/main/models/generated/torchvision.models.resnet50.html#torchvision.models.ResNet50_Weights
     elif not preweights:
       return None

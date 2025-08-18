@@ -89,7 +89,7 @@ MODEL:  # for models created/trained in the run
   type: phase
   domain: spatial # spatial, temporal, full, classifier
 # spatial
-  spaceTransferLearning: fine-tune # fine-tune | feat-xtract
+  spaceTransferLearning: feat-xtract # fine-tune | feat-xtract
   spaceArch: resnet50
   spacePreweights: image-net # sfx = spatial feature extraction
   path_spaceModel: #C:/Users/DC/Documents/Programming/python/ucl/ML_SurgeNet/logs/LDSS/run_20241104-00/checkpoints/LDSS-20241104-00-fold6-0.837800.pth # if empty, uses new untrained one

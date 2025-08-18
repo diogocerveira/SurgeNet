@@ -32,16 +32,18 @@ class Teacher():
     self.DATASET_SIZE = dataset.__len__()
     train_metric, valid_metric, test_metrics = self._get_metrics(TRAIN, EVAL, self.N_PHASES, dataset.labelToClassMap, dataset.labelType, DEVICE)
     criterion = self._get_criterion(TRAIN["criterionId"], dataset.classWeights, DEVICE)
-    self.trainer = Trainer(train_metric, criterion, TRAIN["HYPER"], DEVICE)
+    
+    
+    self.trainer = Trainer(train_metric, criterion, TRAIN, DEVICE)
     self.validater = Validater(valid_metric, criterion, DEVICE)
     self.tester = Tester(test_metrics, dataset.labels, self.PHASES, dataset.labelToClassMap, DEVICE)
 
     self.save_checkpoints = TRAIN["save_checkpoints"]
     self.highScore = -np.inf
     self.bestState = {}
-    self.minDelta = TRAIN["minDelta"]  # minimal delta for early stopping
-    self.patience = TRAIN["patience"]  # patience for early stopping
-    
+    self.minDelta = TRAIN["HYPER"]["minDelta"]  # minimal delta for early stopping
+    self.patience = TRAIN["HYPER"]["patience"]  # patience for early stopping
+
   def teach(self, model, trainloader, validloader, n_epochs, path_states, path_resume=None):
     ''' Iterate through folds and epochs of model learning with training and validation
         In: Untrained model, data, etc
@@ -49,10 +51,9 @@ class Teacher():
     '''
     if not list(model.parameters()):
       raise ValueError("Model parameters are empty/invalid. Check model initialization.")
+    optimizer = self.trainer.optimizer
+    scheduler = self.trainer.scheduler
     earlyStopper = EarlyStopper(self.patience, self.minDelta)
-    optimizer = optim.SGD(model.parameters(), lr=self.trainer.learningRate, momentum=self.trainer.MOMENTUM)
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=self.trainer.STEP_SIZE, gamma=self.trainer.GAMMA) # updates the optimizer by the GAMMA factor after the step_size
-    # scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=50)
 
     betterState, valid_minLoss = {}, np.inf
     earlyStopper.reset()
@@ -71,7 +72,7 @@ class Teacher():
       self.writer.add_scalar("Acc/train", train_score, epoch + 1)
       self.writer.add_scalar("Acc/valid", valid_score, epoch + 1)
       print(f"Train Loss: {train_loss:4f}\tValid Loss: {valid_loss:4f}")
-      scheduler.step()
+      scheduler.step(valid_loss) # Adjust learning rate based on validation loss
 
       if (valid_minLoss - valid_loss) > earlyStopper.minDelta:  # if valid loss decreased by more than minDelta == good
         print(f"\n* New best model (valid loss): {valid_minLoss:.4f} --> {valid_loss:.4f} *\n")
@@ -130,7 +131,7 @@ class Teacher():
       return nn.BCEWithLogitsLoss(pos_weight=classWeights.to(DEVICE))
     else:
       raise ValueError("Invalid criterion chosen (crossEntropy, )")
-    
+
   def save_checkpoint(self, model, optimizer, epoch, loss, path_checkpoint):
     checkpoint = {
       'epoch': epoch, # Current epoch
@@ -154,15 +155,42 @@ class Teacher():
 class Trainer():
   ''' Part of the teacher that knows how to train models based on data
   '''
-  def __init__(self, metric, criterion, HYPER, DEVICE):
+  def __init__(self, metric, criterion, TRAIN, DEVICE):
     self.train_metric = metric
     self.criterion = criterion
-    self.learningRate = HYPER["learningRate"]
-    self.MOMENTUM = HYPER["momentum"]
-    self.STEP_SIZE = HYPER["stepSize"]
-    self.GAMMA = HYPER["gamma"]
+
+    self.learningRate = TRAIN["HYPER"]["learningRate"]
+    self.MOMENTUM = TRAIN["HYPER"]["momentum"]
+    self.STEP_SIZE = TRAIN["HYPER"]["stepSize"]
+    self.GAMMA = TRAIN["HYPER"]["gamma"]
+
+    self.optimizer = self._get_optimizer(TRAIN["optimizer"], self.learningRate, TRAIN["HYPER"]["momentum"])
+    self.scheduler = self._get_scheduler(TRAIN["scheduler"], self.STEP_SIZE, self.GAMMA)
     self.DEVICE = DEVICE
-    
+  
+  def _get_optimizer(self, optimizerId, lr, momentum):
+  if optimizerId == "adam":
+    return optim.Adam(lr=lr)
+  elif optimizerId == "sgd":
+    return optim.SGD(lr=lr, momentum=momentum)
+  else:
+    raise ValueError("Invalid optimizer chosen (adam, sgd)")
+  def _get_scheduler(self, schedulerId, stepSize, gamma):
+    if schedulerId == "step":
+      scheduler =  optim.lr_scheduler.StepLR(optimizer, step_size=stepSize, gamma=gamma)
+    elif schedulerId == "cosine":
+      scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=stepSize, eta_min=gamma)
+    elif schedulerId == "plateau":
+      scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,
+        mode='min',       # monitor loss (want to minimize)
+        factor=0.1,       # scale lr by this factor (10x smaller)
+        patience=3,       # wait 3 epochs without improvement
+        verbose=True      # log when lr changes
+    )
+    else:
+      raise ValueError("Invalid scheduler chosen (step, cosine)")
+    return scheduler
+
   def train(self, model, trainloader, labelType, optimizer, epoch):
     ''' In: model, data, criterion (loss function), optimizer
         Out: train_loss, train_score
