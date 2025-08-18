@@ -2,7 +2,7 @@ path_root: . #/batataclan
 path_data: #/workspace/raid-diogo/
 seed: 53  # 5 --> 3 or 3 --> 5  DO NOT CHANGE SEED (it messes up with fold training)
 device:
-id_classroom: # if empty creates new learning environment, else loads it (dataset-YYMM-DDHH)
+id_classroom:  # if empty creates new learning environment, else loads it (dataset-YYMM-DDHH)
 actions:
 - train        # train (spatial, temporal, full)
 - process       # process (sample-n-label, mode-filter, extractFeatures)
@@ -10,7 +10,7 @@ actions:
 
 # DATA and TRAIN properties define an unique classroom
 DATA:
-  id_dataset: LDSS-local  # (LDSS-local, LDSSi-local, TEST-local, cifar10-ext)
+  id_dataset: TEST-local  # (LDSS-local, LDSSi-local, TEST-local, cifar10-ext)
   labelType: single-phase # time-to-next-phase, single-phase, time-to-video-end, time-since-video-start
   actionLabels:
     - dissection
@@ -50,7 +50,7 @@ TRAIN: # to fix because the top ones should not define a classroom
   valid_metric: accuracy  # guiding and evaluating training
   k_folds: 7 # number of folds for cross-validation
   HYPER:  # traditional hyperparameters
-    n_epochs: 25
+    n_epochs: 2
     spaceBatchSize: 16
     timeBatchSize: 1  # batch size for temporal training
     clipSize: 0  # amount of frames (sec) per clip when temporal training
@@ -81,13 +81,14 @@ PROCESS:  # Process
   fx_spatial: True
   featureLayer:
   - flatten
+  - layer4.2.relu_2
   # - layer2.3.relu_2
   fx_temporal: False
   fx_load_models: True  #loads models to extract features if not training
   
 MODEL:  # for models created/trained in the run
   type: phase
-  domain: spatial # spatial, temporal, full, classifier
+  domain: temporal # spatial, temporal, full, classifier
 # spatial
   spaceTransferLearning: fine-tune # fine-tune | feat-xtract
   spaceArch: resnet50
@@ -100,6 +101,7 @@ MODEL:  # for models created/trained in the run
   tf_filter: 3  # size in time (timeframe, # of frames)
   n_blocks: 2 # inside the stage
 # classification
+  classifierType: # space | time
   n_classes:   # normally gets from dataset itself 
 
 EVAL:  # Eval

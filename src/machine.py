@@ -25,36 +25,39 @@ class Phasinator(nn.Module):
       classifier = nn.Linear(spaceinator.featureSize, spaceinator.n_classes)
       inators = [spaceinator, classifier]
       inputType = "images-frame"
+      arch = spaceinator.arch
     elif modelDomain == "temporal":
-      classifier = nn.Linear(timeinator.featureSize, timeinator.n_classes)
-      inators = [timeinator, classifier]
+      if timeinator.arch == "phatima":
+        classifier = nn.Linear(timeinator.featureSize, timeinator.n_classes)
+        inators = [timeinator, classifier]
+      elif timeinator.arch == "tecno":
+        inators = [timeinator]
       inputType = "fmaps-clip"
-    elif modelDomain == "temporal-frames":
-      classifier = nn.Linear(timeinator.featureSize, timeinator.n_classes)
-      inators = [timeinator, classifier]
-      inputType = "fmaps-clip"
-    elif modelDomain == "tecno-like":
-      inators = [timeinator]
-      inputType = "fmaps-clip"
+      arch = timeinator.arch
     elif modelDomain == "full":
       classifier = nn.Linear(timeinator.featureSize, timeinator.n_classes)
       inators = [spaceinator, timeinator, classifier]
       inputType = "images-frame"
-    elif modelDomain == "spaceClassifier":
+      arch = "full"
+    elif modelDomain == "classifier-space":
       inators = [nn.Linear(spaceinator.featureSize, spaceinator.n_classes)]
       inputType = "fmaps-frame"
-    elif modelDomain == "timeClassifier":
+      arch = "linear"
+    elif modelDomain == "classifier-time":
       inators = [nn.Linear(timeinator.featureSize, timeinator.n_classes)]
       inputType = "fmaps-clip"
+      arch = "linear"
     else:
       raise ValueError("Invalid domain choice!")
-    self.model = nn.Sequential(*inators)
+    self.inators = nn.Sequential(*inators)
+    self.domain = modelDomain
+    self.arch = arch
     self.inputType = inputType
     self.id = f"{modelDomain}phase-{classroomId}_f{fold}" # model name for logging/saving
 
   def forward(self, x_batch):
     # print("Input shape: ", x_batch.shape)
-    x_batch = self.model(x_batch)
+    x_batch = self.inators(x_batch)
     # print("Output shape: ", x_batch.shape)
     return x_batch
 
@@ -66,10 +69,10 @@ class Spaceinator(nn.Module):
     super().__init__()
     self.domain = MODEL["domain"]
     self.n_classes = n_classes
-    arch = MODEL["spaceArch"]
+    self.arch = MODEL["spaceArch"]
     preweights = self._get_preweights(MODEL["spacePreweights"])
     transferMode = MODEL["spaceTransferLearning"]
-    self.model = self._get_model(arch, preweights, transferMode, MODEL["path_spaceModel"])  # to implement my own in model.py 
+    self.model = self._get_model(self.arch, preweights, transferMode, MODEL["path_spaceModel"])  # to implement my own in model.py 
     self.featureSize = self.model.fc.in_features
     self.featureNode = fxs.get_graph_node_names(self.model)[0][-2] # -2 is the flatten node (virtual layer)
 
@@ -186,11 +189,11 @@ class Timeinator(nn.Module):
     super().__init__()
     self.domain = MODEL["domain"]
     self.n_classes = n_classes
-    arch = MODEL["timeArch"]
+    self.arch = MODEL["timeArch"]
     preweights = None
     transferMode = None
-    self.model = self._get_model(arch, MODEL, in_channels, n_classes)  # to implement my own in model.py 
-    self.out_featureSize = self.model.out_featureSize
+    self.model = self._get_model(self.arch, MODEL, in_channels, n_classes)  # to implement my own in model.py 
+    self.featureSize = self.model.featureSize
     self.featureNode = fxs.get_graph_node_names(self.model)[0][-2] # -2 is the flatten node (virtual layer)
 
     if self.domain == "classifier" and MODEL["path_timeModel"]:
@@ -248,13 +251,13 @@ class Phatima(nn.Module):
     TF_FILTER = MODEL["tf_filter"]
     self.n_classes = n_classes
 
-    stage1 = _TCStage(in_channels, N_FILTERS, N_BLOCKS, N_FILTERS, TF_FILTER, dilation=1)
-    stage2 = _TCStage(N_FILTERS, N_FILTERS * 2, N_BLOCKS, N_FILTERS * 2, TF_FILTER, dilation=2)
-    stage3 = _TCStage(N_FILTERS * 2, N_FILTERS * 4, N_BLOCKS, N_FILTERS * 4, TF_FILTER, dilation=4)
-    stage4 = _TCStage(N_FILTERS * 4, N_FILTERS * 8, N_BLOCKS, N_FILTERS * 8, TF_FILTER, dilation=8)
+    stage1 = _PhatimaStage(in_channels, N_FILTERS, N_BLOCKS, N_FILTERS, TF_FILTER, dilation=1)
+    stage2 = _PhatimaStage(N_FILTERS, N_FILTERS * 2, N_BLOCKS, N_FILTERS * 2, TF_FILTER, dilation=2)
+    stage3 = _PhatimaStage(N_FILTERS * 2, N_FILTERS * 4, N_BLOCKS, N_FILTERS * 4, TF_FILTER, dilation=4)
+    stage4 = _PhatimaStage(N_FILTERS * 4, N_FILTERS * 8, N_BLOCKS, N_FILTERS * 8, TF_FILTER, dilation=8)
 
     self.stages = nn.ModuleList([stage1, stage2, stage3, stage4])
-    self.out_featureSize = N_FILTERS * 8 # (batchSize, n_classes)
+    self.featureSize = N_FILTERS * 8 # (batchSize, n_classes)
 
   def forward(self, x):
     # print("In Shape: ", x.shape)
@@ -268,7 +271,28 @@ class Phatima(nn.Module):
   def min_blocks_for_rf(self, L, k):
     a = math.ceil(math.log2(((L - 1) / (2 * (k - 1))) + 1))
     return int(a)
-    
+
+class _PhatimaStage(nn.Module):
+  def __init__(self, in_channels, out_channels, n_blocks, n_filters, tf_filter, dilation=1):
+    super().__init__()
+    self.conv1x1_in = nn.Conv1d(in_channels, n_filters, kernel_size=1) # adapts fv channel dimension
+    # self.blocks = nn.ModuleList([copy.deepcopy(_TCResBlock(n_filters, n_filters, tf_filter, 2**b)) for b in range(n_blocks)])
+    self.ProjectionResBlock = _ProjectionResBlock(in_channels, n_filters, tf_filter, dilation)
+    self.IdentityResBlock = _IdentityResBlock(n_filters, n_filters, tf_filter, dilation)
+    self.blocks = nn.ModuleList([self.ProjectionResBlock] + [copy.deepcopy(self.IdentityResBlock) for _ in range(n_blocks - 1)])
+    self.conv1x1_out = nn.Conv1d(n_filters, out_channels, kernel_size=1)
+  def forward(self, x):
+    # print("Before conv1x1_in Shape: ", x.shape)
+    x = self.conv1x1_in(x)
+    # print("After conv1x1_in Shape: ", x.shape)
+    for block in self.blocks:
+      x = block(x)
+    # print("After blocks Shape: ", x.shape)
+    x = self.conv1x1_out(x)
+    # print("After conv1x1_out Shape: ", x.shape)
+    return x    
+
+
 class Tecno(nn.Module):
   ''' Receives [batch_size, in_channels == feature size, in_length == length of clip of vid] feature tensors
       Outputs [batch_size, N_CLASSES, in_length] further guesses
@@ -281,13 +305,9 @@ class Tecno(nn.Module):
     self.N_FILTERS = MODEL["n_filters"]
     TF_FILTER = MODEL["tf_filter"]
     self.n_classes = n_classes
-
-    self.conv1x1_in = nn.Conv1d(in_channels, self.N_FILTERS, kernel_size=1)
-    self.predStage = copy.deepcopy(_TCStage(in_channels, N_BLOCKS, N_FILTERS, TF_FILTER, n_classes))  # stage for prediction
-    self.refStages = nn.ModuleList([copy.deepcopy(_TCStage(n_classes, N_BLOCKS, N_FILTERS, TF_FILTER, n_classes)) for s in range(N_STAGES - 1)])
-
-    self.stages = nn.ModuleList([copy.deepcopy(_TCStage(self.N_FILTERS, self.N_FILTERS, N_BLOCKS, self.N_FILTERS, TF_FILTER)) for s in range(N_STAGES)])
-    self.out_featureSize = self.n_classes # (batchSize, n_classes)
+    self.predStage = _TecnoStage(in_channels, n_classes, N_BLOCKS, self.N_FILTERS, TF_FILTER)  # stage for prediction
+    self.refStages = nn.ModuleList([copy.deepcopy(_TecnoStage(n_classes, n_classes, N_BLOCKS, self.N_FILTERS, TF_FILTER)) for s in range(N_STAGES - 1)])
+    self.featureSize = n_classes # (batchSize, n_classes)
 
   def forward(self, x):
     # print("Before predStage Shape: ", x.shape)
@@ -298,28 +318,25 @@ class Tecno(nn.Module):
     x_acm = x.unsqueeze(0)  # add dimension for accumulation stage results
     for stage in self.refStages:
       x = stage(F.softmax(x, dim=1)) # get probabilities from logits
+      # print("After conv1x1_out Shape: ", x.shape)
       x_acm = torch.cat((x_acm, x.unsqueeze(0)), dim=0) # accumulate stage results
-    # print("After conv1x1_out Shape: ", x.shape)
     # print(list(x_acm)[0], list(x_acm)[-1])  # print accumulated results for debugging
-    return x # x_acm for more in depth (returning last state guess)
+    return x_acm.permute(0, 1, 3, 2) # x_acm for more in depth (returning last state guess)
 
-class _TCStage(nn.Module):
+class _TecnoStage(nn.Module):
   def __init__(self, in_channels, out_channels, n_blocks, n_filters, tf_filter, dilation=1):
     super().__init__()
-    # self.conv1x1_res = nn.Conv1d(in_channels, out_channels, kernel_size=1) # adapts fv channel dimension
-    # self.blocks = nn.ModuleList([copy.deepcopy(_TCResBlock(n_filters, n_filters, tf_filter, 2**b)) for b in range(n_blocks)])
-    self.ProjectionResBlock = _ProjectionResBlock(in_channels, n_filters, tf_filter, dilation)
-    self.IdentityResBlock = _IdentityResBlock(n_filters, n_filters, tf_filter, dilation)
-    self.blocks = nn.ModuleList([self.ProjectionResBlock] + [copy.deepcopy(self.IdentityResBlock) for _ in range(n_blocks - 1)])
-    # self.conv1x1_out = nn.Conv1d(n_filters, out_channels, kernel_size=1)
+    self.conv1x1_in = nn.Conv1d(in_channels, n_filters, kernel_size=1) # adapts fv channel dimension
+    self.blocks = nn.ModuleList([copy.deepcopy(_IdentityResBlock(n_filters, n_filters, tf_filter, 2**b)) for b in range(n_blocks)])
+    self.conv1x1_out = nn.Conv1d(n_filters, out_channels, kernel_size=1)
   def forward(self, x):
     # print("Before conv1x1_in Shape: ", x.shape)
-    # x = self.conv1x1_in(x)
+    x = self.conv1x1_in(x)
     # print("After conv1x1_in Shape: ", x.shape)
     for block in self.blocks:
       x = block(x)
     # print("After blocks Shape: ", x.shape)
-    # x = self.conv1x1_out(x)
+    x = self.conv1x1_out(x)
     # print("After conv1x1_out Shape: ", x.shape)
     return x
   
@@ -328,21 +345,17 @@ class _IdentityResBlock(nn.Module):
   def __init__(self, in_channels, out_channels, kernelSize, dilation):
     super().__init__()
     self.convDilated = nn.Conv1d(in_channels, out_channels, kernel_size=kernelSize, padding=dilation, dilation=dilation)
-    # self.conv1x1 = nn.Conv1d(out_channels, out_channels, kernel_size=1) # filter with time frame 1: mix learned features
+    self.conv1x1 = nn.Conv1d(out_channels, out_channels, kernel_size=1) # filter with time frame 1: mix learned features
     self.dropout = nn.Dropout()
-    self.batchNorm = nn.BatchNorm1d(out_channels)  # Batch Normalization for stability
+    # self.batchNorm = nn.BatchNorm1d(out_channels)  # Batch Normalization for stability
   def forward(self, x):
     # x becomes the residual
-    # out = self.convDilated(x)
-    # out = self.batchNorm(out)
-    # out = F.relu(out)
     out = self.convDilated(x)
-    out = self.batchNorm(out)
+    # out = self.batchNorm(out)
     out = F.relu(out)
     # out = self.dropout(out)
-    # out = F.relu(self.convDilated(x))
-    # out = self.conv1x1(out)
-    # out = self.dropout(out)
+    out = self.conv1x1(out)
+    out = self.dropout(out)
     return out + x
 
 class _ProjectionResBlock(nn.Module):
@@ -351,14 +364,16 @@ class _ProjectionResBlock(nn.Module):
     super().__init__()
     self.conv1x1_proj = nn.Conv1d(in_channels, out_channels, kernel_size=1) # filter with time frame 1: mix learned features
     self.convDilated = nn.Conv1d(in_channels, out_channels, kernel_size=kernelSize, padding=dilation, dilation=dilation)
+    self.conv1x1 = nn.Conv1d(out_channels, out_channels, kernel_size=1) # filter with time frame 1: mix learned features
     self.dropout = nn.Dropout()
-    self.batchNorm = nn.BatchNorm1d(out_channels)  # Batch Normalization for stability
+    # self.batchNorm = nn.BatchNorm1d(out_channels)  # Batch Normalization for stability
   
   def forward(self, x):
     out = self.convDilated(x)
-    out = self.batchNorm(out)
+    # out = self.batchNorm(out)
     out = F.relu(out)
-    # out = self.dropout(out)
+    out = self.conv1x1_proj(out)
+    out = self.dropout(out)
     x = self.conv1x1_proj(x)  # project input to output channels
     return out + x
 
