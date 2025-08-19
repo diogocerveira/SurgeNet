@@ -57,7 +57,7 @@ class SampledVideosDataset(Dataset):
     
     self.labelToClassMap = self.get_labelToClassMap(self.labels)
     self.n_classes = len(self.labelToClassMap)
-    self.phases = sorted(set(self.labels["frameLabels"]))
+    self.phases = self._get_phases()  # Get unique phases from labels
     print(f"Phases (#{len(self.phases)}): ", self.phases)
     self.classWeights = self.get_labelWeights(self.labels)
     print(f"Class weights: {self.classWeights}\n")
@@ -273,6 +273,32 @@ class SampledVideosDataset(Dataset):
     # print(classes[:5])
     return labelToClassMap
 
+  def _get_phases(self):
+    phases = sorted(set(self.labels["frameLabels"]))
+    return phases
+    def normalize_phase(phase):
+      """
+      Canonicalize a phase string into 'A,B' form with alphabetical order.
+      Handles '-' and ',' separators.
+      """
+      parts = str(phase).replace(",", "-").split("-")
+      parts = sorted(p.strip() for p in parts if p.strip())
+      return "-".join(parts)
+
+    def normalize_and_sort_phases(phases):
+      """
+      Normalize all phases and return them sorted:
+      - each phase internally normalized (A,B)
+      - whole list sorted lexicographically as tuples
+      """
+      normalized = {normalize_phase(p) for p in phases}  # unique + normalized
+      print(normalized)
+      # sort by tuple of components
+      
+      sortedPhases = sorted(normalized, key=lambda ph: tuple(ph.split(",")))
+      print("Sorted phases: ", sortedPhases)
+      return sortedPhases
+    return normalize_and_sort_phases(phases)
 class Cataloguer():
   ''' Each Cataloguer organises/handles 1 dataset (local - LDSS - or external - CIFAR10)
       In - digital rawdata from pc paths
@@ -557,7 +583,7 @@ class Cataloguer():
   def _get_preprocessing(self, preprocessingType, normValues=None):
     ''' Get torch group of tranforms directly applied to torch Dataset object'''
     normValues = ((0.416, 0.270, 0.271), (0.196, 0.157, 0.156))
-    if preprocessingType == "basic":
+    if preprocessingType == "ldss":
       transform = transforms.Compose([
         transforms.ToImage(), # only for v2
         transforms.Resize((224, 224), antialias=True),

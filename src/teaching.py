@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 from matplotlib.offsetbox import TextArea, AnchoredOffsetbox
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
+import re, itertools, colorsys
 import seaborn as sns
 import pickle
 import time
@@ -319,7 +320,8 @@ class Tester():
     self.labels = labels
     self.PHASES = PHASES
     self.labelToClassMap = labelToClassMap  # map from label to class index
-  
+    self.colormap = self.build_colormap_from_phases(PHASES)
+
   def test(self, model, testloader, labelType, labels, export_bundle, path_export=None):
     ''' Test the model - return Preds, labels and sampleIds
     '''
@@ -549,7 +551,7 @@ class Tester():
     num_videos = len(videos)
     print(f'\n\nNumber of videos: {num_videos}')
     # color_map = {0: 'springgreen', 1: 'goldenrod', 2: 'tomato', 3: 'mediumslateblue', 4: 'plum', 5: 'deepskyblue'}
-    colormap, ordered_phases = self.get_phase_colormap_with_unknowns(df)
+    
     plt.rcParams['font.family'] = 'monospace'
     # for saving all videos to same img
     # fig, axes = plt.subplots(num_videos, 1, figsize=(9, 5), sharex=True) # Create subplots
@@ -566,7 +568,11 @@ class Tester():
         start_positions = np.arange(len(data_video))
         class_values = data_video[stage].values
         # print(class_values)
-        ax.broken_barh(list(zip(start_positions, np.ones(len(start_positions)))), (j - 0.4, 0.8), facecolors=[colormap[val] for val in class_values])
+        ax.broken_barh(
+            list(zip(start_positions, np.ones(len(start_positions)))),
+            (j - 0.4, 0.8),
+            facecolors=[self.colormap.get(val, "#bbbbbb") for val in class_values]
+        )
       # Add vertical separators
       # ax.axvline(x=len(data_video), color='grey', linestyle='--', linewidth=0.5)
       # Set labels
@@ -584,25 +590,30 @@ class Tester():
       ax_text.text(0, 0.5, ot, transform=ax_text.transAxes, fontsize=11, 
                   verticalalignment='center', horizontalalignment='left',
                   bbox=dict(boxstyle="round,pad=0.3", edgecolor="black", facecolor="white"))
-    
-    # Create custom legend handles and labels as before
-    handles = [plt.Rectangle((0, 0), 1, 1, color=colormap[i]) for i in colormap.keys()]
-    labels = [f'{i}' for i in colormap.keys()]
 
-    # Legend outside axes, anchored to figure bottom-right
-    legend = fig.legend(
-        handles, labels,
-        loc='lower right',                   # Align legend's lower right corner
-        bbox_to_anchor=(0.98, 0.02),        # Just inside figure bottom right (x,y)
-        bbox_transform=fig.transFigure,     # coords relative to figure, not axes
-        borderaxespad=0.5,
-        fontsize=9,
-        title='Classes',
-        frameon=True
-    )
-    plt.tight_layout()  # can keep to adjust spacing nicely
-    plt.savefig(os.path.join(path_phaseCharts, f"{modelId}_{video[:4]}_phase-ev.png"), bbox_inches='tight')
-    plt.close(fig)
+      # Only phases actually present in this video's data
+      used_set = set(map(str, data_video["Target"].values)) | set(map(str, data_video["Pred"].values))
+
+      # Order legend entries by your global PHASES
+      used_phases = [p for p in self.PHASES if p in used_set]
+
+      handles = [plt.Rectangle((0, 0), 1, 1, color=self.colormap.get(p, "#bbbbbb")) for p in used_phases]
+      labels  = used_phases  # strings like 'Dis,Pro' etc.
+
+      legend = fig.legend(
+          handles, labels,
+          loc='lower right',
+          bbox_to_anchor=(0.98, 0.02),
+          bbox_transform=fig.transFigure,
+          borderaxespad=0.5,
+          fontsize=9,
+          title='Classes',
+          frameon=True
+      )
+
+      plt.tight_layout()  # can keep to adjust spacing nicely
+      plt.savefig(os.path.join(path_phaseCharts, f"{modelId}_{video[:4]}_phase-ev.png"), bbox_inches='tight')
+      plt.close(fig)
 
     t2 = time.time()
     print(f"Video graphing took {t2 - t1:.2f} seconds")
@@ -610,6 +621,7 @@ class Tester():
 
   def get_phase_colormap_with_unknowns(self, df):
     known_set = set(self.PHASES)
+    print(f"Known phases: {known_set}", self.PHASES)
     # Gather all predicted and target phases
     preds = df["Pred"].dropna().tolist()
     targets = df["Target"].dropna().tolist()
@@ -629,6 +641,47 @@ class Tester():
       for i, phase in enumerate(full_phases)
     }
     return colormap, full_phases
+
+  def _beautiful_palette(self, n_colors=25):
+    """
+    Returns a vibrant exotic palette with up to 25 colors, maximally distinct first.
+    """
+    palette = [
+        "#aaffc3", "#3cb44b", "#ffe119", "#4363d8", "#f58231",
+        "#911eb4", "#46f0f0", "#f032e6", "#bcf60c", "#fabebe",
+        "#008080", "#e6beff", "#9a6324", "#fffac8", "#800000",
+        "#e6194b", "#808000", "#ffd8b1", "#000075", "#808080",
+        "#ffffff", "#000000", "#ff69b4", "#7fff00", "#00ced1"
+    ]
+    # Cap at requested n_colors
+    return palette[:n_colors]
+
+  def build_colormap_from_phases(self, phases):
+      """
+      Build a fixed colormap for ALL unordered class pairs found in `phases`.
+      Keys include both ',' and '-' separators and both orders (A,B) & (B,A).
+      """
+      # 1) collect atomic class tokens
+      tokens = set()
+      for ph in phases:
+          for t in re.split(r'[,-]', str(ph)):
+              t = t.strip()
+              if t:
+                  tokens.add(t)
+      tokens = sorted(tokens)
+
+      # 2) all unordered pairs
+      pairs = list(itertools.combinations(tokens, 2))
+      palette = self._beautiful_palette(len(pairs))
+
+      # 3) map synonyms → same color
+      cmap = {}
+      for (a, b), col in zip(pairs, palette):
+          for k in (f"{a},{b}", f"{b},{a}", f"{a}-{b}", f"{b}-{a}"):
+              cmap[k] = col
+
+      return cmap
+
 
 class EarlyStopper:
   ''' Controls the validation loss progress to keep it going down and improve times
