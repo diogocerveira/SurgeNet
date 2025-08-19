@@ -10,7 +10,7 @@ actions:
 
 # DATA and TRAIN properties define an unique classroom
 DATA:
-  id_dataset: TEST-local  # (LDSS-local, LDSSi-local, TEST-local, cifar10-ext)
+  id_dataset: LDSS-local  # (LDSS-local, LDSSi-local, TEST-local, cifar10-ext)
   labelType: single-phase # time-to-next-phase, single-phase, time-to-video-end, time-since-video-start
   actionLabels:
     - dissection
@@ -42,16 +42,16 @@ TRAIN: # to fix because the top ones should not define a classroom
   save_betterState: True
   save_lastState: False
   log_events: True
-  skipFolds:  # 0 for fold 1... after a break (e.g. crash) allows to skip folds and restart from a checkpoint
+  skipFolds: [] # 0 for fold 1... after a break (e.g. crash) allows to skip folds and restart from a checkpoint
 
   criterionId: weighted-cross-entropy # cross-entropy | weighted-cross-entropy | binary-cross-entropy-logits
-  optimiserId: adam # adam | sgd
+  optimizerId: adam # adam | sgd
   schedulerId: plateau # step | cosine | plateau
   train_metric: accuracy
   valid_metric: accuracy  # guiding and evaluating training
   k_folds: 7 # number of folds for cross-validation
   HYPER:  # traditional hyperparameters
-    n_epochs: 2
+    n_epochs: 25
     spaceBatchSize: 16
     timeBatchSize: 1  # batch size for temporal training
     clipSize: 0  # amount of frames (sec) per clip when temporal training
@@ -82,8 +82,7 @@ PROCESS:  # Process
   fx_spatial: False
   featureLayer:
   - flatten
-  - layer4.2.relu_2
-  # - layer2.3.relu_2
+  # - layer4.2.relu_2
   fx_temporal: False
   fx_load_models: True  #loads models to extract features if not training
   
@@ -93,7 +92,7 @@ MODEL:  # for models created/trained in the run
 # spatial
   spaceTransferLearning: fine-tune # fine-tune | feat-xtract
   spaceArch: resnet50
-  spacePreweights: image-net # sfx = spatial feature extraction
+  spacePreweights: image-net # image-net
   path_spaceModel: #C:/Users/DC/Documents/Programming/python/ucl/ML_SurgeNet/logs/LDSS/run_20241104-00/checkpoints/LDSS-20241104-00-fold6-0.837800.pth # if empty, uses new untrained one
 # temporal
   timeArch: tecno # tecno | phatima

@@ -583,7 +583,7 @@ class Cataloguer():
         # transforms.RandomHorizontalFlip(p=0.5),  # 50% chance to flip horizontally
         # transforms.RandomVerticalFlip(p=0.5),    # 50% chance to flip vertically
         transforms.RandomResizedCrop((224, 224), scale=(0.8, 1.0), ratio=(0.75, 1.333)),
-        tranforms.RandomCrop((224, 224), padding=4, padding_mode='reflect'),  # pad and crop to 224x224
+        transforms.RandomCrop((224, 224), padding=4, padding_mode='reflect'),  # pad and crop to 224x224
         # transforms.ColorJitter(10, 2)
       ])
     elif not preprocessingType:
@@ -673,7 +673,7 @@ class Cataloguer():
     # print(f"Train idxs: {train_idxs}\nValid idxs: {valid_idxs}\nTest idxs: {test_idxs}")
     # return train_idxs, valid_idxs, test_idxs
 
-  def batch(self, dset, inputType, HYPER, multiclips=False, multiClipStride=1, multiclips=False, multiClipStride=1, train_idxs=None, valid_idxs=None, test_idxs=None):
+  def batch(self, dset, inputType, HYPER, multiclips=False, multiClipStride=1, train_idxs=None, valid_idxs=None, test_idxs=None):
     ''' helper for loading data, features or stopping when fx_mode == 'export'
     '''
     inputTypeLeft, inputTypeRight = inputType.split('-')
@@ -684,7 +684,7 @@ class Cataloguer():
       if inputTypeRight == "frame":  # classifier training on space features
         return self._batch_frameFeats(dset, HYPER["spaceBatchSize"], train_idxs, valid_idxs, test_idxs)
       elif inputTypeRight == "clip" and not multiclips: # temporal model training on space features
-        return self._batch_clipFeats(dset, HYPER["timeBatchSize"], HYPER["clipSize"], train_idxs, valid_idxs, test_idxs)
+        return self._batch_clipFeats(dset, HYPER["timeBatchSize"], HYPER["clipSize"], train_idx=train_idxs, valid_idx=valid_idxs, test_idx=test_idxs)
       elif inputTypeRight == "clip" and multiclips:  # temporal model training on space features
         assert HYPER["clipSize"] > 0, "clipSize must be greater than 0 for multiclips!"
         return self._batch_multiClipFeats(dset, HYPER["timeBatchSize"], HYPER["clipSize"], multiClipStride, train_idxs, valid_idxs, test_idxs)
@@ -697,7 +697,7 @@ class Cataloguer():
     try:
       if dset.DATA_SCOPE == "local":
         if np.any(train_idxs):
-          loaders["trainloader"] = DataLoader(dataset=dset, batch_size=size_batch, num_workers=0, sampler=torch.utils.data.SubsetRandomSampler(train_idxs))
+          loaders["trainloader"] = DataLoader(dataset=dset, batch_size=size_batch, num_workers=2, sampler=torch.utils.data.SubsetRandomSampler(train_idxs))
         if np.any(valid_idxs):
           loaders["validloader"] = DataLoader(dataset=dset, batch_size=size_batch, num_workers=2, sampler=torch.utils.data.SubsetRandomSampler(valid_idxs))
         if np.any(test_idxs):

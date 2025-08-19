@@ -2,7 +2,7 @@ path_root: . #/batataclan
 path_data: #/workspace/raid-diogo/
 seed: 53  # 5 --> 3 or 3 --> 5  DO NOT CHANGE SEED (it messes up with fold training)
 device:
-id_classroom: # if empty creates new learning environment, else loads it (dataset-YYMM-DDHH)
+id_classroom:  # if empty creates new learning environment, else loads it (dataset-YYMM-DDHH)
 actions:
 - train        # train (spatial, temporal, full)
 - process       # process (sample-n-label, mode-filter, extractFeatures)
@@ -10,7 +10,7 @@ actions:
 
 # DATA and TRAIN properties define an unique classroom
 DATA:
-  id_dataset: LDSS-local  # (LDSS-local, LDSSi-local, TEST-local, cifar10-ext)
+  id_dataset: TEST-local  # (LDSS-local, LDSSi-local, TEST-local, cifar10-ext)
   labelType: single-phase # time-to-next-phase, single-phase, time-to-video-end, time-since-video-start
   actionLabels:
     - dissection
@@ -28,7 +28,8 @@ DATA:
     # - Fixation of the implant to the vault
     # - Fixation of the implant to the promontory
     # - Reperitonealisation
-  preprocessing: basic  # basic, resnet, augmentation
+  durationValues: True
+  preprocessing: resnet  # basic, resnet, augmentation
   multiClips: False
   multiClipStride: 3  # stride for multi-clip mode (e.g. 1, 2, 3)
   datatype: png-image #, jpeg-image, feature-dict
@@ -41,23 +42,23 @@ TRAIN: # to fix because the top ones should not define a classroom
   save_betterState: True
   save_lastState: False
   log_events: True
-  skipFolds:  # 0 for fold 1... after a break (e.g. crash) allows to skip folds and restart from a checkpoint
+  skipFolds: [] # 0 for fold 1... after a break (e.g. crash) allows to skip folds and restart from a checkpoint
 
   criterionId: weighted-cross-entropy # cross-entropy | weighted-cross-entropy | binary-cross-entropy-logits
-  optimiserId: adam # adam | sgd
+  optimizerId: adam # adam | sgd
   schedulerId: plateau # step | cosine | plateau
   train_metric: accuracy
   valid_metric: accuracy  # guiding and evaluating training
   k_folds: 7 # number of folds for cross-validation
   HYPER:  # traditional hyperparameters
-    n_epochs: 25
+    n_epochs: 2
     spaceBatchSize: 16
     timeBatchSize: 1  # batch size for temporal training
     clipSize: 0  # amount of frames (sec) per clip when temporal training
     learningRate: 0.001  # learning rate
     stepSize: 25  # optimizer scheduler (to change mid train)
     momentum: 0.9
-    gamma: 0.1
+    gamma: 0.1 # factor to scale learning rate by
     minDelta: 0.001  # minimum delta to save a better state
     patience: 5  # number of epochs to wait for a better state before stopping training
 
@@ -78,10 +79,10 @@ PROCESS:  # Process
   path_bundle: True
   export_modedPreds: True  # if apply-mode-filter == True
   
-  fx_spatial: True
+  fx_spatial: False
   featureLayer:
   - flatten
-  # - layer2.3.relu_2
+  # - layer4.2.relu_2
   fx_temporal: False
   fx_load_models: True  #loads models to extract features if not training
   
@@ -89,9 +90,9 @@ MODEL:  # for models created/trained in the run
   type: phase
   domain: spatial # spatial, temporal, full, classifier
 # spatial
-  spaceTransferLearning: feat-xtract # fine-tune | feat-xtract
+  spaceTransferLearning: fine-tune # fine-tune | feat-xtract
   spaceArch: resnet50
-  spacePreweights: image-net # sfx = spatial feature extraction
+  spacePreweights:  # image-net
   path_spaceModel: #C:/Users/DC/Documents/Programming/python/ucl/ML_SurgeNet/logs/LDSS/run_20241104-00/checkpoints/LDSS-20241104-00-fold6-0.837800.pth # if empty, uses new untrained one
 # temporal
   timeArch: tecno # tecno | phatima
@@ -100,6 +101,7 @@ MODEL:  # for models created/trained in the run
   tf_filter: 3  # size in time (timeframe, # of frames)
   n_blocks: 2 # inside the stage
 # classification
+  classifierType: # space | time
   n_classes:   # normally gets from dataset itself 
 
 EVAL:  # Eval

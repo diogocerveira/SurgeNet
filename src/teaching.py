@@ -32,8 +32,7 @@ class Teacher():
     self.DATASET_SIZE = dataset.__len__()
     train_metric, valid_metric, test_metrics = self._get_metrics(TRAIN, EVAL, self.N_PHASES, dataset.labelToClassMap, dataset.labelType, DEVICE)
     criterion = self._get_criterion(TRAIN["criterionId"], dataset.classWeights, DEVICE)
-    
-    
+   
     self.trainer = Trainer(train_metric, criterion, TRAIN, DEVICE)
     self.validater = Validater(valid_metric, criterion, DEVICE)
     self.tester = Tester(test_metrics, dataset.labels, self.PHASES, dataset.labelToClassMap, DEVICE)
@@ -44,15 +43,16 @@ class Teacher():
     self.minDelta = TRAIN["HYPER"]["minDelta"]  # minimal delta for early stopping
     self.patience = TRAIN["HYPER"]["patience"]  # patience for early stopping
 
-  def teach(self, model, trainloader, validloader, n_epochs, path_states, path_resume=None):
+  def teach(self, model, trainloader, validloader, n_epochs, path_states, labels, path_resume=None):
     ''' Iterate through folds and epochs of model learning with training and validation
         In: Untrained model, data, etc
         Out: Trained model (state_dict)
     '''
     if not list(model.parameters()):
       raise ValueError("Model parameters are empty/invalid. Check model initialization.")
-    optimizer = self.trainer.optimizer
-    scheduler = self.trainer.scheduler
+    optimizer = self._get_optimizer(model, self.trainer.optimizerId, self.trainer.learningRate, self.trainer.momentum)
+    scheduler = self._get_scheduler(optimizer, self.trainer.schedulerId, self.trainer.stepSize, self.trainer.gamma)
+
     earlyStopper = EarlyStopper(self.patience, self.minDelta)
 
     betterState, valid_minLoss = {}, np.inf
@@ -114,6 +114,28 @@ class Teacher():
         torch.cuda.empty_cache()
         gc.collect()
 
+  def _get_optimizer(self, model, optimizerId, lr, momentum):
+    if optimizerId == "adam":
+      return optim.Adam(model.parameters(), lr=lr)
+    elif optimizerId == "sgd":
+      return optim.SGD(model.parameters(), lr=lr, momentum=momentum)
+    else:
+      raise ValueError("Invalid optimizer chosen (adam, sgd)")
+  def _get_scheduler(self, optimizer, schedulerId, stepSize, gamma):
+    if schedulerId == "step":
+      scheduler =  optim.lr_scheduler.StepLR(optimizer, step_size=stepSize, gamma=gamma)
+    elif schedulerId == "cosine":
+      scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=stepSize, eta_min=gamma)
+    elif schedulerId == "plateau":
+      scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,
+        mode='min',       # monitor loss (want to minimize)
+        factor=0.1,       # scale lr by this factor (10x smaller)
+        patience=3,       # wait 3 epochs without improvement
+    )
+    else:
+      raise ValueError("Invalid scheduler chosen (step, cosine)")
+    return scheduler
+  
   def _get_metrics(self, TRAIN, EVAL, N_PHASES, labelToClass, labelType, DEVICE):
     
     train_metric = RunningMetric(TRAIN["train_metric"], N_PHASES, DEVICE, EVAL["agg"], EVAL["computeRate"], labelType, EVAL["updateRate"])
@@ -159,39 +181,16 @@ class Trainer():
     self.train_metric = metric
     self.criterion = criterion
 
+    self.optimizerId = TRAIN["optimizerId"]
     self.learningRate = TRAIN["HYPER"]["learningRate"]
-    self.MOMENTUM = TRAIN["HYPER"]["momentum"]
-    self.STEP_SIZE = TRAIN["HYPER"]["stepSize"]
-    self.GAMMA = TRAIN["HYPER"]["gamma"]
+    self.momentum = TRAIN["HYPER"]["momentum"]
+    self.schedulerId = TRAIN["schedulerId"]
+    self.stepSize = TRAIN["HYPER"]["stepSize"]
+    self.gamma = TRAIN["HYPER"]["gamma"]
 
-    self.optimizer = self._get_optimizer(TRAIN["optimizer"], self.learningRate, TRAIN["HYPER"]["momentum"])
-    self.scheduler = self._get_scheduler(TRAIN["scheduler"], self.STEP_SIZE, self.GAMMA)
     self.DEVICE = DEVICE
-  
-  def _get_optimizer(self, optimizerId, lr, momentum):
-    if optimizerId == "adam":
-      return optim.Adam(lr=lr)
-    elif optimizerId == "sgd":
-      return optim.SGD(lr=lr, momentum=momentum)
-    else:
-      raise ValueError("Invalid optimizer chosen (adam, sgd)")
-  def _get_scheduler(self, schedulerId, stepSize, gamma):
-    if schedulerId == "step":
-      scheduler =  optim.lr_scheduler.StepLR(optimizer, step_size=stepSize, gamma=gamma)
-    elif schedulerId == "cosine":
-      scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=stepSize, eta_min=gamma)
-    elif schedulerId == "plateau":
-      scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,
-        mode='min',       # monitor loss (want to minimize)
-        factor=0.1,       # scale lr by this factor (10x smaller)
-        patience=3,       # wait 3 epochs without improvement
-        verbose=True      # log when lr changes
-    )
-    else:
-      raise ValueError("Invalid scheduler chosen (step, cosine)")
-    return scheduler
 
-  def train(self, model, trainloader, labelType, optimizer, epoch):
+  def train(self, model, trainloader, labelType, labels, optimizer, epoch):
     ''' In: model, data, criterion (loss function), optimizer
         Out: train_loss, train_score
         Note - inputs can be samples (pics) or feature maps / outputs are logits and then pred/probabilities
@@ -211,7 +210,7 @@ class Trainer():
 
       outputs = model(inputs) # forward pass
       # print(inputs[:5], targets[:5], outputs[:5])
-      print("outputs: ", outputs.shape, "\ttargets: ", targets.shape, '\n')
+      # print("outputs: ", outputs.shape, "\ttargets: ", targets.shape, '\n')
       if model.inputType.split('-')[1] == "clip":
         if labelType.split('-')[0] == "single":
           targets = targets.reshape(-1)
@@ -237,7 +236,7 @@ class Trainer():
         loss = self.criterion(outputs, targets)
       loss.backward() # backward pass
       optimizer.step()    # a single optimization step
-      print("outputs: ", outputs.shape, "\ttargets: ", targets.shape, '\n')
+      # print("outputs: ", outputs.shape, "\ttargets: ", targets.shape, '\n')
       # print("outputs: ", outputs[:5], "\ttargets: ", targets[:5], '\n')
       if labelType.split('-')[0] == "single":
         outputs = torch.argmax(outputs, dim=1)  # get labels with max prediction values

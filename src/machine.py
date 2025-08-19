@@ -27,7 +27,7 @@ class Phasinator(nn.Module):
       inputType = "images-frame"
       arch = spaceinator.arch
     elif modelDomain == "spatdur":
-      classifier = Classifier(spaceinator.featureSize + 1, spaceinator.n_classes, add_durationValues=True)
+      classifier = Classifier(spaceinator.featureSize + 1, spaceinator.n_classes, add_timestamps=True)
       inators = [spaceinator, classifier]
       inputType = "images-frame"
       arch = spaceinator.arch
@@ -44,6 +44,10 @@ class Phasinator(nn.Module):
       inators = [spaceinator, timeinator, classifier]
       inputType = "images-frame"
       arch = "full"
+    elif modelDomain == "classifier":
+      inators = [Classifier(spaceinator.featureSize, spaceinator.n_classes)]
+      inputType = "images-frame"
+      arch = "linear"
     elif modelDomain == "classifier-space":
       inators = [Classifier(spaceinator.featureSize, spaceinator.n_classes)]
       inputType = "fmaps-frame"
@@ -96,15 +100,15 @@ class Spaceinator(nn.Module):
     
   def forward(self, x):
     if self.domain == "spatdur":
-      x, durationValues = x  # Unpack: x → [B, C, H, W], durationValues → [B]
-      # print(f"[DEBUG] Duration values shape before unsqueeze: {durationValues.shape}", flush=True)
+      x, timestamps = x  # Unpack: x → [B, C, H, W], timestamps → [B]
+      # print(f"[DEBUG] Duration values shape before unsqueeze: {timestamps.shape}", flush=True)
     # print(f"Spaceinator input shape: {x.shape}", flush=True)
 
     x = self.model(x)  # → [B, 2048]
     # print("spaceinator output shape: ", x.shape)
     # print(f"[DEBUG] Feature map after model: {x.shape}", flush=True)
     if self.domain == "spatdur":      # Add duration as new feature
-      x = (x, durationValues)
+      x = (x, timestamps)
       # print(f"[DEBUG] Concatenated features + duration: {x.shape}", flush=True)
       
     return x
@@ -403,21 +407,25 @@ class _ProjectionResBlock(nn.Module):
     return out + x
 
 class Classifier(nn.Module):
-  def __init__(self, FEATURE_SIZE, N_CLASSES, add_durationValues=False):
+  def __init__(self, FEATURE_SIZE, N_CLASSES, add_timestamps=False):
     super().__init__()
-    self.add_durationValues = add_durationValues
-    self.linear = nn.Linear(FEATURE_SIZE, N_CLASSES)
+    self.add_timestamps = add_timestamps
+    self.FEATURE_SIZE = FEATURE_SIZE
+    if add_timestamps:
+      self.FEATURE_SIZE += 1
+    self.linear = nn.Linear(self.FEATURE_SIZE, N_CLASSES)
     self.mlp = nn.Sequential( # 5 positive phases
         nn.Linear(1, 5),
         nn.ReLU(),
         nn.Linear(5, 1)
       )
+
   def forward(self, x):
-    if self.add_durationValues:
-      x, durationValues = x  # Unpack: x → [B, C, H, W], durationValues → [B]
-      # print("x.shape: ", x.shape, "durationValues.shape: ", durationValues.shape)
-      durationValues = self.mlp(durationValues.unsqueeze(1))  # [B] → [B, 1]
-      # print("durationValues.shape: ", durationValues.shape)
-      x = torch.cat((x, durationValues), dim=1)
+    if self.add_timestamps:
+      x, timestamps = x  # Unpack: x → [B, C, H, W], timestamps → [B]
+      # print("x.shape: ", x.shape, "timestamps.shape: ", timestamps.shape)
+      timestamps = self.mlp(timestamps.unsqueeze(1))  # [B] → [B, 1]
+      # print("timestamps.shape: ", timestamps.shape)
+      x = torch.cat((x, timestamps), dim=1)
     x = self.linear(x)  # → [B, N_CLASSES]
     return x
