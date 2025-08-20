@@ -189,7 +189,7 @@ def learning(**the):
 
 if __name__ == "__main__":
   # Load default parameters from config.yml
-  configId = "config_SP-FX-RN50-aug.yml"
+  configId = "cfg_SP-pFT-tsRN50-aug.yml"
   with open(os.path.join("settings", configId), "r") as file:
     config = yaml.safe_load(file)
   # Set up argparse fir CLASSROOMtime overriding

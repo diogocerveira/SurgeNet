@@ -4,9 +4,9 @@ seed: 53  # 5 --> 3 or 3 --> 5  DO NOT CHANGE SEED (it messes up with fold train
 device:
 id_classroom:  # if empty creates new learning environment, else loads it (dataset-YYMM-DDHH)
 actions:
-- train        # train (spatial, temporal, full)
-- process       # process (sample-n-label, mode-filter, extractFeatures)
-- eval         # eval (aprfc, phaseTiming, phaseChart)
+# - train        # train (spatial, temporal, full)
+# - process       # process (sample-n-label, mode-filter, extractFeatures)
+# - eval         # eval (aprfc, phaseTiming, phaseChart)
 
 # DATA and TRAIN properties define an unique classroom
 DATA:
@@ -28,8 +28,7 @@ DATA:
     # - Fixation of the implant to the vault
     # - Fixation of the implant to the promontory
     # - Reperitonealisation
-  durationValues: True
-  preprocessing: ldss  # ldss, imagenet, augmentation
+  preprocessing: resnet  # ldss, imagenet, augmentation
   multiClips: False
   multiClipStride: 3  # stride for multi-clip mode (e.g. 1, 2, 3)
   datatype: png-image #, jpeg-image, feature-dict
@@ -90,10 +89,11 @@ MODEL:  # for models created/trained in the run
   type: phase
   domain: spatial # spatial, temporal, full, classifier
 # spatial
-  spaceTransferLearning: fine-tune # fine-tune | feat-xtract
+  spaceTransferLearning: feat-xtract # fine-tune | feat-xtract
   spaceArch: resnet50
-  spacePreweights:  # image-net
+  spacePreweights: image-net # image-net
   path_spaceModel: #C:/Users/DC/Documents/Programming/python/ucl/ML_SurgeNet/logs/LDSS/run_20241104-00/checkpoints/LDSS-20241104-00-fold6-0.837800.pth # if empty, uses new untrained one
+  add_timestamps: no # no | direct | mlp
 # temporal
   timeArch: tecno # tecno | phatima
   n_stages: 3

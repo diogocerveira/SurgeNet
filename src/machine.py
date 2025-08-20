@@ -27,7 +27,7 @@ class Phasinator(nn.Module):
       inputType = "images-frame"
       arch = spaceinator.arch
     elif modelDomain == "spatdur":
-      classifier = Classifier(spaceinator.featureSize + 1, spaceinator.n_classes, add_timestamps=True)
+      classifier = Classifier(spaceinator.featureSize, spaceinator.n_classes, add_timestamps=spaceinator.add_timestamps)
       inators = [spaceinator, classifier]
       inputType = "images-frame"
       arch = spaceinator.arch
@@ -94,7 +94,7 @@ class Spaceinator(nn.Module):
     self.neuron = nn.Linear(1, 1)
     if self.domain == "temporal" and MODEL["path_spaceModel"]:
       self.exportedFeatures = torch.load(MODEL["path_spaceModel"], weights_only=False, map_location="cpu")
-    
+    self.add_timestamps = MODEL["add_timestamps"]
     # print(self.model)
     # print(fxs.get_graph_node_names(self.model)[0])
     
@@ -414,25 +414,31 @@ class _ProjectionResBlock(nn.Module):
     return out + x
 
 class Classifier(nn.Module):
-  def __init__(self, FEATURE_SIZE, N_CLASSES, add_timestamps=False):
+  def __init__(self, FEATURE_SIZE, N_CLASSES, add_timestamps="no"):
     super().__init__()
-    self.add_timestamps = add_timestamps
+    self.add_timestamps = True if (add_timestamps == "direct" or add_timestamps == "mlp") else False
     self.FEATURE_SIZE = FEATURE_SIZE
-    if add_timestamps:
+    if self.add_timestamps:
       self.FEATURE_SIZE += 1
-    self.linear = nn.Linear(self.FEATURE_SIZE, N_CLASSES)
-    self.mlp = nn.Sequential( # 5 positive phases
+    if add_timestamps == "mlp":
+      self.tsFeed = nn.Sequential(
         nn.Linear(1, 5),
         nn.ReLU(),
         nn.Linear(5, 1)
       )
+    else:
+      self.tsFeed = nn.Identity()
+    self.linear = nn.Linear(self.FEATURE_SIZE, N_CLASSES)
 
   def forward(self, x):
     if self.add_timestamps:
       x, timestamps = x  # Unpack: x → [B, C, H, W], timestamps → [B]
-      # print("x.shape: ", x.shape, "timestamps.shape: ", timestamps.shape)
-      timestamps = self.mlp(timestamps.unsqueeze(1))  # [B] → [B, 1]
-      # print("timestamps.shape: ", timestamps.shape)
+      print("x.shape: ", x.shape, "timestamps.shape: ", timestamps.shape)
+      squeezed = timestamps.unsqueeze(1)  # [B] → [B, 1]
+      print("squeezed.shape: ", squeezed.shape)
+      timestamps = self.tsFeed(squeezed)
+      print("timestamps.shape: ", timestamps.shape)
       x = torch.cat((x, timestamps), dim=1)
     x = self.linear(x)  # → [B, N_CLASSES]
+    print("Classifier output shape: ", x.shape)
     return x

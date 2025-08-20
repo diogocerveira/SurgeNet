@@ -28,7 +28,6 @@ DATA:
     # - Fixation of the implant to the vault
     # - Fixation of the implant to the promontory
     # - Reperitonealisation
-  durationValues: True
   preprocessing: imagenet-aug  # ldss, imagenet, ldss-aug, imagenet-aug
   multiClips: False
   multiClipStride: 3  # stride for multi-clip mode (e.g. 1, 2, 3)
