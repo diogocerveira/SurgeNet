@@ -132,6 +132,13 @@ class Spaceinator(nn.Module):
         # parameters of newly constructed modules have requires_grad=True by default
     elif transferMode == "fine-tune":
       pass
+    elif transferMode == "l4-fine-tune":
+      for name, param in model.named_parameters():
+        # print(f"    {name}: {param.requires_grad}")
+        if "layer4" in name or "fc" in name:
+          continue
+        param.requires_grad = False
+        
     else:
       raise ValueError("Invalid transfer learning mode!")
     # remove final layer if passing features to another model (not learning them)

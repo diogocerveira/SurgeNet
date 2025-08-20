@@ -184,12 +184,12 @@ def learning(**the):
     print(f"\n\t = = = = = \t = = = = =\n\t\t Fold {fold + 1} done!\n\t = = = = = \t = = = = =\n")
     # break # == 1 folc (debug)
     # break
-  os.system(f"tensorboard --logdir={Csr.path_classroom}")
+  # os.system(f"tensorboard --logdir={Csr.path_classroom}")
  
 
 if __name__ == "__main__":
   # Load default parameters from config.yml
-  configId = "config_RN50.yml"
+  configId = "config_SP-FX-RN50-aug.yml"
   with open(os.path.join("settings", configId), "r") as file:
     config = yaml.safe_load(file)
   # Set up argparse fir CLASSROOMtime overriding
@@ -211,8 +211,7 @@ if __name__ == "__main__":
   torch.manual_seed(config["seed"]);
   random.seed(config["seed"])
   if not config["actions"]:
-    print("\nNo action specified. Exiting...\n")
-    exit()
+    config["actions"] = []  # default actions if none specified
   if config["device"] == "auto" or not config["device"]: # where to save torch tensors (e.g. during training)
     config["device"] = "cuda" if torch.cuda.is_available() else "cpu"
   print()

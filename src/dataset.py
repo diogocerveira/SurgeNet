@@ -590,7 +590,7 @@ class Cataloguer():
         transforms.ToDtype(torch.float32, scale=True),
         transforms.Normalize(normValues[0], normValues[1])
       ])
-    elif preprocessingType == "resnet":
+    elif preprocessingType == "imagenet":
       transform = transforms.Compose([
         transforms.ToImage(),
         transforms.Resize((224, 224), antialias=True),  # squishes if needed
@@ -598,7 +598,7 @@ class Cataloguer():
         transforms.Normalize(mean=[0.485, 0.456, 0.406], # ImageNet channel stats
                             std=[0.229, 0.224, 0.225])
       ])
-    elif preprocessingType == "augmentation":
+    elif preprocessingType == "ldss-aug":
       transform = transforms.Compose([
         # from 0-255 Image/numpy.ndarray to 0.0-1.0 torch.FloatTensor
         transforms.ToImage(), # only for v2
@@ -611,6 +611,18 @@ class Cataloguer():
         transforms.RandomResizedCrop((224, 224), scale=(0.8, 1.0), ratio=(0.75, 1.333)),
         transforms.RandomCrop((224, 224), padding=4, padding_mode='reflect'),  # pad and crop to 224x224
         # transforms.ColorJitter(10, 2)
+      ])
+    elif preprocessingType == "imagenet-aug":
+      transform = transforms.Compose([
+        # from 0-255 Image/numpy.ndarray to 0.0-1.0 torch.FloatTensor
+        transforms.ToImage(), # only for v2
+        transforms.RandomRotation((-15, 15)),  # rotate randomly
+        transforms.RandomCrop((224, 224)),  # crop to 224x224
+        transforms.RandomHorizontalFlip(p=0.5),  # 50% chance to flip horizontally
+        transforms.RandomVerticalFlip(p=0.5),    # 50% chance to flip vertically
+        transforms.ToDtype(torch.float32, scale=True),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], # ImageNet channel stats
+                            std=[0.229, 0.224, 0.225])
       ])
     elif not preprocessingType:
       # make identity transform

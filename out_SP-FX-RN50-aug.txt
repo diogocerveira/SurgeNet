@@ -1,0 +1,86 @@
+nohup: ignoring input
+
+A. [classroom] LDSS-2508-1 (Matched)
+   [model] spatialphase2 (Matched)
+   For ('train', 'process', 'eval')
+
+   Warning: Skipping annotation for 96c7 (./data/LDSS-local/annotations/96c7.json not found)
+   Skipping hidden file _becb
+
+   Skipping hidden file .DS_Store
+
+   Skipping hidden file _2e98
+
+   Skipping hidden file _d699
+
+   Warning: Skipping annotation for b5bf (./data/LDSS-local/annotations/b5bf.json not found)
+   A new labels.csv was created ./data/LDSS-local/labels/single-phase.csv
+{0: '0Act-0Obj', 1: '0Obj-Rep', 2: 'Dis-Pro', 3: 'Dis-Vau', 4: 'Fix-Pro', 5: 'Fix-Vau'}
+Phases (#6):  ['0Act-0Obj', '0Obj-Rep', 'Dis-Pro', 'Dis-Vau', 'Fix-Pro', 'Fix-Vau']
+Class weights: tensor([0.3846, 0.6755, 1.0557, 0.2113, 3.4933, 0.1796])
+
+B. [dataset] LDSS-local (#134498)
+   [label] single-phase
+   [preprocessing] imagenet-aug
+   [classes] #6 (Unbalanced) ['0Act-0Obj', '0Obj-Rep', 'Dis-Pro', 'Dis-Vau', 'Fix-Pro', 'Fix-Vau']
+
+   note: labels are formed automatically and sorted alphabetically,
+      resulting in a different order from the annotations file. Fix-Vau comes before Fix-Pro!
+
+C. [training] start on [device] cuda
+   [folds] #7 [epochs] #25 [batch sizes] s32 / t1
+
+  Fold 1 splits:
+	train ['26d9', '315a', '436c', '5238', 'a909', 'b670', 'b71b', 'e6a9', 'e8d3', 'e8d7']
+	valid ['a334', 'f63b']
+	test ['cf7c']
+
+    No 'path_spaceModel' found. Using pretrained resnet50 in feat-xtract mode.
+    Feature size of 2048 at node 'flatten'
+
+Feature path (spacefmaps_f1) not found in ./logs/LDSS-2508-1/spatialphase1/process/features
+
+-------------- Epoch 1 --------------
+	  T [E1 B1]   scr: 0.1875
+	  T [E1 B1001]   scr: 0.6378
+	  T [E1 B2001]   scr: 0.6650
+	  T [E1 B3001]   scr: 0.6775
+	  V [E1 B1]   scr: 0.4688
+Train Loss: 0.924312	Valid Loss: 1.222690
+
+* New best model (valid loss): inf --> 1.2227 *
+
+-------------- Epoch 2 --------------
+	  T [E2 B1]   scr: 0.5938
+	  T [E2 B1001]   scr: 0.7203
+	  T [E2 B2001]   scr: 0.7216
+	  T [E2 B3001]   scr: 0.7243
+	  V [E2 B1]   scr: 0.6562
+Train Loss: 0.743456	Valid Loss: 1.120679
+
+* New best model (valid loss): 1.2227 --> 1.1207 *
+
+-------------- Epoch 3 --------------
+	  T [E3 B1]   scr: 0.7188
+	  T [E3 B1001]   scr: 0.7346
+	  T [E3 B2001]   scr: 0.7336
+	  T [E3 B3001]   scr: 0.7332
+	  V [E3 B1]   scr: 0.5000
+Train Loss: 0.712935	Valid Loss: 1.223135
+-------------- Epoch 4 --------------
+	  T [E4 B1]   scr: 0.8438
+	  T [E4 B1001]   scr: 0.7423
+	  T [E4 B2001]   scr: 0.7401
+	  T [E4 B3001]   scr: 0.7382
+	  V [E4 B1]   scr: 0.6875
+Train Loss: 0.694371	Valid Loss: 1.160601
+-------------- Epoch 5 --------------
+	  T [E5 B1]   scr: 0.7812
+	  T [E5 B1001]   scr: 0.7370
+	  T [E5 B2001]   scr: 0.7408
+	  T [E5 B3001]   scr: 0.7414
+	  V [E5 B1]   scr: 0.5312
+Train Loss: 0.679432	Valid Loss: 1.151144
+-------------- Epoch 6 --------------
+	  T [E6 B1]   scr: 0.7188
+	  T [E6 B1001]   scr: 0.7446

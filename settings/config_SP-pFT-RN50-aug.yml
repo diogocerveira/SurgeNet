@@ -29,7 +29,7 @@ DATA:
     # - Fixation of the implant to the promontory
     # - Reperitonealisation
   durationValues: True
-  preprocessing: imagenet  # ldss, imagenet, augmentation
+  preprocessing: imagenet-aug  # ldss, imagenet, augmentation
   multiClips: False
   multiClipStride: 3  # stride for multi-clip mode (e.g. 1, 2, 3)
   datatype: png-image #, jpeg-image, feature-dict
@@ -58,7 +58,7 @@ TRAIN: # to fix because the top ones should not define a classroom
     learningRate: 0.001  # learning rate
     stepSize: 25  # optimizer scheduler (to change mid train)
     momentum: 0.9
-    gamma: 0.1
+    gamma: 0.1 # factor to scale learning rate by
     minDelta: 0.001  # minimum delta to save a better state
     patience: 5  # number of epochs to wait for a better state before stopping training
 
@@ -90,7 +90,7 @@ MODEL:  # for models created/trained in the run
   type: phase
   domain: spatial # spatial, temporal, full, classifier
 # spatial
-  spaceTransferLearning: fine-tune # fine-tune | feat-xtract
+  spaceTransferLearning: l4-fine-tune # fine-tune | feat-xtract | l4-fine-tune
   spaceArch: resnet50
   spacePreweights: image-net # image-net
   path_spaceModel: #C:/Users/DC/Documents/Programming/python/ucl/ML_SurgeNet/logs/LDSS/run_20241104-00/checkpoints/LDSS-20241104-00-fold6-0.837800.pth # if empty, uses new untrained one

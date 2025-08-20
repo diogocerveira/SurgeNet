@@ -1,0 +1,489 @@
+nohup: ignoring input
+
+A. [classroom] LDSS-2508-1 (New)
+   [model] spatialphase1 (New)
+   For ('train', 'process', 'eval')
+
+   Warning: Skipping annotation for 96c7 (./data/LDSS-local/annotations/96c7.json not found)
+   Skipping hidden file _becb
+
+   Skipping hidden file .DS_Store
+
+   Skipping hidden file _2e98
+
+   Skipping hidden file _d699
+
+   Warning: Skipping annotation for b5bf (./data/LDSS-local/annotations/b5bf.json not found)
+   A new labels.csv was created ./data/LDSS-local/labels/single-phase.csv
+{0: '0Act-0Obj', 1: '0Obj-Rep', 2: 'Dis-Pro', 3: 'Dis-Vau', 4: 'Fix-Pro', 5: 'Fix-Vau'}
+Phases (#6):  ['0Act-0Obj', '0Obj-Rep', 'Dis-Pro', 'Dis-Vau', 'Fix-Pro', 'Fix-Vau']
+Class weights: tensor([0.3846, 0.6755, 1.0557, 0.2113, 3.4933, 0.1796])
+
+B. [dataset] LDSS-local (#134498)
+   [label] single-phase
+   [preprocessing] imagenet-aug
+   [classes] #6 (Unbalanced) ['0Act-0Obj', '0Obj-Rep', 'Dis-Pro', 'Dis-Vau', 'Fix-Pro', 'Fix-Vau']
+
+   note: labels are formed automatically and sorted alphabetically,
+      resulting in a different order from the annotations file. Fix-Vau comes before Fix-Pro!
+
+C. [training] start on [device] cuda
+   [folds] #7 [epochs] #25 [batch sizes] s32 / t1
+
+  Fold 1 splits:
+	train ['26d9', '315a', '436c', '5238', 'a909', 'b670', 'b71b', 'e6a9', 'e8d3', 'e8d7']
+	valid ['a334', 'f63b']
+	test ['cf7c']
+
+    No 'path_spaceModel' found. Using pretrained resnet50 in l4-fine-tune mode.
+    Feature size of 2048 at node 'flatten'
+
+Feature path (spacefmaps_f1) not found in ./logs/LDSS-2508-1/spatialphase1/process/features
+
+-------------- Epoch 1 --------------
+	  T [E1 B1]   scr: 0.1875
+	  T [E1 B1001]   scr: 0.7518
+	  T [E1 B2001]   scr: 0.7947
+	  T [E1 B3001]   scr: 0.8166
+	  V [E1 B1]   scr: 0.5000
+Train Loss: 0.488721	Valid Loss: 1.167910
+
+* New best model (valid loss): inf --> 1.1679 *
+
+-------------- Epoch 2 --------------
+	  T [E2 B1]   scr: 0.9062
+	  T [E2 B1001]   scr: 0.8832
+	  T [E2 B2001]   scr: 0.8860
+	  T [E2 B3001]   scr: 0.8902
+	  V [E2 B1]   scr: 0.7500
+Train Loss: 0.278307	Valid Loss: 1.064088
+
+* New best model (valid loss): 1.1679 --> 1.0641 *
+
+-------------- Epoch 3 --------------
+	  T [E3 B1]   scr: 0.8750
+	  T [E3 B1001]   scr: 0.9106
+	  T [E3 B2001]   scr: 0.9110
+	  T [E3 B3001]   scr: 0.9127
+	  V [E3 B1]   scr: 0.5938
+Train Loss: 0.222810	Valid Loss: 1.136383
+-------------- Epoch 4 --------------
+	  T [E4 B1]   scr: 0.8750
+	  T [E4 B1001]   scr: 0.9269
+	  T [E4 B2001]   scr: 0.9268
+	  T [E4 B3001]   scr: 0.9261
+	  V [E4 B1]   scr: 0.7188
+Train Loss: 0.183027	Valid Loss: 1.121254
+-------------- Epoch 5 --------------
+	  T [E5 B1]   scr: 0.8438
+	  T [E5 B1001]   scr: 0.9352
+	  T [E5 B2001]   scr: 0.9356
+	  T [E5 B3001]   scr: 0.9364
+	  V [E5 B1]   scr: 0.6250
+Train Loss: 0.154930	Valid Loss: 1.362276
+-------------- Epoch 6 --------------
+	  T [E6 B1]   scr: 0.9062
+	  T [E6 B1001]   scr: 0.9433
+	  T [E6 B2001]   scr: 0.9412
+	  T [E6 B3001]   scr: 0.9423
+	  V [E6 B1]   scr: 0.8125
+Train Loss: 0.139824	Valid Loss: 1.220555
+-------------- Epoch 7 --------------
+	  T [E7 B1]   scr: 0.9688
+	  T [E7 B1001]   scr: 0.9557
+	  T [E7 B2001]   scr: 0.9563
+	  T [E7 B3001]   scr: 0.9567
+	  V [E7 B1]   scr: 0.7812
+Train Loss: 0.100200	Valid Loss: 1.193157
+
+* Stopped early *
+
+
+	Testing...
+	  T [B1]   scr: 0.5625
+Testing took 76.56 seconds
+{'0Act-0Obj': 0, '0Obj-Rep': 1, 'Dis-Pro': 2, 'Dis-Vau': 3, 'Fix-Pro': 4, 'Fix-Vau': 5}
+
+phases_preds counts: [3885 1597  958 5803  121 5412] 	 17776
+phases_gt counts: [5930 1281 1128 3955  157 5325] 	 17776
+{0: '0Act-0Obj', 1: '0Obj-Rep', 2: 'Dis-Pro', 3: 'Dis-Vau', 4: 'Fix-Pro', 5: 'Fix-Vau'}
+
+Video cf7c Phase Report
+             	|   T Preds   |  T Targets  ||  Diff
+0Act-0Obj    	| 64.75   min | 98.83   min || -34.08  min
+0Obj-Rep     	| 26.62   min | 21.35   min || 5.27    min
+Dis-Pro      	| 15.97   min | 18.80   min || -2.83   min
+Dis-Vau      	| 96.72   min | 65.92   min || 30.80   min
+Fix-Pro      	| 2.02    min | 2.62    min || -0.60   min
+Fix-Vau      	| 90.20   min | 88.75   min || 1.45    min 
+
+
+
+Number of videos: 1
+Video graphing took 0.96 seconds
+
+Saved phase metric graphs to ./logs/LDSS-2508-1/spatialphase1/eval/phase-charts
+
+	 = = = = = 	 = = = = =
+		 Fold 1 done!
+	 = = = = = 	 = = = = =
+
+  Fold 2 splits:
+	train ['26d9', '315a', '436c', '5238', 'a909', 'b670', 'b71b', 'e6a9', 'e8d3', 'e8d7']
+	valid ['cf7c']
+	test ['a334', 'f63b']
+
+    No 'path_spaceModel' found. Using pretrained resnet50 in l4-fine-tune mode.
+    Feature size of 2048 at node 'flatten'
+
+Feature path (spacefmaps_f2) not found in ./logs/LDSS-2508-1/spatialphase1/process/features
+
+-------------- Epoch 1 --------------
+	  T [E1 B1]   scr: 0.1562
+	  T [E1 B1001]   scr: 0.7494
+	  T [E1 B2001]   scr: 0.7950
+	  T [E1 B3001]   scr: 0.8169
+	  V [E1 B1]   scr: 0.6875
+Train Loss: 0.488307	Valid Loss: 1.398994
+
+* New best model (valid loss): inf --> 1.3990 *
+
+-------------- Epoch 2 --------------
+	  T [E2 B1]   scr: 0.8750
+	  T [E2 B1001]   scr: 0.8787
+	  T [E2 B2001]   scr: 0.8851
+	  T [E2 B3001]   scr: 0.8887
+	  V [E2 B1]   scr: 0.6250
+Train Loss: 0.279281	Valid Loss: 1.591200
+-------------- Epoch 3 --------------
+	  T [E3 B1]   scr: 0.9062
+	  T [E3 B1001]   scr: 0.9082
+	  T [E3 B2001]   scr: 0.9119
+	  T [E3 B3001]   scr: 0.9133
+	  V [E3 B1]   scr: 0.5625
+Train Loss: 0.221541	Valid Loss: 1.493142
+-------------- Epoch 4 --------------
+	  T [E4 B1]   scr: 0.9375
+	  T [E4 B1001]   scr: 0.9235
+	  T [E4 B2001]   scr: 0.9246
+	  T [E4 B3001]   scr: 0.9263
+	  V [E4 B1]   scr: 0.7812
+Train Loss: 0.182373	Valid Loss: 1.631484
+-------------- Epoch 5 --------------
+	  T [E5 B1]   scr: 0.9375
+	  T [E5 B1001]   scr: 0.9331
+	  T [E5 B2001]   scr: 0.9338
+	  T [E5 B3001]   scr: 0.9344
+	  V [E5 B1]   scr: 0.6875
+Train Loss: 0.161682	Valid Loss: 1.413246
+-------------- Epoch 6 --------------
+	  T [E6 B1]   scr: 0.9375
+	  T [E6 B1001]   scr: 0.9476
+	  T [E6 B2001]   scr: 0.9499
+	  T [E6 B3001]   scr: 0.9525
+	  V [E6 B1]   scr: 0.5938
+Train Loss: 0.114137	Valid Loss: 1.750621
+
+* Stopped early *
+
+
+	Testing...
+	  T [B1]   scr: 0.8125
+Testing took 84.41 seconds
+{'0Act-0Obj': 0, '0Obj-Rep': 1, 'Dis-Pro': 2, 'Dis-Vau': 3, 'Fix-Pro': 4, 'Fix-Vau': 5}
+
+phases_preds counts: [1111  695   89 1569  128 2818] 	 6410
+phases_gt counts: [ 579 1423   53  916  100 3339] 	 6410
+{0: '0Act-0Obj', 1: '0Obj-Rep', 2: 'Dis-Pro', 3: 'Dis-Vau', 4: 'Fix-Pro', 5: 'Fix-Vau'}
+
+Video a334 Phase Report
+             	|   T Preds   |  T Targets  ||  Diff
+0Act-0Obj    	| 18.52   min | 9.65    min || 8.87    min
+0Obj-Rep     	| 11.58   min | 23.72   min || -12.13  min
+Dis-Pro      	| 1.48    min | 0.88    min || 0.60    min
+Dis-Vau      	| 26.15   min | 15.27   min || 10.88   min
+Fix-Pro      	| 2.13    min | 1.67    min || 0.47    min
+Fix-Vau      	| 46.97   min | 55.65   min || -8.68   min 
+
+
+phases_preds counts: [1769  761 1312 4265  187 4662] 	 12956
+phases_gt counts: [2841  718 1344 3002  155 4896] 	 12956
+{0: '0Act-0Obj', 1: '0Obj-Rep', 2: 'Dis-Pro', 3: 'Dis-Vau', 4: 'Fix-Pro', 5: 'Fix-Vau'}
+
+Video f63b Phase Report
+             	|   T Preds   |  T Targets  ||  Diff
+0Act-0Obj    	| 29.48   min | 47.35   min || -17.87  min
+0Obj-Rep     	| 12.68   min | 11.97   min || 0.72    min
+Dis-Pro      	| 21.87   min | 22.40   min || -0.53   min
+Dis-Vau      	| 71.08   min | 50.03   min || 21.05   min
+Fix-Pro      	| 3.12    min | 2.58    min || 0.53    min
+Fix-Vau      	| 77.70   min | 81.60   min || -3.90   min 
+
+
+
+Number of videos: 2
+Video graphing took 1.23 seconds
+
+Saved phase metric graphs to ./logs/LDSS-2508-1/spatialphase1/eval/phase-charts
+
+	 = = = = = 	 = = = = =
+		 Fold 2 done!
+	 = = = = = 	 = = = = =
+
+  Fold 3 splits:
+	train ['26d9', '315a', '436c', '5238', 'a334', 'a909', 'b670', 'b71b', 'e8d3', 'f63b']
+	valid ['cf7c']
+	test ['e6a9', 'e8d7']
+
+    No 'path_spaceModel' found. Using pretrained resnet50 in l4-fine-tune mode.
+    Feature size of 2048 at node 'flatten'
+
+Feature path (spacefmaps_f3) not found in ./logs/LDSS-2508-1/spatialphase1/process/features
+
+-------------- Epoch 1 --------------
+	  T [E1 B1]   scr: 0.0000
+	  T [E1 B1001]   scr: 0.7669
+	  T [E1 B2001]   scr: 0.8054
+	  T [E1 B3001]   scr: 0.8253
+	  V [E1 B1]   scr: 0.6250
+Train Loss: 0.458339	Valid Loss: 1.301799
+
+* New best model (valid loss): inf --> 1.3018 *
+
+-------------- Epoch 2 --------------
+	  T [E2 B1]   scr: 0.8750
+	  T [E2 B1001]   scr: 0.8837
+	  T [E2 B2001]   scr: 0.8882
+	  T [E2 B3001]   scr: 0.8928
+	  V [E2 B1]   scr: 0.6562
+Train Loss: 0.268304	Valid Loss: 1.231653
+
+* New best model (valid loss): 1.3018 --> 1.2317 *
+
+-------------- Epoch 3 --------------
+	  T [E3 B1]   scr: 0.9062
+	  T [E3 B1001]   scr: 0.9112
+	  T [E3 B2001]   scr: 0.9129
+	  T [E3 B3001]   scr: 0.9144
+	  V [E3 B1]   scr: 0.5000
+Train Loss: 0.208749	Valid Loss: 1.356482
+-------------- Epoch 4 --------------
+	  T [E4 B1]   scr: 0.9688
+	  T [E4 B1001]   scr: 0.9249
+	  T [E4 B2001]   scr: 0.9267
+	  T [E4 B3001]   scr: 0.9264
+	  V [E4 B1]   scr: 0.6562
+Train Loss: 0.178114	Valid Loss: 1.403433
+-------------- Epoch 5 --------------
+	  T [E5 B1]   scr: 0.9375
+	  T [E5 B1001]   scr: 0.9340
+	  T [E5 B2001]   scr: 0.9343
+	  T [E5 B3001]   scr: 0.9361
+	  V [E5 B1]   scr: 0.6562
+Train Loss: 0.153846	Valid Loss: 1.525276
+-------------- Epoch 6 --------------
+	  T [E6 B1]   scr: 1.0000
+	  T [E6 B1001]   scr: 0.9439
+	  T [E6 B2001]   scr: 0.9423
+	  T [E6 B3001]   scr: 0.9422
+	  V [E6 B1]   scr: 0.6875
+Train Loss: 0.135854	Valid Loss: 1.487426
+-------------- Epoch 7 --------------
+	  T [E7 B1]   scr: 0.9375
+	  T [E7 B1001]   scr: 0.9515
+	  T [E7 B2001]   scr: 0.9544
+	  T [E7 B3001]   scr: 0.9562
+	  V [E7 B1]   scr: 0.7812
+Train Loss: 0.099462	Valid Loss: 1.574228
+
+* Stopped early *
+
+
+	Testing...
+	  T [B1]   scr: 0.5000
+Testing took 83.83 seconds
+{'0Act-0Obj': 0, '0Obj-Rep': 1, 'Dis-Pro': 2, 'Dis-Vau': 3, 'Fix-Pro': 4, 'Fix-Vau': 5}
+
+phases_preds counts: [1979 1059  468 4388  118 4752] 	 12764
+phases_gt counts: [2072 1604  445 4324  280 4039] 	 12764
+{0: '0Act-0Obj', 1: '0Obj-Rep', 2: 'Dis-Pro', 3: 'Dis-Vau', 4: 'Fix-Pro', 5: 'Fix-Vau'}
+
+Video e6a9 Phase Report
+             	|   T Preds   |  T Targets  ||  Diff
+0Act-0Obj    	| 32.98   min | 34.53   min || -1.55   min
+0Obj-Rep     	| 17.65   min | 26.73   min || -9.08   min
+Dis-Pro      	| 7.80    min | 7.42    min || 0.38    min
+Dis-Vau      	| 73.13   min | 72.07   min || 1.07    min
+Fix-Pro      	| 1.97    min | 4.67    min || -2.70   min
+Fix-Vau      	| 79.20   min | 67.32   min || 11.88   min 
+
+
+phases_preds counts: [ 902  939   36 1848  214 2639] 	 6578
+phases_gt counts: [ 964  890  836 1709  211 1968] 	 6578
+{0: '0Act-0Obj', 1: '0Obj-Rep', 2: 'Dis-Pro', 3: 'Dis-Vau', 4: 'Fix-Pro', 5: 'Fix-Vau'}
+
+Video e8d7 Phase Report
+             	|   T Preds   |  T Targets  ||  Diff
+0Act-0Obj    	| 15.03   min | 16.07   min || -1.03   min
+0Obj-Rep     	| 15.65   min | 14.83   min || 0.82    min
+Dis-Pro      	| 0.60    min | 13.93   min || -13.33  min
+Dis-Vau      	| 30.80   min | 28.48   min || 2.32    min
+Fix-Pro      	| 3.57    min | 3.52    min || 0.05    min
+Fix-Vau      	| 43.98   min | 32.80   min || 11.18   min 
+
+
+
+Number of videos: 2
+Video graphing took 1.24 seconds
+
+Saved phase metric graphs to ./logs/LDSS-2508-1/spatialphase1/eval/phase-charts
+
+	 = = = = = 	 = = = = =
+		 Fold 3 done!
+	 = = = = = 	 = = = = =
+
+  Fold 4 splits:
+	train ['26d9', '315a', '436c', 'a334', 'a909', 'b670', 'b71b', 'e6a9', 'e8d7', 'f63b']
+	valid ['cf7c']
+	test ['5238', 'e8d3']
+
+    No 'path_spaceModel' found. Using pretrained resnet50 in l4-fine-tune mode.
+    Feature size of 2048 at node 'flatten'
+
+Feature path (spacefmaps_f4) not found in ./logs/LDSS-2508-1/spatialphase1/process/features
+
+-------------- Epoch 1 --------------
+	  T [E1 B1]   scr: 0.2812
+	  T [E1 B1001]   scr: 0.7442
+	  T [E1 B2001]   scr: 0.7918
+	  T [E1 B3001]   scr: 0.8136
+	  V [E1 B1]   scr: 0.6875
+Train Loss: 0.473081	Valid Loss: 1.194610
+
+* New best model (valid loss): inf --> 1.1946 *
+
+-------------- Epoch 2 --------------
+	  T [E2 B1]   scr: 0.9688
+	  T [E2 B1001]   scr: 0.8809
+	  T [E2 B2001]   scr: 0.8855
+	  T [E2 B3001]   scr: 0.8893
+	  V [E2 B1]   scr: 0.6250
+Train Loss: 0.272284	Valid Loss: 1.274385
+-------------- Epoch 3 --------------
+	  T [E3 B1]   scr: 0.9375
+	  T [E3 B1001]   scr: 0.9110
+	  T [E3 B2001]   scr: 0.9125
+	  T [E3 B3001]   scr: 0.9142
+	  V [E3 B1]   scr: 0.5312
+Train Loss: 0.211588	Valid Loss: 1.629592
+-------------- Epoch 4 --------------
+	  T [E4 B1]   scr: 0.9062
+	  T [E4 B1001]   scr: 0.9267
+	  T [E4 B2001]   scr: 0.9258
+	  T [E4 B3001]   scr: 0.9264
+	  V [E4 B1]   scr: 0.6250
+Train Loss: 0.178944	Valid Loss: 1.621957
+-------------- Epoch 5 --------------
+	  T [E5 B1]   scr: 0.9688
+	  T [E5 B1001]   scr: 0.9366
+	  T [E5 B2001]   scr: 0.9369
+	  T [E5 B3001]   scr: 0.9371
+	  V [E5 B1]   scr: 0.7812
+Train Loss: 0.151293	Valid Loss: 1.613948
+-------------- Epoch 6 --------------
+	  T [E6 B1]   scr: 0.9062
+	  T [E6 B1001]   scr: 0.9486
+	  T [E6 B2001]   scr: 0.9519
+	  T [E6 B3001]   scr: 0.9539
+	  V [E6 B1]   scr: 0.7188
+Train Loss: 0.106663	Valid Loss: 1.774086
+
+* Stopped early *
+
+
+	Testing...
+	  T [B1]   scr: 0.7812
+Testing took 109.66 seconds
+{'0Act-0Obj': 0, '0Obj-Rep': 1, 'Dis-Pro': 2, 'Dis-Vau': 3, 'Fix-Pro': 4, 'Fix-Vau': 5}
+
+phases_preds counts: [2603 1108  832 3619  100 3064] 	 11326
+phases_gt counts: [2439 1014  359 4849  135 2530] 	 11326
+{0: '0Act-0Obj', 1: '0Obj-Rep', 2: 'Dis-Pro', 3: 'Dis-Vau', 4: 'Fix-Pro', 5: 'Fix-Vau'}
+
+Video 5238 Phase Report
+             	|   T Preds   |  T Targets  ||  Diff
+0Act-0Obj    	| 43.38   min | 40.65   min || 2.73    min
+0Obj-Rep     	| 18.47   min | 16.90   min || 1.57    min
+Dis-Pro      	| 13.87   min | 5.98    min || 7.88    min
+Dis-Vau      	| 60.32   min | 80.82   min || -20.50  min
+Fix-Pro      	| 1.67    min | 2.25    min || -0.58   min
+Fix-Vau      	| 51.07   min | 42.17   min || 8.90    min 
+
+
+phases_preds counts: [1098   20  491 2445   57 3300] 	 7411
+phases_gt counts: [ 632    0  451 3121   57 3150] 	 7411
+{0: '0Act-0Obj', 1: '0Obj-Rep', 2: 'Dis-Pro', 3: 'Dis-Vau', 4: 'Fix-Pro', 5: 'Fix-Vau'}
+
+Video e8d3 Phase Report
+             	|   T Preds   |  T Targets  ||  Diff
+0Act-0Obj    	| 18.30   min | 10.53   min || 7.77    min
+0Obj-Rep     	| 0.33    min | 0.00    min || 0.33    min
+Dis-Pro      	| 8.18    min | 7.52    min || 0.67    min
+Dis-Vau      	| 40.75   min | 52.02   min || -11.27  min
+Fix-Pro      	| 0.95    min | 0.95    min || 0.00    min
+Fix-Vau      	| 55.00   min | 52.50   min || 2.50    min 
+
+
+
+Number of videos: 2
+Video graphing took 1.20 seconds
+
+Saved phase metric graphs to ./logs/LDSS-2508-1/spatialphase1/eval/phase-charts
+
+	 = = = = = 	 = = = = =
+		 Fold 4 done!
+	 = = = = = 	 = = = = =
+
+  Fold 5 splits:
+	train ['26d9', '315a', '436c', '5238', 'a334', 'b670', 'e6a9', 'e8d3', 'e8d7', 'f63b']
+	valid ['cf7c']
+	test ['a909', 'b71b']
+
+    No 'path_spaceModel' found. Using pretrained resnet50 in l4-fine-tune mode.
+    Feature size of 2048 at node 'flatten'
+
+Feature path (spacefmaps_f5) not found in ./logs/LDSS-2508-1/spatialphase1/process/features
+
+-------------- Epoch 1 --------------
+	  T [E1 B1]   scr: 0.0312
+	  T [E1 B1001]   scr: 0.7473
+	  T [E1 B2001]   scr: 0.7908
+	  T [E1 B3001]   scr: 0.8149
+	  V [E1 B1]   scr: 0.7812
+Train Loss: 0.472022	Valid Loss: 1.203995
+
+* New best model (valid loss): inf --> 1.2040 *
+
+-------------- Epoch 2 --------------
+	  T [E2 B1]   scr: 0.7500
+	  T [E2 B1001]   scr: 0.8834
+	  T [E2 B2001]   scr: 0.8876
+	  T [E2 B3001]   scr: 0.8900
+	  V [E2 B1]   scr: 0.5625
+Train Loss: 0.268332	Valid Loss: 1.445293
+-------------- Epoch 3 --------------
+	  T [E3 B1]   scr: 0.8125
+	  T [E3 B1001]   scr: 0.9097
+	  T [E3 B2001]   scr: 0.9118
+	  T [E3 B3001]   scr: 0.9140
+	  V [E3 B1]   scr: 0.5312
+Train Loss: 0.210322	Valid Loss: 1.706078
+-------------- Epoch 4 --------------
+	  T [E4 B1]   scr: 0.9688
+	  T [E4 B1001]   scr: 0.9259
+	  T [E4 B2001]   scr: 0.9264
+	  T [E4 B3001]   scr: 0.9264
+	  V [E4 B1]   scr: 0.6875
+Train Loss: 0.175557	Valid Loss: 1.734240
+-------------- Epoch 5 --------------
+	  T [E5 B1]   scr: 0.8438
