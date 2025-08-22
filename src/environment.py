@@ -89,7 +89,7 @@ class Classroom():
       studentStatus = "New"
       num = 1
       while True:
-        id_student = f"{MODEL['domain']}{MODEL['type']}{num}"
+        id_student = self.get_modelId(MODEL)
         if id_student not in os.listdir(self.path_classroom):
           break
         num += 1
@@ -121,10 +121,24 @@ class Classroom():
 
   def get_modelId(self, MODEL):
     # learnMode = {"space": "SP", "time": "TP", "spatio-temporal": "ST"}
-    transferMode = {"feat-xtract": "FX", "fine-tune": "FT", "l4-fine-tune": "pFT"}
+    spaceTransferMode = {'': '', "feat-xtract": "FX", "fine-tune": "FT", "l4-fine-tune": "pFT"}
     spaceArch = {"resnet50": "RN50"}
-    timeArch = {"tecno": "TECNO", "phatima": "PHA"}
-    modelId = f"{transferMode[MODEL['transferMode']]}-{spaceArch[MODEL['spaceArch']]}-{timeArch[MODEL['timeArch']]}"
+    timeTransferMode = {'': '', "feat-xtract": "FX", "fine-tune": "FT"}
+    timeArch = {"tecno": "TECNO", "phatima": "PHA", "dTsNet": "DTS", "pTsNet": "PTS"}
+    classifierArch = {"one-linear": "1L", "two-linear": "2L"}
+    domain = MODEL["domain"].split('-')  # e.g. ['space', 'time'] or ['space', time']
+    modelId = []
+
+    if "space" in domain:
+      modelId.append(spaceTransferMode[MODEL["spaceTransferMode"]])  # e.g. "FT" or "FX"
+      modelId.append(spaceArch[MODEL["spaceArch"]])
+    elif "time" in domain:
+      modelId.append(timeTransferMode[MODEL["timeTransferMode"]])  # e.g. "FT" or "FX"
+      modelId.append(timeArch[MODEL["timeArch"]])
+
+    modelId.append(classifierArch[MODEL["classifierArch"]])
+    # print(modelId)
+    return '-'.join(modelId)
   
   def match_learningEnvironment(self, TRAIN, DATA):
     classrooms = [c for c in os.listdir(self.path_logs)
@@ -186,7 +200,7 @@ class Classroom():
     paths_data = {}
     paths_data["path_dataset"] = os.path.join(self.path_data, "data", id_dataset)
     paths_data["path_samples"] = os.path.join(paths_data["path_dataset"], "samples")
-    paths_data["path_labels"] = os.path.join(paths_data["path_dataset"], "labels", f"{'-'.join(list(labelType)[1:3])}.csv")
+    paths_data["path_labels"] = os.path.join(paths_data["path_dataset"], "labels", f"{labelType}.csv")
     paths_data["path_annots"] = os.path.join(paths_data["path_dataset"], "annotations")
     return paths_data
   def _get_paths_logs(self, id_student):
@@ -285,9 +299,8 @@ def build_globalCM(path_preds, path_to, n_classes, labelType, labelToClassMap, D
     return None
 
   # map string labels to integers
-  label_to_idx = {label: i for i, label in enumerate(sorted(labelToClassMap.keys()))}
-  pred_indices = torch.tensor([label_to_idx[p] for p in overallBundle["Pred"]], device=DEVICE)
-  target_indices = torch.tensor([label_to_idx[t] for t in overallBundle["Target"]], device=DEVICE)
+  pred_indices = torch.tensor([labelToClassMap[p] for p in overallBundle["Pred"]], device=DEVICE)
+  target_indices = torch.tensor([labelToClassMap[t] for t in overallBundle["Target"]], device=DEVICE)
 
   # debug: check tensor shapes
   print(f"Pred tensor shape: {pred_indices.shape}, Target tensor shape: {target_indices.shape}")

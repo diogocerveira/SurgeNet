@@ -61,9 +61,9 @@ class SampledVideosDataset(Dataset):
     self.n_classes = len(self.labelToClassMap)
     self.headType = headType.split('-') if headType else [self.n_classes]  # default to single head strct [4, 3]
     self.phases = self._get_phases()  # Get unique phases from labels
-    print(f"Phases (#{len(self.phases)}): ", self.phases)
+
     self.classWeights = self.get_labelWeights(self.labels)
-    print(f"Class weights: {self.classWeights}\n")
+    
      # check if the class distribution is balanced
     if all([self.classWeights[i] == self.classWeights[i + 1] for i in range(len(self.classWeights) - 1)]):
       self.BALANCED = True
@@ -225,31 +225,32 @@ class SampledVideosDataset(Dataset):
     """
     if labelType[0] == "single":
       # single-label per sample
-      targets = [self.labelToClassMap[label.strip()] for label in labels]
-      return torch.tensor(targets, dtype=torch.long)
+      classTargets = [self.labelToClassMap[label.strip()] for label in labels]
+      return [torch.tensor(classTargets, dtype=torch.long)]
 
     elif labelType[0] == "multi":
-      # convert labels to global indices
-      label_indices = [
+      # convert labels to classes
+      classTargets = [
         [self.labelToClassMap[lbl.strip()] for lbl in multi.split(',')]
         for multi in labels
       ]
 
       if len(self.headType) == 1:
         # single multi-label head
-        targets = self._multiHot(label_indices, self.n_classes)
-        return targets
-      else:
+        multiHotTargets = self._multiHot(classTargets, self.n_classes)
+        return [multiHotTargets]
+      elif len(self.headType) == 2:
         # multi-head
-        head_targets = []
+        multiHotTargets = []
         # compute head splits from self.headType
-        splits = ((0, 1, 3, 5), (1, 4, 6))
-        for head_classes in splits:  # e.g., (0,1,3,5)
-          idx_map = {c:i for i,c in enumerate(head_classes)}
-          head_multi = self._multiHot(label_indices, len(head_classes), idx_map=idx_map)
-          head_targets.append(head_multi)
-
-        return head_targets
+        splits = ((0, 2, 3, 5), (1, 4, 6))
+        for headClassTargets in splits:  # e.g., (0,1,3,5)
+          idxMap = {c:i for i,c in enumerate(headClassTargets)}
+          headTargets = self._multiHot(classTargets, len(headClassTargets), idx_map=idxMap)
+          multiHotTargets.append(headTargets)
+        return multiHotTargets
+      else:
+        assert 1 == 0, "Head type not implemented"
 
     else:
       raise ValueError(f"Invalid labelType: {labelType[0]}")
@@ -372,7 +373,7 @@ class SampledVideosDataset(Dataset):
     classes = [tuple([labelToClassMap[single] for single in multi.split(',')]) for multi in labels["frameLabels"]]
     # print(classes[:5])
     self.classToLabelMap = {i: l for i, l in enumerate(sorted(list(uniqueLabels)))}
-    print(self.classToLabelMap)
+    # print(self.classToLabelMap)
     # print(classes[:5])
     return labelToClassMap
 
@@ -566,11 +567,9 @@ class Cataloguer():
         totalFrameLabels.extend(frameLabels)
         # print(len(totalFrameClasses), len(totalFrameIds))
       elif videoId.startswith(('.', '_')):  # hidden file are disregarded
-        print(f"   Skipping hidden file {videoId}\n")
-        continue
+        print(f"   Skipping hidden file {videoId}")
       else:
         print(f"   Warning: Skipping annotation for {videoId} ({path_annot} not found)")
-
     # Prepare CSV file
     with open(path_to, 'w', newline='') as file_csv:  # newline='' maximizes compatibility with other os
       fieldNames = ['frameId', 'frameLabels']
@@ -585,6 +584,8 @@ class Cataloguer():
       for frameId, frameLabel in sortedZip:
         writer.writerow({'frameId': frameId, 'frameLabels': frameLabel})
         # print(frameLabel, end='\n')
+    print()
+
 
   def _get_phaseDelimiters(self, path_annot):
     ''' extract annotated video frames from annotation file as (timestamp, label))

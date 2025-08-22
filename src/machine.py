@@ -16,55 +16,57 @@ class Phasinator(nn.Module):
   ''' Receives [batch_size, in_channels, in_length] 1st guesses
       Outputs [output_stage_id, batch_size, N_CLASSES, in_length] further guesses
   '''
-  def __init__(self, modelDomain, spaceinator, timeinator, classroomId, fold):
+  def __init__(self, domain, spaceinator, timeinator, classinator, id):
     super().__init__()
     self.valid_lastScore = -np.inf
-    
+    # inputType = MODEL["inputType"]
     # the modular approach allows to have modules with no conditional on the forward pass
-    if modelDomain == "spatial":
-      classifier = Classifier(spaceinator.featureSize, spaceinator.n_classes)
-      inators = [spaceinator, classifier]
+    if domain == "space":
+      backbone = [spaceinator]
+      head = classinator
       inputType = "images-frame"
-      arch = spaceinator.arch
-    elif modelDomain == "spatdur":
-      headType = spaceinator.head if spaceinator.head else str(spaceinator.n_classes)
-      classifier = Classifier(spaceinator.featureSize, spaceinator.n_classes, add_timestamps=spaceinator.add_timestamps, heads=headType)
-      inators = [spaceinator, classifier]
-      inputType = "images-frame"
-      arch = spaceinator.arch
-    elif modelDomain == "temporal":
+      arch = (spaceinator.arch, classinator.arch)
+    elif domain == "space-time":
+      if timeinator.arch == "dTsNet" or timeinator.arch == "pTsNet":
+        backbone = [spaceinator, timeinator]
+        head = classinator
+        inputType = "images-frame"
+        arch = (spaceinator.arch, timeinator.arch, classinator.arch)
+        spaceinator.feed_ts = True  # Enable time feature feeding
+        print(f"[DEBUG] Spaceinator will feed time features: {spaceinator.feed_ts}")
+      else:
+        assert 1 == 0, "Not implemented yet!"
+    elif domain == "time":
       if timeinator.arch == "phatima":
-        classifier = Classifier(timeinator.featureSize, timeinator.n_classes)
-        inators = [timeinator, classifier]
+        backbone = [timeinator]
+        head = classinator
+        assert 1 == 0, "Not implemented yet!"
       elif timeinator.arch == "tecno":
-        inators = [timeinator]
+        backbone = []
+        head = [timeinator]
       inputType = "fmaps-clip"
-      arch = timeinator.arch
-    elif modelDomain == "full":
-      classifier = Classifier(timeinator.featureSize, timeinator.n_classes)
-      inators = [spaceinator, timeinator, classifier]
+      arch = (timeinator.arch,)
+    elif domain == "full":
+      backbone = [spaceinator]
+      head = timeinator
       inputType = "images-frame"
       arch = "full"
-    elif modelDomain == "classifier":
-      inators = [Classifier(spaceinator.featureSize, spaceinator.n_classes)]
+      assert 1 == 0, "Not implemented yet!"
+    elif domain == "linear":
+      backbone = []
+      head = classinator
       inputType = "images-frame"
       arch = "linear"
-    elif modelDomain == "classifier-space":
-      inators = [Classifier(spaceinator.featureSize, spaceinator.n_classes)]
-      inputType = "fmaps-frame"
-      arch = "linear"
-    elif modelDomain == "classifier-time":
-      inators = [Classifier(timeinator.featureSize, timeinator.n_classes)]
-      inputType = "fmaps-clip"
-      arch = "linear"
+      assert 1 == 0, "Not implemented yet!"
     else:
       raise ValueError("Invalid domain choice!")
-    self.inators = nn.Sequential(*inators)
-    self.domain = modelDomain
+    
+    self.inators = nn.Sequential(*(backbone + [head]))
+    self.domain = domain
     self.arch = arch
     self.inputType = inputType
-    self.id = f"{modelDomain}phase-{classroomId}_f{fold}" # model name for logging/saving
-    self.headType = headType
+    self.id = id # model name for logging/saving
+    self.headType = classinator.heads
 
   def forward(self, x_batch):
     # print("Input shape: ", x_batch.shape)
@@ -89,35 +91,33 @@ class Spaceinator(nn.Module):
     self.n_classes = n_classes
     self.arch = MODEL["spaceArch"]
     preweights = self._get_preweights(MODEL["spacePreweights"])
-    transferMode = MODEL["spaceTransferLearning"]
+    transferMode = MODEL["spaceTransferMode"]
     self.model = self._get_model(self.arch, preweights, transferMode, MODEL["path_spaceModel"])  # to implement my own in model.py 
+    
     self.featureSize = self.model.fc.in_features
     self.featureNode = fxs.get_graph_node_names(self.model)[0][-2] # -2 is the flatten node (virtual layer)
     self.neuron = nn.Linear(1, 1)
-    if self.domain == "temporal" and MODEL["path_spaceModel"]:
+
+    if self.domain == "time" and MODEL["path_spaceModel"]:
       self.exportedFeatures = torch.load(MODEL["path_spaceModel"], weights_only=False, map_location="cpu")
-    self.add_timestamps = MODEL["add_timestamps"]
-    self.head = MODEL["classifierType"]
+
+    self.feed_ts = False
     # print(self.model)
     # print(fxs.get_graph_node_names(self.model)[0])
     
   def forward(self, x):
-    if self.domain == "spatdur":
+    if self.feed_ts:
       x, timestamps = x  # Unpack: x → [B, C, H, W], timestamps → [B]
       # print(f"[DEBUG] Duration values shape before unsqueeze: {timestamps.shape}", flush=True)
     # print(f"Spaceinator input shape: {x.shape}", flush=True)
-
     x = self.model(x)  # → [B, 2048]
     # print("spaceinator output shape: ", x.shape)
     # print(f"[DEBUG] Feature map after model: {x.shape}", flush=True)
-    if self.domain == "spatdur":      # Add duration as new feature
+    if self.feed_ts:      # Add duration as new feature
       x = (x, timestamps)
       # print(f"[DEBUG] Concatenated features + duration: {x.shape}", flush=True)
-      
     return x
 
-
-  
   def _get_model(self, arch, preweights, transferMode, path_model):
     # Choose model architecture - backbones
     if arch == "resnet50":
@@ -232,10 +232,11 @@ class Timeinator(nn.Module):
     preweights = None
     transferMode = None
     self.model = self._get_model(self.arch, MODEL, in_channels, n_classes)  # to implement my own in model.py 
+    
     self.featureSize = self.model.featureSize
-    self.featureNode = fxs.get_graph_node_names(self.model)[0][-2] # -2 is the flatten node (virtual layer)
+    self.featureNode = fxs.get_graph_node_names(self.model)[0][-1]
 
-    if self.domain == "classifier" and MODEL["path_timeModel"]:
+    if self.domain == "class" and MODEL["path_timeModel"]:
       self.exportedFeatures = torch.load(MODEL["path_spaceModel"], weights_only=False, map_location="cpu")
   
   def forward(self, x):
@@ -252,6 +253,8 @@ class Timeinator(nn.Module):
       model = Phatima(MODEL, in_channels, n_classes)
     elif arch == "tecno":
       model = Tecno(MODEL, in_channels, n_classes)
+    elif arch == "dTsNet" or arch == "pTsNet":
+      model = TsNet(MODEL, in_channels)
     else:
       raise ValueError("Invalid time architecture choice!")
     return model
@@ -378,7 +381,7 @@ class _TecnoStage(nn.Module):
     x = self.conv1x1_out(x)
     # print("After conv1x1_out Shape: ", x.shape)
     return x
-  
+
 class _IdentityResBlock(nn.Module):
   # Dilated Residual Block of Layers
   def __init__(self, in_channels, out_channels, kernelSize, dilation):
@@ -415,41 +418,82 @@ class _ProjectionResBlock(nn.Module):
     out = self.dropout(out)
     x = self.conv1x1_proj(x)  # project input to output channels
     return out + x
-
-class Classifier(nn.Module):
-  def __init__(self, FEATURE_SIZE, N_CLASSES, add_timestamps="no", heads=None):
+  
+class TsNet(nn.Module):
+  def __init__(self, MODEL, in_channels):
     super().__init__()
-    self.add_timestamps = True if (add_timestamps == "direct" or add_timestamps == "mlp") else False
-    self.FEATURE_SIZE = FEATURE_SIZE
-    if self.add_timestamps:
-      self.FEATURE_SIZE += 1
-    if add_timestamps == "mlp":
+    self.projChannels = MODEL["proj_channels"] if MODEL["proj_channels"] else 5
+    
+    if MODEL["timeArch"] == "pTsNet":
       self.tsFeed = nn.Sequential(
-        nn.Linear(1, 5),
+        nn.Linear(1, self.projChannels),
         nn.ReLU(),
-        nn.Linear(5, 1)
+        nn.Linear(self.projChannels, 1)
       )
-    else:
+    elif MODEL["timeArch"] == "dTsNet":
       self.tsFeed = nn.Identity()
+    else:
+      raise ValueError("Invalid TsNet type!")
+    self.featureSize = 1 + in_channels  # assuming input features are of size 2048 (e.g., from ResNet50)
+  def forward(self, x):
+    x, ts = x  # Unpack: x → [B, F], ts → [B]
+    # print("x.shape: ", x.shape, "timestamps.shape: ", ts.shape)
+    ts = ts.unsqueeze(1)  # [B] → [B, 1]
+    # print("unsqueezed.shape: ", ts.shape)
+    ts = self.tsFeed(ts)
+    # print("ts.shape: ", ts.shape)
+    x = torch.cat((x, ts), dim=1)  # [B, F] + [B, 1] → [B, F+1]
+    # print("After concat shape: ", x.shape)
+    return x
+  
 
-    if not heads:
-      heads = [N_CLASSES]
-    heads = heads.split("-")
-    self.linear = nn.Linear(self.FEATURE_SIZE, int(heads[0]))
-    self.linear2 = nn.Linear(self.FEATURE_SIZE, int(heads[1])) if len(heads) > 1 else None
+class Classinator(nn.Module):
+  def __init__(self, MODEL, spaceFeatureSize, timeFeatureSize, N_CLASSES):
+    super().__init__()
+    self.FEATURE_SIZE = spaceFeatureSize if MODEL["domain"] in ["space", "spacetime"] else timeFeatureSize
+    self.arch = MODEL["classifierArch"]
+    self.heads = [int(head) for head in MODEL["headType"].split("-")] if MODEL["headType"] else [N_CLASSES]
+    assert sum(self.heads) == N_CLASSES, "Incompatible head configuration"
+    self.model = self._get_model(self.arch, MODEL, self.FEATURE_SIZE, self.heads)  # to implement my own in model.py
 
   def forward(self, x):
-    if self.add_timestamps:
-      x, timestamps = x  # Unpack: x → [B, C, H, W], timestamps → [B]
-      # print("x.shape: ", x.shape, "timestamps.shape: ", timestamps.shape)
-      squeezed = timestamps.unsqueeze(1)  # [B] → [B, 1]
-      # print("squeezed.shape: ", squeezed.shape)
-      timestamps = self.tsFeed(squeezed)
-      # print("timestamps.shape: ", timestamps.shape)
-      x = torch.cat((x, timestamps), dim=1)
-    x1 = self.linear(x)  # → [B, N_CLASSES]
-    if self.linear2:
-      x2 = self.linear2(x)
-      return x1, x2
-    # print("Classifier output shape: ", x.shape)
-    return x1
+    # print("Before Classinator Shape: ", x.shape)
+    x = self.model(x)
+    # print("After Classinator Shape: ", x.shape)
+    return x
+
+  def _extract(self, images, nodesToExtract):
+    # Extract features at specified nodes
+    return fx.create_feature_extractor(self.model, return_nodes=nodesToExtract)(images)
+  def _get_model(self, arch, MODEL, in_channels, n_classes):
+    # Choose model architecture - backbones
+    if arch == "one-linear":
+      assert len(n_classes) == 1, "Single head classifier expects single integer for n_classes"
+      model = SingleHeadLinearClassifier(MODEL, in_channels, n_classes[0])
+    elif arch == "two-linear":
+      assert len(n_classes) == 2, "Two head classifier expects tuple of size two for n_classes"
+      model = TwoHeadLinearClassifier(MODEL, in_channels, n_classes)
+    else:
+      raise ValueError("Invalid classifier architecture choice!")
+    return model
+  
+class SingleHeadLinearClassifier(nn.Module):
+  def __init__(self, MODEL, featureSize, n_classes):
+    super().__init__()
+    self.linear = nn.Linear(featureSize, n_classes)
+
+  def forward(self, x):
+    x = self.linear(x)  # → [B, N_CLASSES]
+    return x
+  
+class TwoHeadLinearClassifier(nn.Module):
+  def __init__(self, MODEL, featureSize, n_classes):
+    super().__init__()
+    n_classes1, n_classes2 = n_classes # tuple of size two
+    self.linear1 = nn.Linear(featureSize, n_classes1)
+    self.linear2 = nn.Linear(featureSize, n_classes2)
+
+  def forward(self, x):
+    x1 = self.linear1(x)  # → [B, N_CLASSES]
+    x2 = self.linear2(x)
+    return x1, x2

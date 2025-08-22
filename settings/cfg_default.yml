@@ -11,7 +11,7 @@ actions:
 # DATA and TRAIN properties define an unique classroom
 DATA:
   id_dataset: TEST-local  # (LDSS-local, LDSSi-local, TEST-local, cifar10-ext)
-  labelType: single-phase-top1 # time-to-next-phase, single-phase, time-to-video-end, time-since-video-start
+  labelType: multi-phase-top1 # time-to-next-phase, single-phase, time-to-video-end, time-since-video-start
   actionLabels:
     - dissection
     - fixation
@@ -50,7 +50,7 @@ TRAIN: # to fix because the top ones should not define a classroom
   valid_metric: accuracy  # guiding and evaluating training
   k_folds: 7 # number of folds for cross-validation
   HYPER:  # traditional hyperparameters
-    n_epochs: 25
+    n_epochs: 2
     spaceBatchSize: 32
     timeBatchSize: 1  # batch size for temporal training
     clipSize: 0  # amount of frames (sec) per clip when temporal training
@@ -60,6 +60,28 @@ TRAIN: # to fix because the top ones should not define a classroom
     gamma: 0.1 # factor to scale learning rate by
     minDelta: 0.001  # minimum delta to save a better state
     patience: 5  # number of epochs to wait for a better state before stopping training
+
+MODEL:  # for models created/trained in the run
+  type: phase # images-frame # images-frame | imagesTs-frame | fmaps-clip
+  domain: space-time # space, time, linear
+# spatial
+  spaceTransferMode: l4-fine-tune # fine-tune | feat-xtract | l4-fine-tune
+  spaceArch: resnet50
+  spacePreweights: image-net # image-net
+  path_spaceModel: #C:/Users/DC/Documents/Programming/python/ucl/ML_SurgeNet/logs/LDSS/run_20241104-00/checkpoints/LDSS-20241104-00-fold6-0.837800.pth # if empty, uses new untrained one
+  path_spaceFeats:
+# temporal
+  timeTransferMode: # fine-tune | feat-xtract
+  timeArch: dTsNet # tecno | phatima | dTsNet | pTsNet
+  n_stages: 3
+  n_filters: 64  # number of convolution kernels per filter == number of channels
+  tf_filter: 3  # size in time (timeframe, # of frames)
+  n_blocks: 2 # inside the stage
+  proj_channels: 5 # ts-net projection channels
+# classification
+  classifierArch: two-linear # one-liner | two-linear
+  headType: 4-3 
+  n_classes:   # normally gets from dataset itself 
 
 PROCESS:  # Process
   sample: False
@@ -86,26 +108,6 @@ PROCESS:  # Process
   # - layer4.2.relu_2
   fx_temporal: False
   fx_load_models: True  #loads models to extract features if not training
-  
-MODEL:  # for models created/trained in the run
-  type: phase
-  domain: spatdur # spatial, temporal, full, classifier
-# spatial
-  spaceTransferLearning: l4-fine-tune # fine-tune | feat-xtract | l4-fine-tune
-  spaceArch: resnet50
-  spacePreweights: image-net # image-net
-  path_spaceModel: #C:/Users/DC/Documents/Programming/python/ucl/ML_SurgeNet/logs/LDSS/run_20241104-00/checkpoints/LDSS-20241104-00-fold6-0.837800.pth # if empty, uses new untrained one
-  path_spaceFeats:
-  add_timestamps: mlp # no | direct | mlp
-# temporal
-  timeArch: tecno # tecno | phatima
-  n_stages: 3
-  n_filters: 64  # number of convolution kernels per filter == number of channels
-  tf_filter: 3  # size in time (timeframe, # of frames)
-  n_blocks: 2 # inside the stage
-# classification
-  classifierType: #4-3 # space | time
-  n_classes:   # normally gets from dataset itself 
 
 EVAL:  # Eval
   eval_from: model  # model | predictions

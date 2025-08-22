@@ -1,6 +1,6 @@
 import torch.nn as nn
 import torch.nn.functional as F
-from torcheval.metrics import MulticlassAccuracy, TopKMultilabelAccuracy, MulticlassPrecision, MulticlassRecall, MulticlassF1Score, MulticlassConfusionMatrix
+from torcheval.metrics import MulticlassAccuracy, TopKMultilabelAccuracy, MulticlassPrecision, BinaryPrecision, MulticlassRecall, BinaryRecall, MulticlassF1Score, BinaryF1Score, MulticlassConfusionMatrix, BinaryConfusionMatrix
 from src import machine
 import torch
 import numpy as np
@@ -34,7 +34,12 @@ class Teacher():
     self.DATASET_SIZE = dataset.__len__()
     train_metric, valid_metric, test_metrics = self._get_metrics(TRAIN, EVAL, self.N_PHASES, dataset.labelToClassMap, dataset.labelType, DEVICE)
     criterion = self._get_criterion(TRAIN["criterionId"], dataset.classWeights, DEVICE)
-   
+
+    if dataset.labelType[0] == "single":
+      assert isinstance(criterion, torch.nn.CrossEntropyLoss), "Use CrossEntropyLoss for single-label tasks"
+    else:
+      assert isinstance(criterion, torch.nn.BCEWithLogitsLoss), "Use BCEWithLogitsLoss for multi-label tasks"
+
     self.trainer = Trainer(train_metric, criterion, TRAIN, DEVICE)
     self.validater = Validater(valid_metric, criterion, DEVICE)
     self.tester = Tester(test_metrics, dataset.labels, self.PHASES, dataset.labelToClassMap, DEVICE)
@@ -50,8 +55,7 @@ class Teacher():
         In: Untrained model, data, etc
         Out: Trained model (state_dict)
     '''
-    if not list(model.parameters()):
-      raise ValueError("Model parameters are empty/invalid. Check model initialization.")
+    print("\nTeaching model: ", model.id)
     optimizer = self._get_optimizer(model, self.trainer.optimizerId, self.trainer.learningRate, self.trainer.momentum)
     scheduler = self._get_scheduler(optimizer, self.trainer.schedulerId, self.trainer.stepSize, self.trainer.gamma)
 
@@ -71,8 +75,10 @@ class Teacher():
         print(f"\n Dataset augmentation strength increased to {self.dataset.strength} \n")
 
       print(f"-------------- Epoch {epoch + 1} --------------")
-      train_loss, train_score = self.trainer.train(model, trainloader, self.labelType, labels, optimizer, epoch)
-      valid_loss, valid_score = self.validater.validate(model, validloader, self.labelType, labels, epoch)
+      print("        T")
+      train_loss, train_score = self.trainer.train(model, trainloader, self.labelType, labels, optimizer)
+      print("        V")
+      valid_loss, valid_score = self.validater.validate(model, validloader, self.labelType, labels)
 
       self.writer.add_scalar("Loss/train", train_loss, epoch + 1)
       self.writer.add_scalar("Loss/valid", valid_loss, epoch + 1)
@@ -182,6 +188,101 @@ class Teacher():
     print(f"Checkpoint loaded: Epoch {epoch}, Loss {loss}")
     return model, optimizer, epoch, loss
 
+def nextBatch(data, labels, model, labelType, batchStats, DEVICE):
+  try:
+    inputs, targets, idxs = data[0].to(DEVICE), data[1].to(DEVICE), data[2].to(DEVICE) # data is a list of [inputs, labels]
+    # print("inputs: ", inputs.shape, "\ttargets: ", targets.shape, '\n')
+    # print(targets[:5])  # show a few samples
+    if model.domain == "space-time" and ("dTsNet" in model.arch or "pTsNet" in model.arch):
+      normTs = torch.tensor(labels.loc[idxs.cpu().numpy(), 'normalizedTimestamp'].values,
+          dtype=torch.float32).to(DEVICE)
+      inputs = (inputs, normTs)  # ← tuple of tensors
+
+    # mask based on labelType (not inputType)
+    if labelType[0] == "single":
+      targets = [tgt.reshape(-1) for tgt in targets]
+      mask = targets[0] != -1
+    else:  # multi-label
+      targets = [tgt.reshape(-1, tgt.shape[-1]) for tgt in targets]
+      mask = targets[0][:, 1] != -1   # assuming column 1 encodes validity
+    targets = [tgt[mask] for tgt in targets] 
+    idxs = idxs.reshape(-1)[mask]
+    
+  except Exception as e:
+    print(f"Error processing batch {batchStats[0]} data: {e}")
+    raise
+  if batchStats[0] % batchStats[1] == 0 or (batchStats[0] + 1) == batchStats[2]:
+    if isinstance(inputs, tuple):
+      print("inputs shape: ", inputs[0].shape, inputs[1].shape)
+    else:
+      print("inputs shape: ", inputs.shape)
+    print("target: ", targets[0], " idx: ", idxs[0])
+  return inputs, targets, idxs, mask
+
+def nextOutputs(model, inputs, mask, batchStats):
+  try:
+    outputs = model(inputs) # forward pass (list of head outputs)
+    # print("outputs: ", outputs.shape, "\ttargets: ", targets.shape, '\n')
+    if not isinstance(outputs, list):
+      outputs = [outputs]  # make it a list for uniform processing
+
+    outputs = [
+      out.reshape(-1, out.shape[-1])[mask]  # reshape to (B*T, C) for output for every "head"
+      for out in outputs
+    ]
+  except Exception as e:
+    print(f"Error during model forward pass for batch {batchStats[0]}: {e}")
+    raise
+  if batchStats[0] % batchStats[1] == 0 or (batchStats[0] + 1) == batchStats[2]:
+    print("output: ", outputs[0][0].cpu().detach().numpy())
+  return outputs
+
+def nextLoss(criterion, outputs, targets, batchStats):
+  try:
+    loss = sum(criterion(out, targets) for out in outputs)
+
+    if batchStats[0] % batchStats[1] == 0 or (batchStats[0] + 1) == batchStats[2]:
+      print(f"loss: {loss.item():.4f}")
+  except Exception as e:
+    print(f"Error while computing loss for batch {batchStats[0]}: {e}")
+    raise
+  return loss
+
+def nextPreds(outputs, targets, labelType, metric, batchStats):
+  try:
+    try:
+      k = int(labelType[2][-1])  
+      if labelType[0] == "single":
+        k = 1
+    except:
+      k = 1
+    # always build preds from top-k
+    topkPreds = [torch.topk(out, k=k, dim=1).indices for out in outputs]
+    preds = [torch.zeros_like(out) for out in outputs]
+    for i in range(len(preds)):
+      preds[i].scatter_(1, topkPreds[i], 1)
+
+    # merging possible multiple head preds depending on label type
+    if labelType[0] == "single":
+      merged = torch.stack(preds, dim=0).mean(dim=0) if len(preds) > 1 else preds[0]
+      # collapse one-hot to predicted index
+      merged = merged.argmax(dim=1)
+    elif labelType[0] == "multi":
+      merged = torch.stack(preds, dim=0).max(dim=0).values if len(preds) > 1 else preds[0]
+    else:
+      raise ValueError(f"Invalid labelType {labelType}")
+
+    metric.update(merged, targets.to(torch.int64))  # update metric with merged preds
+    if batchStats[0] % batchStats[1] == 0 or (batchStats[0] + 1) == batchStats[2]:
+      print("preds: ", preds[0][0].cpu().detach().numpy())
+      print("merged: ", merged[0].cpu().detach().numpy())
+      print(f"\t  [B{batchStats[0] + 1}]  scr: {metric.score():.4f}")
+
+  except Exception as e:
+    print(f"Error while originating batch {batchStats[0]} predictions: {e}")
+    raise
+  return merged
+
 class Trainer():
   ''' Part of the teacher that knows how to train models based on data
   '''
@@ -198,7 +299,7 @@ class Trainer():
 
     self.DEVICE = DEVICE
 
-  def train(self, model, trainloader, labelType, labels, optimizer, epoch):
+  def train(self, model, trainloader, labelType, labels, optimizer):
     ''' In: model, data, criterion (loss function), optimizer
         Out: train_loss, train_score
         Note - inputs can be samples (pics) or feature maps / outputs are logits and then pred/probabilities
@@ -206,102 +307,29 @@ class Trainer():
     self.train_metric.reset()  # resets states, typically called between epochs
     runningLoss, totalSamples = 0.0, 0
     smartComputeRate = len(trainloader) // self.train_metric.computeRate if len(trainloader) // self.train_metric.computeRate else 1
+    batchStats = [0, smartComputeRate, len(trainloader)]
 
     model.train().to(self.DEVICE)
     for batch, data in enumerate(trainloader, 0):   # start at batch 0
-      inputs, targets, idxs = nextBatch(data, labels, model, batch)
-      print(inputs[:5], targets[:5], idxs[:5])
+      batchStats[0] = batch
+      inputs, targets, idxs, mask = nextBatch(data, labels, model, labelType, batchStats, self.DEVICE)
+      
       optimizer.zero_grad() # reset the parameter gradients before backward step
 
-      outputs = nextOutputs(model, inputs, batch)  # outputs is a list of size n_heads
-      print(outputs[:5])
-      loss = sum(self.criterion(out, targets) for out in outputs)
-      print(loss)
+      outputs = nextOutputs(model, inputs, mask, batchStats)  # outputs is a list of size n_heads
+
+      loss = nextLoss(self.criterion, outputs, targets, batchStats)
       loss.backward() # backward pass
       optimizer.step()    # a single optimization step
 
-      preds = nextPreds(outputs, labelType, batch)  # preds is a list of size n_heads
-      print(preds[:5])
-      runningLoss += nextMetrics(loss, self.train_metric, preds, outputs, targets, labelType, smartComputeRate, len(trainloader), batch)
+      preds = nextPreds(outputs, targets, labelType, self.train_metric, batchStats)  # preds is a list of size n_heads
+
+      runningLoss += loss.item() * targets.numel()
       totalSamples += targets.numel()
 
     return runningLoss / totalSamples, self.train_metric.score()
 
-def nextBatch(data, labels, model, batch):
-  try:
-    inputs, targets, idxs = data[0].to(self.DEVICE), data[1].to(self.DEVICE), data[2].to(self.DEVICE) # data is a list of [inputs, labels]
-    # print("inputs: ", inputs.shape, "\ttargets: ", targets.shape, '\n')
-    # print(targets[:5])  # show a few samples
-    if model.domain == "spatdur":
-      normTs = torch.tensor(labels.loc[idxs.cpu().numpy(), 'normalizedTimestamp'].values,
-          dtype=torch.float32).to(self.DEVICE)
-      inputs = (inputs, normTs)  # ← tuple of tensors
 
-    if model.inputType.split('-')[1] == "clip":
-      if labelType[0] == "single":
-        targets = targets.reshape(-1)
-        mask = targets != -1
-      else:  # multi
-        targets = targets.reshape(-1, targets.shape[-1])
-        mask = targets[:, 1] != -1  # assuming class=-1 means padding
-      targets = targets[mask]
-  except Exception as e:
-    print(f"Error processing batch {batch} data: {e}")
-    raise
-
-  return inputs, targets, idxs
-
-def nextOutputs(model, inputs, batch):
-  try:
-    outputs = model(inputs) # forward pass (list of head outputs)
-    # print("outputs: ", outputs.shape, "\ttargets: ", targets.shape, '\n')
-    if not isinstance(outputs, list):
-      outputs = [outputs]  # make it a list for uniform processing
-
-    outputs = [
-      outputs[s].reshape(-1, outputs.shape[-1])[mask]  # reshape to (B*T, C) for output for every "head"
-      for s in range(outputs.shape[0])
-    ]  
-  except Exception as e:
-    print(f"Error during model forward pass for batch {batch}: {e}")
-    raise
-
-  return outputs
-
-def nextPreds(outputs, labelType, batch):
-  try:
-    try:
-      k = labelType[2][-1] # if specified, use last digit specifier for top-k
-    except:
-      k = 1
-    topkPreds = [torch.topk(out, k=k, dim=1).indices for out in outputs]
-    preds = [torch.zeros_like(out) for out in outputs]
-    for i in range(len(preds)):
-      preds[i].scatter_(1, topkPreds[i], 1)
-  except Exception as e:
-    print(f"Error while originating batch {batch} predictions: {e}")
-    raise
-  return preds
-
-def nextMetrics(loss, model, metric, preds, outputs, targets, labelType, smartComputeRate, n_batches, batch):
-  try:
-    if model.domain == "temporal" and model.arch == "tecno":
-      outputs = outputs[-1]  # use the last stage outputs for metric calculation
-    
-    if labelType[0] == "single":
-      metric.update(outputs, targets) # single label metrics accept logits
-    elif labelType[0] == "multi":
-      metric.update(preds, targets) 
-    else:
-      raise ValueError("Invalid labelType chosen (single-*, multi-*)")
-
-    lossIncrement = loss.item() * targets.numel()
-    if batch % smartComputeRate == 0 or (batch + 1) == n_batches:
-      print(f"\t  T [E{epoch + 1} B{batch + 1}]  scr: {self.train_metric.score():.4f}")
-  except Exception as e:
-    print(f"Error obtaining batch {batch} metrics: {e}")
-  # accumulate loss by batch size (safer, though most batches are same size)
-  return lossIncrement
   
 class Validater():
   ''' Part of the teacher that knows how to validate a run of model training
@@ -311,60 +339,31 @@ class Validater():
     self.criterion = criterion
     self.DEVICE = DEVICE
 
-  def validate(self, model, validloader, labelType, labels, epoch):
+  def validate(self, model, validloader, labelType, labels):
     ''' In: model, data, criterion (loss function)
         Out: valid_loss, valid_score
     '''
     self.valid_metric.reset() # Running metric, e.g. accuracy
     runningLoss, totalSamples = 0.0, 0
     smartComputeRate = len(validloader) // self.valid_metric.computeRate if len(validloader) // self.valid_metric.computeRate else 1
+    batchStats = [0, smartComputeRate, len(validloader)]
+    
     model.eval()
     with torch.no_grad(): # don't calculate gradients (for learning only)
-      for batch, data in enumerate(validloader, 0):
-        inputs, targets, idxs = data[0].to(self.DEVICE), data[1].to(self.DEVICE), data[2].to(self.DEVICE)
-        if model.domain == "spatdur":
-          durationValues = torch.tensor(labels.loc[idxs.cpu().numpy(), 'normalizedTimestamp'].values,
-              dtype=torch.float32).to(self.DEVICE)
-          inputs = (inputs, durationValues)  # ← tuple of tensors
-        if len(model.headType) == 2:
-          outputs1, outputs2 = model(inputs)
-        else:
-          outputs = model(inputs) # forward pass
-        # print(inputs[:5], targets[:5], outputs[:5])
-        # print("outputs: ", outputs.shape, "\ttargets: ", targets.shape, '\n')
-        if model.inputType.split('-')[1] == "clip":
-          if labelType[0] == "single":
-            targets = targets.reshape(-1)
-            mask = targets != -1
-            assert isinstance(self.criterion, torch.nn.CrossEntropyLoss), "Use CrossEntropyLoss for single-label tasks"
-          else:  # multi
-            targets = targets.reshape(-1, targets.shape[-1])
-            mask = targets[:, 1] != -1  # assuming class=-1 means padding
-            assert isinstance(self.criterion, torch.nn.BCEWithLogitsLoss), "Use BCEWithLogitsLoss for multi-label tasks"
-          targets = targets[mask]
-          if model.domain == "temporal" and model.arch == "tecno":
-            outputs = [
-              outputs[s].reshape(-1, outputs.shape[-1])[mask]  # same as operation below
-              for s in range(outputs.shape[0])
-            ]  # reshape to (B*T, C) for each stage
-          else:
-            outputs = outputs.reshape(-1, outputs.shape[-1])[mask]
+      for batch, data in enumerate(validloader, 0):   # start at batch 0
+        batchStats[0] = batch
+        inputs, targets, idxs, mask = nextBatch(data, labels, model, labelType, batchStats, self.DEVICE)
 
-        # print("outputs: ", outputs.shape, "\ttargets: ", targets.shape, '\n')
-        if model.domain == "temporal" and model.arch == "tecno":
-          loss = sum(self.criterion(stageOut, targets) for stageOut in outputs)
-          outputs = outputs[-1]  # use the last stage outputs for metric calculation
-        else:
-          loss = self.criterion(outputs, targets)
-        runningLoss += loss.item() * targets.numel() # accumulate loss by batch size (safer, though most batches are same size)
+        outputs = nextOutputs(model, inputs, mask, batchStats)  # outputs is a list of size n_heads
+
+        loss = sum(self.criterion(out, targets) for out in outputs)
+        # print(loss.item())
+
+        preds = nextPreds(outputs, targets,labelType, self.valid_metric, batchStats)  # preds is a list of size n_heads
+
+        runningLoss += loss.item() * targets.numel()
         totalSamples += targets.numel()
-        if labelType[0] == "single":
-          outputs = torch.argmax(outputs, dim=1)  # get labels with max prediction values
-        else:
-          outputs = torch.sigmoid(outputs)  # get probabilities for Multi label accuracy
-        self.valid_metric.update(outputs, targets)  # updates with data from new batch
-        if batch % smartComputeRate == 0 or (batch + 1) == len(validloader):
-          print(f"\t  V [E{epoch + 1} B{batch + 1}]   scr: {self.valid_metric.score():.4f}")
+
     return runningLoss / totalSamples, self.valid_metric.score()
 
 class Tester():
@@ -386,55 +385,22 @@ class Tester():
     targetsList = []
     sampleIdsList = []
     smartComputeRate = len(testloader) // self.test_metrics.computeRate  if len(testloader) // self.test_metrics.computeRate else 1
+    batchStats = [0, smartComputeRate, len(testloader)]
+
     model.eval().to(self.DEVICE); print("\n\tTesting...")
     with torch.no_grad():
-      for batch, data in enumerate(testloader):
-        inputs, targets, idxs = data[0].to(self.DEVICE), data[1].to(self.DEVICE), data[2].to(self.DEVICE)
-        if model.domain == "spatdur":
-          durationValues = torch.tensor(labels.loc[idxs.cpu().numpy(), 'normalizedTimestamp'].values,
-              dtype=torch.float32).to(self.DEVICE)
-          inputs = (inputs, durationValues)  # ← tuple of tensors
-        if len(model.headType) == 2:
-          outputs1, outputs2 = model(inputs)
-        else:
-          outputs = model(inputs) # forward pass
-        # print(inputs[:5], '\n', targets[:5], '\n', outputs[:5])
-        if model.domain == "temporal" and model.arch == "tecno":
-          outputs = outputs[-1]  # use the last stage outputs for metric calculation
-        if model.inputType.split('-')[1] == "clip":
-          outputs = outputs.reshape(-1, outputs.shape[-1])
-          if labelType[0] == "single":
-            targets = targets.reshape(-1)
-            mask = targets != -1
-          else:  # multi
-            targets = targets.reshape(-1, targets.shape[-1])
-            mask = targets[:, 1] != -1  # assuming class=-1 means padding
-          idxs = idxs.reshape(-1)
-          # print("outputs: ", outputs.shape, "\ttargets: ", targets.shape, '\n')
-          outputs = outputs[mask]
-          targets = targets[mask]
-          idxs = idxs[mask]
-          # print("outputs: ", outputs.shape, "\ttargets: ", targets.shape, '\n')
+      for batch, data in enumerate(testloader, 0):   # start at batch 0
+        batchStats[0] = batch
+        inputs, targets, idxs, mask = nextBatch(data, labels, model, labelType, batchStats, self.DEVICE)
 
-        # print("outputs.shape", outputs.shape)
-        if labelType[0] == "single":
-          preds = torch.argmax(outputs, dim=1)  # get labels with max prediction values
-        else:
-          k = labelType[1][0] if labelType[1][0].isdigit() else 2
-          topkPreds = torch.topk(outputs, k=k, dim=1).indices
-          preds = torch.zeros_like(outputs)
-          preds.scatter_(1, topkPreds, 1)
-          # print(preds[:5], targets[:5])
+        outputs = nextOutputs(model, inputs, mask, batchStats)  # outputs is a list of size n_heads
+
+        preds = nextPreds(outputs, targets, labelType, self.test_metrics, batchStats)
 
         predsList.append(preds)
         targetsList.append(targets)
         sampleIdsList.append(idxs)
-        # print("pred: ", outputs[:5], '\n', "target: ", targets[:5])
-        # print("outputs.shape", outputs.shape)
-        # print("targets.min()", targets.min().item(), "targets.max()", targets.max().item())
-        self.test_metrics.update(preds, targets)
-        if batch % smartComputeRate == 0 or (batch + 1) == len(testloader):
-          print(f"\t  T [B{batch + 1}]   scr: {self.test_metrics.accuracy.score():.4f}")
+
     predsList = torch.cat(predsList).cpu().tolist()  # flattens the list of tensor
     targetsList = torch.cat(targetsList).cpu().tolist()
     sampleIdsList = torch.cat(sampleIdsList).cpu().tolist()
@@ -448,7 +414,7 @@ class Tester():
         pickle.dump(test_bundle, f)
     # print(len(predsList), len(targetsList), len(sampleIdsList))
     # print(f"SampleIds Type: {type(sampleIdsList[0])}, Content: {sampleIdsList[:5]}")
-    return test_bundle
+    return test_bundle, self.test_metrics.score()
 
   def _get_bundle(self, preds, targets, sampleIds, labelType):
     # for now requires ordered parameters
@@ -795,13 +761,25 @@ class StillMetric:
       else:
         self.metric = TopKMultilabelAccuracy(device=DEVICE, k=self.topK) # criteria="hamming"
     elif metricName == "precision":
-      self.metric =  MulticlassPrecision(average=agg, num_classes=n_classes, device=DEVICE)
+      if labelType[0] == "single":
+        self.metric =  MulticlassPrecision(average=agg, num_classes=n_classes, device=DEVICE)
+      else:
+        self.metric = BinaryPrecision(device=DEVICE)
     elif metricName == "recall":
-      self.metric = MulticlassRecall(average=agg, num_classes=n_classes, device=DEVICE)
+      if labelType[0] == "single":
+        self.metric = MulticlassRecall(average=agg, num_classes=n_classes, device=DEVICE)
+      else:
+        self.metric = BinaryRecall(device=DEVICE)
     elif metricName == "f1score":
-      self.metric = MulticlassF1Score(average=agg, num_classes=n_classes, device=DEVICE)
+      if labelType[0] == "single":
+        self.metric = MulticlassF1Score(average=agg, num_classes=n_classes, device=DEVICE)
+      else:
+        self.metric = BinaryF1Score(device=DEVICE)
     elif metricName == "confusionMatrix":
-      self.metric = MulticlassConfusionMatrix(num_classes=n_classes, device=DEVICE)
+      if labelType[0] == "single":
+        self.metric = MulticlassConfusionMatrix(num_classes=n_classes, device=DEVICE, normalize='true')
+      else:
+        self.metric = BinaryConfusionMatrix(normalize='true')
     else:
       raise ValueError("Invalid Metric Name")
 
@@ -811,8 +789,8 @@ class StillMetric:
     if self.name == "confusionMatrix":
       cm = self.metric.compute().cpu().numpy()
 
-      # normalize by row (true labels)
-      cm = cm.astype('float') / (cm.sum(axis=1)[:, np.newaxis] + 1e-8)  # avoid division by zero
+      # # normalize by row (true labels)
+      # cm = cm.astype('float') / (cm.sum(axis=1)[:, np.newaxis] + 1e-8)  # avoid division by zero
 
       # original labels
       labels = list(self.labelToClass.keys())
@@ -888,15 +866,15 @@ class MetricBunch:
       self.recall = RunningMetric("recall", n_classes, DEVICE, agg, computeRate, labelType, labelToClass) if self.metricSwitches["recall"] else None
       self.f1score = RunningMetric("f1score", n_classes, DEVICE, agg, computeRate, labelType, labelToClass) if self.metricSwitches["f1score"] else None
       self.confusionMatrix = RunningMetric("confusionMatrix", n_classes, DEVICE, agg, computeRate, labelType, labelToClass) if self.metricSwitches["confusionMatrix"] else None
-    elif labelType[0] == "multi":
+    else:  # multi-label
       self.accuracy = RunningMetric("accuracy", n_classes, DEVICE, "micro", computeRate, labelType, labelToClass) if self.metricSwitches["accuracy"] else None
       self.precision = None
       self.recall = None
       self.f1score = None
       self.confusionMatrix = RunningMetric("confusionMatrix", n_classes, DEVICE, agg, computeRate, labelType, labelToClass) if self.metricSwitches["confusionMatrix"] else None
-    else:
-      raise ValueError(f"Invalid labelType {labelType} for metric bunch")
-    
+  def score(self):
+     assert self.accuracy, "Accuracy metric not initialized! Can't compute Bunch score."
+     return self.accuracy.score()
   def reset(self):
     if self.accuracy: self.accuracy.reset()
     if self.precision: self.precision.reset()

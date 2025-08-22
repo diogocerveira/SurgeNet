@@ -33,25 +33,21 @@ def learning(**the):
       Ctl.crop_frames(Csr.path_samples, Csr.path_samples)
       print(f"   [crop] {Csr.path_samples}")
     if the["PROCESS"]["label"]:  # label (csv file) image frames
-      Ctl.label(Csr.path_samples, Csr.path_labels, '-'.join(list(Csr.DATA["labelType"]))
-      print(f"   A new labels.csv was created {Csr.path_labels}")
+      Ctl.label(Csr.path_samples, Csr.path_labels, Csr.DATA["labelType"])
+      print(f"   A new labels.csv was created {Csr.path_labels}\n")
 
-  dset = Ctl.build_dataset(Csr.DATA["id_dataset"].split('-')[1], Csr.path_samples, Csr.path_labels, headType=the["MODEL"]["classifierType"]) # for now the dataset is still used from inside the cataloguer
+  dset = Ctl.build_dataset(Csr.DATA["id_dataset"].split('-')[1], Csr.path_samples, Csr.path_labels, headType=the["MODEL"]["headType"]) # for now the dataset is still used from inside the cataloguer
   print(f"B. [dataset] {the['DATA']['id_dataset']} (#{len(dset)})")
-  print(f"   [label] {Csr.DATA['labelType']}")
+  print(f"   [label] {'-'.join(list(dset.labelType))}")
   print(f"   [preprocessing] {Ctl.preprocessingType}")
-  print(f"   [classes] #{dset.n_classes} ({'Balanced' if dset.BALANCED else 'Unbalanced'}) {list(dset.labelToClassMap.keys())}\n")
-  print(f"""   note: labels are formed automatically and sorted alphabetically,
-      resulting in a different order from the annotations file. Fix-Vau comes before Fix-Pro!\n""")
+  print(f"   [classes] #{dset.n_classes} ({'Balanced' if dset.BALANCED else 'Unbalanced'}) {list(dset.labelToClassMap.keys())}")
+  print(f"   [weights] {dset.classWeights}")
+  print(f"   [phases] #{len(dset.phases)}) ", dset.phases, '\n')
 
   # teaching.py (metrics, train validation, test)
   Tch = teaching.Teacher(Csr.TRAIN, the["EVAL"], dset, the["device"])
   print(f"C. [training] {Csr.TRAIN['train_point']} on [device] {the['device']}")
   print(f"   [folds] #{Csr.TRAIN['k_folds']} [epochs] #{Csr.TRAIN['HYPER']['n_epochs']} [batch sizes] s{Csr.TRAIN['HYPER']['spaceBatchSize']} / t{Csr.TRAIN['HYPER']['timeBatchSize']}\n")
-  if dset.labelType[0] == "single":
-      assert isinstance(Tch.trainer.criterion, torch.nn.CrossEntropyLoss), "Use CrossEntropyLoss for single-label tasks"
-  else:
-      assert isinstance(Tch.trainer.criterion, torch.nn.BCEWithLogitsLoss), "Use BCEWithLogitsLoss for multi-label tasks"
   highScore = 0.0
   # print(Ctl.get_mean_std(dset))
 
@@ -71,10 +67,12 @@ def learning(**the):
 
     # Create the model
     spaceinator = machine.Spaceinator(the["MODEL"], dset.n_classes)
-    print(f"    Feature size of {spaceinator.featureSize} at node '{spaceinator.featureNode}'\n")
+    print(f"    Feature size of {spaceinator.featureSize} at node '{spaceinator.featureNode}'")
     timeinator = machine.Timeinator(the["MODEL"], spaceinator.featureSize, dset.n_classes)
-    model = machine.Phasinator(the["MODEL"]["domain"], spaceinator, timeinator, Csr.id, fold + 1)
-
+    print(f"    Feature size of {timeinator.featureSize} at node '{timeinator.featureNode}'\n")
+    classifier = machine.Classinator(the["MODEL"], spaceinator.featureSize, timeinator.featureSize, dset.n_classes)
+    model = machine.Phasinator(the["MODEL"]["domain"], spaceinator, timeinator, classifier, f"{Csr.studentId}_f{fold + 1}")
+    
     dset.path_spaceFeatures, featuresId = teaching.get_path_exportedfeatures(Csr.path_exportedSpaceFeatures, f"spacefmaps_f{fold + 1}")
     trainloader, validloader, testloader = Ctl.batch(dset, model.inputType, Csr.TRAIN["HYPER"], Csr.DATA["multiClips"], Csr.DATA["multiClipStride"], train_idxs=train_idxs, valid_idxs=valid_idxs, test_idxs=test_idxs)
 
@@ -154,9 +152,9 @@ def learning(**the):
           break
         t1 = time.time()
         path_export = os.path.join(Csr.path_preds, f"preds_{model.id.split('_')[1]}")
-        test_bundle  = Tch.tester.test(model, testloader, dset.labelType, dset.labels, the["EVAL"]["export_testBundle"], path_export=path_export)
+        test_bundle, test_score  = Tch.tester.test(model, testloader, dset.labelType, dset.labels, the["EVAL"]["export_testBundle"], path_export=path_export)
         t2 = time.time()
-        print(f"Testing took {t2 - t1:.2f} seconds")
+        print(f"Test Score: {test_score:.04f} (took {t2 - t1:.2f}s)\n")
         # print(test_bundle.head())
       else:
         raise ValueError("Invalid evalFrom choice!")
