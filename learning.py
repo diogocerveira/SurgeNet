@@ -17,6 +17,8 @@ def learning(**the):
   Csr = environment.Classroom(the["path_root"], the["TRAIN"], the["DATA"], the["MODEL"], id_classroom=the["id_classroom"], path_data=the["path_data"])
   print(f"A. [classroom] {Csr.id} ({Csr.status})\n   [model] {Csr.studentId} ({Csr.studentStatus})")
   print(f"   For {tuple(the['actions'])}\n")
+  # Csr.update_fileIds()
+  
   # dataset.py (dataset, data handling)
   Ctl = dataset.Cataloguer(Csr.DATA, Csr.path_annots, the["device"])
   if "process" in the["actions"]:
@@ -31,10 +33,10 @@ def learning(**the):
       Ctl.crop_frames(Csr.path_samples, Csr.path_samples)
       print(f"   [crop] {Csr.path_samples}")
     if the["PROCESS"]["label"]:  # label (csv file) image frames
-      Ctl.label(Csr.path_samples, Csr.path_labels, Csr.DATA["labelType"])
+      Ctl.label(Csr.path_samples, Csr.path_labels, '-'.join(list(Csr.DATA["labelType"]))
       print(f"   A new labels.csv was created {Csr.path_labels}")
 
-  dset = Ctl.build_dataset(Csr.DATA["id_dataset"].split('-')[1], Csr.path_samples, Csr.path_labels) # for now the dataset is still used from inside the cataloguer
+  dset = Ctl.build_dataset(Csr.DATA["id_dataset"].split('-')[1], Csr.path_samples, Csr.path_labels, headType=the["MODEL"]["classifierType"]) # for now the dataset is still used from inside the cataloguer
   print(f"B. [dataset] {the['DATA']['id_dataset']} (#{len(dset)})")
   print(f"   [label] {Csr.DATA['labelType']}")
   print(f"   [preprocessing] {Ctl.preprocessingType}")
@@ -46,6 +48,10 @@ def learning(**the):
   Tch = teaching.Teacher(Csr.TRAIN, the["EVAL"], dset, the["device"])
   print(f"C. [training] {Csr.TRAIN['train_point']} on [device] {the['device']}")
   print(f"   [folds] #{Csr.TRAIN['k_folds']} [epochs] #{Csr.TRAIN['HYPER']['n_epochs']} [batch sizes] s{Csr.TRAIN['HYPER']['spaceBatchSize']} / t{Csr.TRAIN['HYPER']['timeBatchSize']}\n")
+  if dset.labelType[0] == "single":
+      assert isinstance(Tch.trainer.criterion, torch.nn.CrossEntropyLoss), "Use CrossEntropyLoss for single-label tasks"
+  else:
+      assert isinstance(Tch.trainer.criterion, torch.nn.BCEWithLogitsLoss), "Use BCEWithLogitsLoss for multi-label tasks"
   highScore = 0.0
   # print(Ctl.get_mean_std(dset))
 
@@ -77,13 +83,13 @@ def learning(**the):
 
     # TRAIN
     if "train" in the["actions"]:
-      trainedModel, valid_maxScore, betterState = Tch.teach(model, trainloader, validloader, Csr.TRAIN["HYPER"]["n_epochs"], Csr.path_states, dset.labels, Csr.TRAIN["path_resumeModel"])
+      trainedModel, valid_maxScore, betterState = Tch.teach(model, trainloader, validloader, Csr.TRAIN["HYPER"]["n_epochs"], Csr.path_state, dset.labels, Csr.TRAIN["path_resumeModel"])
       if Csr.TRAIN["save_betterState"]:
         trainedModel.id = f"{trainedModel.id}-{valid_maxScore:.2f}" # update model id with the best validation score
-        torch.save(betterState, os.path.join(Csr.path_states, trainedModel.id))
+        torch.save(betterState, os.path.join(Csr.path_state, f"state_{model.id.split('_')[1]}.pt"))
       if Csr.TRAIN["save_lastState"]:
         trainedModel.id = f"{trainedModel.id}-{trainedModel.valid_lastScore:.2f}"
-        torch.save(trainedModel.state_dict(), os.path.join(Csr.path_states, trainedModel.id))
+        torch.save(trainedModel.state_dict(), os.path.join(Csr.path_state, f"state_{model.id.split('_')[1]}.pt"))
 
     # PROCESS - Feature extraction
     if the["PROCESS"]["fx_spatial"] and "process" in the["actions"]:
@@ -92,9 +98,9 @@ def learning(**the):
         spaceinator.load_state_dict(trainedModel.state_dict(), strict=False)
         fx_stateId = trainedModel.id
       elif the["PROCESS"]["fx_load_models"]:
-        fx_stateDict, fx_stateId = teaching.get_testState(Csr.path_states, model.id)
+        fx_stateDict, fx_stateId = teaching.get_testState(Csr.path_state, model.id)
         spaceinator.load_state_dict(fx_stateDict, strict=False)
-      path_export = os.path.join(Csr.path_features, f"spacefmaps_{fx_stateId.split('_')[1]}.pt")
+      path_export = os.path.join(Csr.path_feats, f"feats_{fx_stateId.split('_')[1]}.pt")
       spaceinator.export_features(DataLoader(dset, batch_size=Csr.TRAIN["HYPER"]["spaceBatchSize"]), path_export, the["PROCESS"]["featureLayer"], the["device"])
       t2 = time.time()
       print(f"Exporting features took {(t2 - t1) // 3600} hours and {(((t2 - t1) % 3600) / 60):.1f} minutes!")
@@ -107,9 +113,9 @@ def learning(**the):
         timeinator.load_state_dict(trainedModel.state_dict(), strict=False)
         fx_stateId = trainedModel.id
       elif the["PROCESS"]["fx_load_models"]:
-        fx_stateDict, fx_stateId = teaching.get_testState(Csr.path_states, model.id)
+        fx_stateDict, fx_stateId = teaching.get_testState(Csr.path_state, model.id)
         timeinator.load_state_dict(fx_stateDict, strict=False)
-      path_export = os.path.join(Csr.path_features, f"timefmaps_{fx_stateId.split('_')[1]}.pt")
+      path_export = os.path.join(Csr.path_feats, f"feats_{fx_stateId.split('_')[1]}.pt")
       timeinator.export_features(DataLoader(dset, batch_size=Csr.TRAIN["HYPER"]["timeBatchSize"]), path_export, the["PROCESS"]["featureLayer"], the["device"])
       t2 = time.time()
       print(f"Exporting features took {(t2 - t1) // 3600} hours and {(((t2 - t1) % 3600) / 60):.1f} minutes!")
@@ -120,7 +126,7 @@ def learning(**the):
     # EVALUATE 
     if "eval" in the["actions"]:
       if the["EVAL"]["eval_from"] == "predictions":
-        ## path_pred = utils.choose_in_path(Csr.path_predictions)
+        ## path_pred = utils.choose_in_path(Csr.path_preds)
         try:
           with open(the["path_pred"], 'rb') as f:  # Load the DataFrame
             test_bundle = pickle.load(f)
@@ -132,22 +138,22 @@ def learning(**the):
           if "train" in the["actions"]: # use model just trained
             model.load_state_dict(betterState, strict=False)
           else: # load model from 
-            if the["EVAL"]["path_model"]: # chose before running
+            if the["EVAL"]["path_model"]: # chose before running NOT WORKING
               test_stateDict, test_stateId = torch.load(the["EVAL"]["path_model"], weights_only=False, map_location=the["device"])
               Tch.evaluate(test_bundle, the["EVAL"], fold + 1, Csr, Ctl.N_CLASSES, Csr.DATA["extradata"],
-                  Csr.path_eval, Csr.path_aprfc, Csr.path_phaseCharts, the["TEST"]["path_preds"])
+                  Csr.path_eval, Csr.path_aprfc, Csr.path_ribbons, the["TEST"]["path_preds"])
               print("Breaking testing loop on 'Fold 1' because a path_model was provided without 'train' action.")
               break
             else: # choose from the states folder (corresponding to fold)
-              test_stateDict, stateId = teaching.get_testState(Csr.path_states, model.id)
-              # path_model = environment.choose_in_path(Csr.path_models)
+              test_stateDict, stateId = teaching.get_testState(Csr.path_state, model.id)
+              # path_model = environment.choose_in_path(Csr.path_state)
               # stateDict = torch.load(path_model, weights_only=False, map_location=the["device"])
             model.load_state_dict(test_stateDict, strict=False)
         except Exception as e:
           print(f"Error loading model state for testing: {e}\n")
           break
         t1 = time.time()
-        path_export = os.path.join(Csr.path_predictions, f"preds_{model.id.split('_')[1]}")
+        path_export = os.path.join(Csr.path_preds, f"preds_{model.id.split('_')[1]}")
         test_bundle  = Tch.tester.test(model, testloader, dset.labelType, dset.labels, the["EVAL"]["export_testBundle"], path_export=path_export)
         t2 = time.time()
         print(f"Testing took {t2 - t1:.2f} seconds")
@@ -157,23 +163,23 @@ def learning(**the):
       
       # PROCESS - Filterting
       if the["PROCESS"]["apply_modeFilter"] and "process" in the["actions"]:
-        if the["PROCESS"]["path_bundle"]:
-          ## path_bundle = utils.choose_in_path(Csr.path_modeFilter)
-          with open(the["PROCESS"]["path_bundle"], 'rb') as f:
-            test_bundle = pickle.load(f)
-        else:
-          try:
-            preds = np.array(test_bundle["Preds"])
-            modePreds = environment.modeFilter(preds, 10)
-            # torch.save(modePreds, Csr.path_modeFilter)
-            test_bundle["Preds"] = modePreds
-            if the["PROCESS"]["export_modedPreds"]:
-              path_modeFilter = os.path.join(Csr.path_modeFilter, os.path.splitext(the["PROCESS"]["path_bundle"])[0] + "_moded")
-              with open(path_modeFilter, 'wb') as f:
-                pickle.dump(test_bundle, f)
-          except Exception as e:
-            print(f"No predictions (test_bundle) provided for processing: {e}")
-            continue
+
+        ## path_bundle = utils.choose_in_path(Csr.path_modeFilter)
+        with open(Csr.path_preds, 'rb') as f:
+          test_bundle = pickle.load(f)
+    
+        try:
+          preds = np.array(test_bundle["Preds"])
+          modePreds = environment.modeFilter(preds, 3)
+          # torch.save(modePreds, Csr.path_modedPreds)
+          test_bundle["Preds"] = modePreds
+          if the["PROCESS"]["export_modedPreds"]:
+            path_modedPred = os.path.join(Csr.path_modedPreds, f"moded-{Csr.path_preds}")
+            with open(path_modedPred, 'wb') as f:
+              pickle.dump(test_bundle, f)
+        except Exception as e:
+          print(f"No predictions (test_bundle) provided for processing: {e}")
+          continue
 
       Tch.evaluate(test_bundle, the["EVAL"]["eval_tests"], model.id, Csr)
 
@@ -184,35 +190,44 @@ def learning(**the):
     print(f"\n\t = = = = = \t = = = = =\n\t\t Fold {fold + 1} done!\n\t = = = = = \t = = = = =\n")
     # break # == 1 folc (debug)
     # break
+  if "process" in the["actions"] and the["PROCESS"]["build_globalCM"]:
+    environment.build_globalCM(Csr.path_preds, Csr.path_aprfc, dset.n_classes, dset.labelType, dset.labelToClassMap, the["device"])
+
+  print(f"\n\n ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨\n\n")
   # os.system(f"tensorboard --logdir={Csr.path_classroom}")
  
 
 if __name__ == "__main__":
   # Load default parameters from config.yml
-  configId = "cfg_SP-pFT-tsRN50-aug.yml"
-  with open(os.path.join("settings", configId), "r") as file:
-    config = yaml.safe_load(file)
-  # Set up argparse fir CLASSROOMtime overriding
-  parser = argparse.ArgumentParser(description="Override config parameters at CLASSROOMtime")
-  parser.add_argument("--action", type=str, help="Action to perform T-rainE-val process)")
-  parser.add_argument("--teachkey", type=str, help="Model to teach (spatial, temporal, medianFilter)")
-  parser.add_argument("--evalkey", type=str, help="Tests to perform (apref1coma, phaseTiming, phaseChart)")
-  parser.add_argument("--n_epochs", type=int, help="Number of epochs")
-  parser.add_argument("--dataset", type=str, help="Dataset name")
-  parser.add_argument("--fx_batchSize", type=int, help="Batch size for general training")
-  args = parser.parse_args()  # parse input arguments
+  # configIds = ["cfg_SP-RN50.yml", "cfg_SP-FX-RN50.yml", "cfg_SP-l4FT-RN50.yml", "cfg_SP-FT-RN50.yml",
+  #             "cfg_SP-FX-RN50-aug.yml", "cfg_SP-l4FT-RN50-aug.yml", 
+  #             "cfg_SP-l4FT-dTsRN50-aug.yml", "cfg_SP-l4FT-pTsRN50-aug.yml"]
+  configIds = ["cfg_default.yml"]
 
-  # Override YAML config with argparse arguments
-  for key, value in vars(args).items(): # Use vars(args) to convert the Namespace to a dictionary
-    if value is not None:  # Only override if argument is provided
-      config[key] = value
+  for configId in configIds:
+    with open(os.path.join("settings", configId), "r") as file:
+      config = yaml.safe_load(file)
+    # Set up argparse fir CLASSROOMtime overriding
+    parser = argparse.ArgumentParser(description="Override config parameters at CLASSROOMtime")
+    parser.add_argument("--action", type=str, help="Action to perform T-rainE-val process)")
+    parser.add_argument("--teachkey", type=str, help="Model to teach (spatial, temporal, medianFilter)")
+    parser.add_argument("--evalkey", type=str, help="Tests to perform (apref1coma, phaseTiming, phaseChart)")
+    parser.add_argument("--n_epochs", type=int, help="Number of epochs")
+    parser.add_argument("--dataset", type=str, help="Dataset name")
+    parser.add_argument("--fx_batchSize", type=int, help="Batch size for general training")
+    args = parser.parse_args()  # parse input arguments
 
-  np.random.seed(config["seed"]);
-  torch.manual_seed(config["seed"]);
-  random.seed(config["seed"])
-  if not config["actions"]:
-    config["actions"] = []  # default actions if none specified
-  if config["device"] == "auto" or not config["device"]: # where to save torch tensors (e.g. during training)
-    config["device"] = "cuda" if torch.cuda.is_available() else "cpu"
-  print()
-  learning(**config)
+    # Override YAML config with argparse arguments
+    for key, value in vars(args).items(): # Use vars(args) to convert the Namespace to a dictionary
+      if value is not None:  # Only override if argument is provided
+        config[key] = value
+
+    np.random.seed(config["seed"]);
+    torch.manual_seed(config["seed"]);
+    random.seed(config["seed"])
+    if not config["actions"]:
+      config["actions"] = []  # default actions if none specified
+    if config["device"] == "auto" or not config["device"]: # where to save torch tensors (e.g. during training)
+      config["device"] = "cuda" if torch.cuda.is_available() else "cpu"
+    print()
+    learning(**config)

@@ -28,7 +28,7 @@ DATA:
     # - Fixation of the implant to the vault
     # - Fixation of the implant to the promontory
     # - Reperitonealisation
-  preprocessing: ldss  # ldss, imagenet, augmentation
+  preprocessing: imagenet-aug  # ldss, imagenet, augmentation
   multiClips: False
   multiClipStride: 3  # stride for multi-clip mode (e.g. 1, 2, 3)
   datatype: png-image #, jpeg-image, feature-dict
@@ -72,7 +72,7 @@ PROCESS:  # Process
   resize: False
   crop: False
 
-  label: False
+  label: True
 
   apply_modeFilter: False
   path_bundle: True
@@ -89,14 +89,14 @@ PROCESS:  # Process
   
 MODEL:  # for models created/trained in the run
   type: phase
-  domain: spatial # spatial, temporal, full, classifier
+  domain: spatdur # spatial, temporal, full, classifier
 # spatial
-  spaceTransferLearning: fine-tune # fine-tune | feat-xtract
+  spaceTransferLearning: l4-fine-tune # fine-tune | feat-xtract | l4-fine-tune
   spaceArch: resnet50
   spacePreweights: image-net # image-net
   path_spaceModel: #C:/Users/DC/Documents/Programming/python/ucl/ML_SurgeNet/logs/LDSS/run_20241104-00/checkpoints/LDSS-20241104-00-fold6-0.837800.pth # if empty, uses new untrained one
   path_spaceFeats:
-  add_timestamps: no # no | direct | mlp
+  add_timestamps: direct # no | direct | mlp
 # temporal
   timeArch: tecno # tecno | phatima
   n_stages: 3

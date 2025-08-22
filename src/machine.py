@@ -27,7 +27,8 @@ class Phasinator(nn.Module):
       inputType = "images-frame"
       arch = spaceinator.arch
     elif modelDomain == "spatdur":
-      classifier = Classifier(spaceinator.featureSize, spaceinator.n_classes, add_timestamps=spaceinator.add_timestamps)
+      headType = spaceinator.head if spaceinator.head else str(spaceinator.n_classes)
+      classifier = Classifier(spaceinator.featureSize, spaceinator.n_classes, add_timestamps=spaceinator.add_timestamps, heads=headType)
       inators = [spaceinator, classifier]
       inputType = "images-frame"
       arch = spaceinator.arch
@@ -63,6 +64,7 @@ class Phasinator(nn.Module):
     self.arch = arch
     self.inputType = inputType
     self.id = f"{modelDomain}phase-{classroomId}_f{fold}" # model name for logging/saving
+    self.headType = headType
 
   def forward(self, x_batch):
     # print("Input shape: ", x_batch.shape)
@@ -95,6 +97,7 @@ class Spaceinator(nn.Module):
     if self.domain == "temporal" and MODEL["path_spaceModel"]:
       self.exportedFeatures = torch.load(MODEL["path_spaceModel"], weights_only=False, map_location="cpu")
     self.add_timestamps = MODEL["add_timestamps"]
+    self.head = MODEL["classifierType"]
     # print(self.model)
     # print(fxs.get_graph_node_names(self.model)[0])
     
@@ -414,7 +417,7 @@ class _ProjectionResBlock(nn.Module):
     return out + x
 
 class Classifier(nn.Module):
-  def __init__(self, FEATURE_SIZE, N_CLASSES, add_timestamps="no"):
+  def __init__(self, FEATURE_SIZE, N_CLASSES, add_timestamps="no", heads=None):
     super().__init__()
     self.add_timestamps = True if (add_timestamps == "direct" or add_timestamps == "mlp") else False
     self.FEATURE_SIZE = FEATURE_SIZE
@@ -428,17 +431,25 @@ class Classifier(nn.Module):
       )
     else:
       self.tsFeed = nn.Identity()
-    self.linear = nn.Linear(self.FEATURE_SIZE, N_CLASSES)
+
+    if not heads:
+      heads = [N_CLASSES]
+    heads = heads.split("-")
+    self.linear = nn.Linear(self.FEATURE_SIZE, int(heads[0]))
+    self.linear2 = nn.Linear(self.FEATURE_SIZE, int(heads[1])) if len(heads) > 1 else None
 
   def forward(self, x):
     if self.add_timestamps:
       x, timestamps = x  # Unpack: x → [B, C, H, W], timestamps → [B]
-      print("x.shape: ", x.shape, "timestamps.shape: ", timestamps.shape)
+      # print("x.shape: ", x.shape, "timestamps.shape: ", timestamps.shape)
       squeezed = timestamps.unsqueeze(1)  # [B] → [B, 1]
-      print("squeezed.shape: ", squeezed.shape)
+      # print("squeezed.shape: ", squeezed.shape)
       timestamps = self.tsFeed(squeezed)
-      print("timestamps.shape: ", timestamps.shape)
+      # print("timestamps.shape: ", timestamps.shape)
       x = torch.cat((x, timestamps), dim=1)
-    x = self.linear(x)  # → [B, N_CLASSES]
-    print("Classifier output shape: ", x.shape)
-    return x
+    x1 = self.linear(x)  # → [B, N_CLASSES]
+    if self.linear2:
+      x2 = self.linear2(x)
+      return x1, x2
+    # print("Classifier output shape: ", x.shape)
+    return x1

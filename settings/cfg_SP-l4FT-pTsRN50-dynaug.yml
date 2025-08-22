@@ -28,7 +28,7 @@ DATA:
     # - Fixation of the implant to the vault
     # - Fixation of the implant to the promontory
     # - Reperitonealisation
-  preprocessing: imagenet  # ldss, imagenet, augmentation
+  preprocessing: imagenet-dynaug  # ldss, imagenet, augmentation
   multiClips: False
   multiClipStride: 3  # stride for multi-clip mode (e.g. 1, 2, 3)
   datatype: png-image #, jpeg-image, feature-dict
@@ -78,7 +78,9 @@ PROCESS:  # Process
   path_bundle: True
   export_modedPreds: True  # if apply-mode-filter == True
   
-  fx_spatial: False
+  build_globalCM: True  # builds a global confusion matrix from all folds predictions
+
+  fx_spatial: True
   featureLayer:
   - flatten
   # - layer4.2.relu_2
@@ -87,13 +89,14 @@ PROCESS:  # Process
   
 MODEL:  # for models created/trained in the run
   type: phase
-  domain: spatial # spatial, temporal, full, classifier
+  domain: spatdur # spatial, temporal, full, classifier
 # spatial
   spaceTransferLearning: l4-fine-tune # fine-tune | feat-xtract | l4-fine-tune
   spaceArch: resnet50
   spacePreweights: image-net # image-net
   path_spaceModel: #C:/Users/DC/Documents/Programming/python/ucl/ML_SurgeNet/logs/LDSS/run_20241104-00/checkpoints/LDSS-20241104-00-fold6-0.837800.pth # if empty, uses new untrained one
-  add_timestamps: no # no | direct | mlp
+  path_spaceFeats:
+  add_timestamps: mlp # no | direct | mlp
 # temporal
   timeArch: tecno # tecno | phatima
   n_stages: 3
@@ -101,7 +104,7 @@ MODEL:  # for models created/trained in the run
   tf_filter: 3  # size in time (timeframe, # of frames)
   n_blocks: 2 # inside the stage
 # classification
-  classifierType: # space | time
+  classifierType:  # space | time
   n_classes:   # normally gets from dataset itself 
 
 EVAL:  # Eval
@@ -122,4 +125,4 @@ EVAL:  # Eval
     confusionMatrix: True
   agg: macro  # overall, accuracy is locked to micro (see utils.py)
   updateRate: 1  # updates metrics with new data every batch
-  computeRate: 1000  # computes the metrics
+  computeRate: 3  # computes the metrics

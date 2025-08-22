@@ -6,6 +6,9 @@ import torch.nn as nn
 import datetime
 import yaml
 import shutil
+from src import teaching
+import torch
+import pickle
 
 def modeFilter(preds, windowSize):
   def mode(sequence):
@@ -112,6 +115,17 @@ class Classroom():
         self.TRAIN = loaded_data["TRAIN"]
         self.DATA = loaded_data["DATA"]
     
+    self.DATA["labelType"] = tuple(DATA["labelType"].split('-'))  # e.g. ('single', 'head1', 'phase,etc')
+
+    self.path_exportedSpaceFeatures = MODEL["path_spaceFeats"]
+
+  def get_modelId(self, MODEL):
+    # learnMode = {"space": "SP", "time": "TP", "spatio-temporal": "ST"}
+    transferMode = {"feat-xtract": "FX", "fine-tune": "FT", "l4-fine-tune": "pFT"}
+    spaceArch = {"resnet50": "RN50"}
+    timeArch = {"tecno": "TECNO", "phatima": "PHA"}
+    modelId = f"{transferMode[MODEL['transferMode']]}-{spaceArch[MODEL['spaceArch']]}-{timeArch[MODEL['timeArch']]}"
+  
   def match_learningEnvironment(self, TRAIN, DATA):
     classrooms = [c for c in os.listdir(self.path_logs)
                   if not c.startswith(('.', '_'))
@@ -129,6 +143,9 @@ class Classroom():
     students = [m for m in os.listdir(self.path_classroom) if os.path.isdir(os.path.join(self.path_classroom, m))] # list of students in the classroom
     for id_student in students:
       # print(f"Checking student {id_student} in classroom {self.id}")
+      if not os.path.exists(os.path.join(self.path_classroom, id_student, "student-profile.yml")):
+        print(f"Student profile for {id_student} does not exist in classroom {self.id}")
+        continue  # skip if student profile does not exist
       with open(os.path.join(self.path_classroom, id_student, "student-profile.yml"), 'r') as f:
         studentProfile = yaml.safe_load(f)
         # if new learning parameters match a previous classroom with same "subject" (id_dataset)
@@ -169,7 +186,7 @@ class Classroom():
     paths_data = {}
     paths_data["path_dataset"] = os.path.join(self.path_data, "data", id_dataset)
     paths_data["path_samples"] = os.path.join(paths_data["path_dataset"], "samples")
-    paths_data["path_labels"] = os.path.join(paths_data["path_dataset"], "labels", f"{labelType}.csv")
+    paths_data["path_labels"] = os.path.join(paths_data["path_dataset"], "labels", f"{'-'.join(list(labelType)[1:3])}.csv")
     paths_data["path_annots"] = os.path.join(paths_data["path_dataset"], "annotations")
     return paths_data
   def _get_paths_logs(self, id_student):
@@ -181,18 +198,104 @@ class Classroom():
     paths_logs["path_studentProfile"] = os.path.join(self.path_student, "student-profile.yml")
     paths_logs["path_eval"] = os.path.join(self.path_student, "eval")
     paths_logs["path_aprfc"] = os.path.join(paths_logs["path_eval"], "aprfc")
-    paths_logs["path_phaseCharts"] = os.path.join(paths_logs["path_eval"], "phase-charts")
-    paths_logs["path_phaseTiming"] = os.path.join(paths_logs["path_eval"], "phase-timing")
+    paths_logs["path_ribbons"] = os.path.join(paths_logs["path_eval"], "ribbons")
+    paths_logs["path_timings"] = os.path.join(paths_logs["path_eval"], "timings")
     paths_logs["path_train"] = os.path.join(self.path_student, "train")
-    paths_logs["path_predictions"] = os.path.join(paths_logs["path_eval"], "predictions")
+    paths_logs["path_preds"] = os.path.join(paths_logs["path_eval"], "preds")
     paths_logs["path_events"] = os.path.join(paths_logs["path_train"], "events")
-    paths_logs["path_states"] = os.path.join(paths_logs["path_train"], "models")
+    paths_logs["path_state"] = os.path.join(paths_logs["path_train"], "state")
     paths_logs["path_process"] = os.path.join(self.path_student, "process")
-    paths_logs["path_modeFilter"] = os.path.join(paths_logs["path_process"], "mode-filter")
-    paths_logs["path_features"] = os.path.join(paths_logs["path_process"], "features")
-
-    paths_logs["path_exportedSpaceFeatures"] = os.path.join(self.path_classroom, "spatialphase1", "process", "features")
-
+    paths_logs["path_modedPreds"] = os.path.join(paths_logs["path_process"], "moded-preds")
+    paths_logs["path_feats"] = os.path.join(paths_logs["path_process"], "feats")
     return paths_logs
 
+  def update_fileIds(self):
+      """Update filenames inside directories to start with parent-dir + student-classroom IDs"""
+      
+      for directory in [
+        self.path_ribbons,
+        self.path_timings,
+        self.path_preds,
+        self.path_state,
+        self.path_modedPreds,
+        self.path_feats
+      ]:
+          if not os.path.exists(directory):
+              continue
 
+          parent_name = os.path.basename(directory)
+          for filename in os.listdir(directory):
+              old_path = os.path.join(directory, filename)
+              if not os.path.isfile(old_path):
+                  continue
+
+              parts = filename.split('_')
+              # print(parts)
+              # Prepend parent dir name and student-classroom IDs
+              parts = [parts[0]] + parts[2:]  # Remove the first part (which is the old ID)
+              new_filename = "_".join(parts)
+              # parts[0] = f"{parent_name}_{self.studentId}-{self.id}"
+              # new_filename = '_'.join(parts[1:])
+              new_path = os.path.join(directory, new_filename)
+              os.rename(old_path, new_path)
+
+
+  def rename_directories(path_logs, renameMap=None):
+    ''' Rename directories to match the new naming convention
+        This is a one-time operation to update old directory names
+    '''
+    # Mapping of old names to new names
+    renameMap = {
+      "aprfc": "aprfc",
+      "phase-charts": "ribbons",
+      "phase-timing": "timings",
+      "predictions": "preds",
+      "mode-filter": "moded-preds",
+      "features": "feats",
+      "events": "events",
+      "models": "state",
+    }
+
+    workspace_path = "logs"  # Replace with your path if needed
+
+    for root, dirs, files in os.walk(path_logs, topdown=False):
+      for directory in dirs:
+        if directory in renameMap:
+          old_path = os.path.join(root, directory)
+          new_path = os.path.join(root, renameMap[directory])
+          os.rename(old_path, new_path)
+
+
+def build_globalCM(path_preds, path_to, n_classes, labelType, labelToClassMap, DEVICE="cpu"):
+  overallBundle = {"Pred": [], "Target": []}
+
+  # collect predictions and targets
+  for file in os.listdir(path_preds):
+    if file.endswith(".pt"):
+      with open(os.path.join(path_preds, file), 'rb') as f:
+        test_bundle = pickle.load(f)
+        overallBundle["Pred"].extend(test_bundle["Pred"])
+        overallBundle["Target"].extend(test_bundle["Target"])
+
+  # debug: check if we got anything
+  print(f"Collected {len(overallBundle['Pred'])} predictions and {len(overallBundle['Target'])} targets")
+
+  if len(overallBundle["Pred"]) == 0 or len(overallBundle["Target"]) == 0:
+    print("WARNING: No predictions or targets found. Confusion matrix cannot be updated.")
+    return None
+
+  # map string labels to integers
+  label_to_idx = {label: i for i, label in enumerate(sorted(labelToClassMap.keys()))}
+  pred_indices = torch.tensor([label_to_idx[p] for p in overallBundle["Pred"]], device=DEVICE)
+  target_indices = torch.tensor([label_to_idx[t] for t in overallBundle["Target"]], device=DEVICE)
+
+  # debug: check tensor shapes
+  print(f"Pred tensor shape: {pred_indices.shape}, Target tensor shape: {target_indices.shape}")
+
+  cm = teaching.StillMetric("confusionMatrix", n_classes, DEVICE, labelType, labelToClassMap)
+  cm.metric.update(pred_indices, target_indices)
+
+  path_to = os.path.join(path_to, "cm_global")
+  _ = cm.score(path_to)
+ 
+  

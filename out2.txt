@@ -1,0 +1,925 @@
+nohup: ignoring input
+
+A. [classroom] LDSS-2508-2 (New)
+   [model] spatdurphase1 (New)
+   For ('train', 'process', 'eval')
+
+   Warning: Skipping annotation for 96c7 (./data/LDSS-local/annotations/96c7.json not found)
+   Skipping hidden file _becb
+
+   Skipping hidden file .DS_Store
+
+   Skipping hidden file _2e98
+
+   Skipping hidden file _d699
+
+   Warning: Skipping annotation for b5bf (./data/LDSS-local/annotations/b5bf.json not found)
+   A new labels.csv was created ./data/LDSS-local/labels/multi-phase.csv
+{0: '0Act', 1: '0Obj', 2: 'Dis', 3: 'Fix', 4: 'Pro', 5: 'Rep', 6: 'Vau'}
+Phases (#6):  ['0Act,0Obj', '0Obj,Rep', 'Dis,Pro', 'Dis,Vau', 'Fix,Pro', 'Fix,Vau']
+Class weights: tensor([1.0517, 0.6701, 0.4815, 0.4672, 2.2169, 1.8471, 0.2655])
+
+B. [dataset] LDSS-local (#134498)
+   [label] multi-phase
+   [preprocessing] imagenet-aug
+   [classes] #7 (Unbalanced) ['0Act', '0Obj', 'Dis', 'Fix', 'Pro', 'Rep', 'Vau']
+
+   note: labels are formed automatically and sorted alphabetically,
+      resulting in a different order from the annotations file. Fix-Vau comes before Fix-Pro!
+
+C. [training] start on [device] cuda
+   [folds] #7 [epochs] #25 [batch sizes] s32 / t1
+
+  Fold 1 splits:
+	train ['26d9', '315a', '436c', '5238', 'a909', 'b670', 'b71b', 'e6a9', 'e8d3', 'e8d7']
+	valid ['a334', 'f63b']
+	test ['cf7c']
+
+    No 'path_spaceModel' found. Using pretrained resnet50 in l4-fine-tune mode.
+    Feature size of 2048 at node 'flatten'
+
+spacefmaps_f1
+Feature path (spacefmaps_f1) not found in None
+
+-------------- Epoch 1 --------------
+	  T [E1 B1]   scr: 0.0000
+	  T [E1 B1015]   scr: 0.6443
+	  T [E1 B2029]   scr: 0.7148
+	  T [E1 B3043]   scr: 0.7487
+	  V [E1 B1]   scr: 0.6875
+	  V [E1 B203]   scr: 0.6119
+	  V [E1 B405]   scr: 0.6147
+	  V [E1 B606]   scr: 0.6093
+Train Loss: 0.131535	Valid Loss: 0.361383
+
+* New best model (valid loss): inf --> 0.3614 *
+
+-------------- Epoch 2 --------------
+	  T [E2 B1]   scr: 0.8438
+	  T [E2 B1015]   scr: 0.8470
+	  T [E2 B2029]   scr: 0.8521
+	  T [E2 B3043]   scr: 0.8577
+	  V [E2 B1]   scr: 0.5938
+	  V [E2 B203]   scr: 0.5877
+	  V [E2 B405]   scr: 0.5861
+	  V [E2 B606]   scr: 0.5885
+Train Loss: 0.074999	Valid Loss: 0.378983
+-------------- Epoch 3 --------------
+	  T [E3 B1]   scr: 0.8438
+	  T [E3 B1015]   scr: 0.8792
+	  T [E3 B2029]   scr: 0.8851
+	  T [E3 B3043]   scr: 0.8877
+	  V [E3 B1]   scr: 0.5312
+	  V [E3 B203]   scr: 0.5962
+	  V [E3 B405]   scr: 0.5995
+	  V [E3 B606]   scr: 0.5987
+Train Loss: 0.059062	Valid Loss: 0.391044
+-------------- Epoch 4 --------------
+	  T [E4 B1]   scr: 0.8750
+	  T [E4 B1015]   scr: 0.9035
+	  T [E4 B2029]   scr: 0.9037
+	  T [E4 B3043]   scr: 0.9056
+	  V [E4 B1]   scr: 0.6250
+	  V [E4 B203]   scr: 0.6308
+	  V [E4 B405]   scr: 0.6333
+	  V [E4 B606]   scr: 0.6348
+Train Loss: 0.049603	Valid Loss: 0.398693
+-------------- Epoch 5 --------------
+	  T [E5 B1]   scr: 0.9062
+	  T [E5 B1015]   scr: 0.9157
+	  T [E5 B2029]   scr: 0.9169
+	  T [E5 B3043]   scr: 0.9168
+	  V [E5 B1]   scr: 0.5625
+	  V [E5 B203]   scr: 0.6415
+	  V [E5 B405]   scr: 0.6411
+	  V [E5 B606]   scr: 0.6374
+Train Loss: 0.043450	Valid Loss: 0.412888
+-------------- Epoch 6 --------------
+	  T [E6 B1]   scr: 0.9688
+	  T [E6 B1015]   scr: 0.9347
+	  T [E6 B2029]   scr: 0.9388
+	  T [E6 B3043]   scr: 0.9394
+	  V [E6 B1]   scr: 0.7812
+	  V [E6 B203]   scr: 0.6441
+	  V [E6 B405]   scr: 0.6465
+	  V [E6 B606]   scr: 0.6493
+Train Loss: 0.030996	Valid Loss: 0.422633
+
+* Stopped early *
+
+
+	Testing...
+	  T [B1]   scr: 0.6875
+	  T [B186]   scr: 0.5380
+	  T [B371]   scr: 0.5403
+	  T [B556]   scr: 0.5438
+Testing took 59.06 seconds
+{'0Act,0Obj': 0, '0Obj,Rep': 1, 'Dis,Pro': 2, 'Dis,Vau': 3, 'Fix,Pro': 4, 'Fix,Vau': 5}
+
+phases_preds counts: [3455  964 1035 5745   77 5366] 	 16642
+phases_gt counts: [5930 1281 1128 3955  157 5325] 	 17776
+{0: '0Act,0Obj', 1: '0Obj,Rep', 2: 'Dis,Pro', 3: 'Dis,Vau', 4: 'Fix,Pro', 5: 'Fix,Vau'}
+
+Video cf7c Phase Report
+             	|   T Preds   |  T Targets  ||  Diff
+0Act,0Obj    	| 57.58   min | 98.83   min || -41.25  min
+0Obj,Rep     	| 16.07   min | 21.35   min || -5.28   min
+Dis,Pro      	| 17.25   min | 18.80   min || -1.55   min
+Dis,Vau      	| 95.75   min | 65.92   min || 29.83   min
+Fix,Pro      	| 1.28    min | 2.62    min || -1.33   min
+Fix,Vau      	| 89.43   min | 88.75   min || 0.68    min 
+
+
+
+Number of videos: 1
+Video graphing took 1.00 seconds
+
+Saved phase metric graphs to ./logs/LDSS-2508-2/spatdurphase1/eval/ribbons
+
+	 = = = = = 	 = = = = =
+		 Fold 1 done!
+	 = = = = = 	 = = = = =
+
+  Fold 2 splits:
+	train ['26d9', '315a', '436c', '5238', 'a909', 'b670', 'b71b', 'e6a9', 'e8d3', 'e8d7']
+	valid ['cf7c']
+	test ['a334', 'f63b']
+
+    No 'path_spaceModel' found. Using pretrained resnet50 in l4-fine-tune mode.
+    Feature size of 2048 at node 'flatten'
+
+spacefmaps_f2
+Feature path (spacefmaps_f2) not found in None
+
+-------------- Epoch 1 --------------
+	  T [E1 B1]   scr: 0.0000
+	  T [E1 B1015]   scr: 0.6327
+	  T [E1 B2029]   scr: 0.7002
+	  T [E1 B3043]   scr: 0.7374
+	  V [E1 B1]   scr: 0.2812
+	  V [E1 B186]   scr: 0.4625
+	  V [E1 B371]   scr: 0.4663
+	  V [E1 B556]   scr: 0.4666
+Train Loss: 0.137072	Valid Loss: 0.376166
+
+* New best model (valid loss): inf --> 0.3762 *
+
+-------------- Epoch 2 --------------
+	  T [E2 B1]   scr: 0.8438
+	  T [E2 B1015]   scr: 0.8442
+	  T [E2 B2029]   scr: 0.8523
+	  T [E2 B3043]   scr: 0.8570
+	  V [E2 B1]   scr: 0.5312
+	  V [E2 B186]   scr: 0.5002
+	  V [E2 B371]   scr: 0.5019
+	  V [E2 B556]   scr: 0.5010
+Train Loss: 0.076331	Valid Loss: 0.420793
+-------------- Epoch 3 --------------
+	  T [E3 B1]   scr: 0.8750
+	  T [E3 B1015]   scr: 0.8823
+	  T [E3 B2029]   scr: 0.8856
+	  T [E3 B3043]   scr: 0.8878
+	  V [E3 B1]   scr: 0.6250
+	  V [E3 B186]   scr: 0.5514
+	  V [E3 B371]   scr: 0.5500
+	  V [E3 B556]   scr: 0.5487
+Train Loss: 0.059714	Valid Loss: 0.447094
+-------------- Epoch 4 --------------
+	  T [E4 B1]   scr: 0.7812
+	  T [E4 B1015]   scr: 0.9025
+	  T [E4 B2029]   scr: 0.9030
+	  T [E4 B3043]   scr: 0.9050
+	  V [E4 B1]   scr: 0.5938
+	  V [E4 B186]   scr: 0.5277
+	  V [E4 B371]   scr: 0.5387
+	  V [E4 B556]   scr: 0.5388
+Train Loss: 0.050619	Valid Loss: 0.454055
+-------------- Epoch 5 --------------
+	  T [E5 B1]   scr: 0.9062
+	  T [E5 B1015]   scr: 0.9152
+	  T [E5 B2029]   scr: 0.9160
+	  T [E5 B3043]   scr: 0.9181
+	  V [E5 B1]   scr: 0.5000
+	  V [E5 B186]   scr: 0.5161
+	  V [E5 B371]   scr: 0.5092
+	  V [E5 B556]   scr: 0.5030
+Train Loss: 0.043653	Valid Loss: 0.493994
+-------------- Epoch 6 --------------
+	  T [E6 B1]   scr: 1.0000
+	  T [E6 B1015]   scr: 0.9344
+	  T [E6 B2029]   scr: 0.9381
+	  T [E6 B3043]   scr: 0.9400
+	  V [E6 B1]   scr: 0.4688
+	  V [E6 B186]   scr: 0.5470
+	  V [E6 B371]   scr: 0.5460
+	  V [E6 B556]   scr: 0.5425
+Train Loss: 0.031665	Valid Loss: 0.529103
+
+* Stopped early *
+
+
+	Testing...
+	  T [B1]   scr: 0.6562
+	  T [B203]   scr: 0.6410
+	  T [B405]   scr: 0.6451
+	  T [B606]   scr: 0.6440
+Testing took 65.21 seconds
+{'0Act,0Obj': 0, '0Obj,Rep': 1, 'Dis,Pro': 2, 'Dis,Vau': 3, 'Fix,Pro': 4, 'Fix,Vau': 5}
+
+phases_preds counts: [ 870  745   65 1406  146 2741] 	 5973
+phases_gt counts: [ 579 1423   53  916  100 3339] 	 6410
+{0: '0Act,0Obj', 1: '0Obj,Rep', 2: 'Dis,Pro', 3: 'Dis,Vau', 4: 'Fix,Pro', 5: 'Fix,Vau'}
+
+Video a334 Phase Report
+             	|   T Preds   |  T Targets  ||  Diff
+0Act,0Obj    	| 14.50   min | 9.65    min || 4.85    min
+0Obj,Rep     	| 12.42   min | 23.72   min || -11.30  min
+Dis,Pro      	| 1.08    min | 0.88    min || 0.20    min
+Dis,Vau      	| 23.43   min | 15.27   min || 8.17    min
+Fix,Pro      	| 2.43    min | 1.67    min || 0.77    min
+Fix,Vau      	| 45.68   min | 55.65   min || -9.97   min 
+
+
+phases_preds counts: [1162  603 1375 4432  118 4592] 	 12282
+phases_gt counts: [2841  718 1344 3002  155 4896] 	 12956
+{0: '0Act,0Obj', 1: '0Obj,Rep', 2: 'Dis,Pro', 3: 'Dis,Vau', 4: 'Fix,Pro', 5: 'Fix,Vau'}
+
+Video f63b Phase Report
+             	|   T Preds   |  T Targets  ||  Diff
+0Act,0Obj    	| 19.37   min | 47.35   min || -27.98  min
+0Obj,Rep     	| 10.05   min | 11.97   min || -1.92   min
+Dis,Pro      	| 22.92   min | 22.40   min || 0.52    min
+Dis,Vau      	| 73.87   min | 50.03   min || 23.83   min
+Fix,Pro      	| 1.97    min | 2.58    min || -0.62   min
+Fix,Vau      	| 76.53   min | 81.60   min || -5.07   min 
+
+
+
+Number of videos: 2
+Video graphing took 1.23 seconds
+
+Saved phase metric graphs to ./logs/LDSS-2508-2/spatdurphase1/eval/ribbons
+
+	 = = = = = 	 = = = = =
+		 Fold 2 done!
+	 = = = = = 	 = = = = =
+
+  Fold 3 splits:
+	train ['26d9', '315a', '436c', '5238', 'a334', 'a909', 'b670', 'b71b', 'e8d3', 'f63b']
+	valid ['cf7c']
+	test ['e6a9', 'e8d7']
+
+    No 'path_spaceModel' found. Using pretrained resnet50 in l4-fine-tune mode.
+    Feature size of 2048 at node 'flatten'
+
+spacefmaps_f3
+Feature path (spacefmaps_f3) not found in None
+
+-------------- Epoch 1 --------------
+	  T [E1 B1]   scr: 0.0000
+	  T [E1 B1015]   scr: 0.6322
+	  T [E1 B2029]   scr: 0.7013
+	  T [E1 B3043]   scr: 0.7369
+	  T [E1 B3044]   scr: 0.7369
+	  V [E1 B1]   scr: 0.3750
+	  V [E1 B186]   scr: 0.4703
+	  V [E1 B371]   scr: 0.4797
+	  V [E1 B556]   scr: 0.4824
+Train Loss: 0.133588	Valid Loss: 0.364737
+
+* New best model (valid loss): inf --> 0.3647 *
+
+-------------- Epoch 2 --------------
+	  T [E2 B1]   scr: 0.8750
+	  T [E2 B1015]   scr: 0.8378
+	  T [E2 B2029]   scr: 0.8452
+	  T [E2 B3043]   scr: 0.8507
+	  T [E2 B3044]   scr: 0.8507
+	  V [E2 B1]   scr: 0.4062
+	  V [E2 B186]   scr: 0.4835
+	  V [E2 B371]   scr: 0.4847
+	  V [E2 B556]   scr: 0.4875
+Train Loss: 0.076957	Valid Loss: 0.388100
+-------------- Epoch 3 --------------
+	  T [E3 B1]   scr: 0.8438
+	  T [E3 B1015]   scr: 0.8753
+	  T [E3 B2029]   scr: 0.8780
+	  T [E3 B3043]   scr: 0.8811
+	  T [E3 B3044]   scr: 0.8811
+	  V [E3 B1]   scr: 0.5312
+	  V [E3 B186]   scr: 0.4840
+	  V [E3 B371]   scr: 0.4816
+	  V [E3 B556]   scr: 0.4810
+Train Loss: 0.062264	Valid Loss: 0.387544
+-------------- Epoch 4 --------------
+	  T [E4 B1]   scr: 1.0000
+	  T [E4 B1015]   scr: 0.8993
+	  T [E4 B2029]   scr: 0.9001
+	  T [E4 B3043]   scr: 0.9005
+	  T [E4 B3044]   scr: 0.9005
+	  V [E4 B1]   scr: 0.4688
+	  V [E4 B186]   scr: 0.5067
+	  V [E4 B371]   scr: 0.5037
+	  V [E4 B556]   scr: 0.5007
+Train Loss: 0.051628	Valid Loss: 0.507594
+-------------- Epoch 5 --------------
+	  T [E5 B1]   scr: 0.9062
+	  T [E5 B1015]   scr: 0.9123
+	  T [E5 B2029]   scr: 0.9127
+	  T [E5 B3043]   scr: 0.9133
+	  T [E5 B3044]   scr: 0.9133
+	  V [E5 B1]   scr: 0.5000
+	  V [E5 B186]   scr: 0.5269
+	  V [E5 B371]   scr: 0.5301
+	  V [E5 B556]   scr: 0.5265
+Train Loss: 0.045262	Valid Loss: 0.478148
+-------------- Epoch 6 --------------
+	  T [E6 B1]   scr: 0.9688
+	  T [E6 B1015]   scr: 0.9324
+	  T [E6 B2029]   scr: 0.9365
+	  T [E6 B3043]   scr: 0.9376
+	  T [E6 B3044]   scr: 0.9376
+	  V [E6 B1]   scr: 0.6562
+	  V [E6 B186]   scr: 0.5319
+	  V [E6 B371]   scr: 0.5239
+	  V [E6 B556]   scr: 0.5285
+Train Loss: 0.032160	Valid Loss: 0.480432
+
+* Stopped early *
+
+
+	Testing...
+	  T [B1]   scr: 0.6250
+	  T [B202]   scr: 0.6770
+	  T [B403]   scr: 0.6735
+	  T [B604]   scr: 0.6715
+	  T [B605]   scr: 0.6715
+Testing took 59.66 seconds
+{'0Act,0Obj': 0, '0Obj,Rep': 1, 'Dis,Pro': 2, 'Dis,Vau': 3, 'Fix,Pro': 4, 'Fix,Vau': 5}
+
+phases_preds counts: [1270 1250  519 4469  124 4395] 	 12027
+phases_gt counts: [2072 1604  445 4324  280 4039] 	 12764
+{0: '0Act,0Obj', 1: '0Obj,Rep', 2: 'Dis,Pro', 3: 'Dis,Vau', 4: 'Fix,Pro', 5: 'Fix,Vau'}
+
+Video e6a9 Phase Report
+             	|   T Preds   |  T Targets  ||  Diff
+0Act,0Obj    	| 21.17   min | 34.53   min || -13.37  min
+0Obj,Rep     	| 20.83   min | 26.73   min || -5.90   min
+Dis,Pro      	| 8.65    min | 7.42    min || 1.23    min
+Dis,Vau      	| 74.48   min | 72.07   min || 2.42    min
+Fix,Pro      	| 2.07    min | 4.67    min || -2.60   min
+Fix,Vau      	| 73.25   min | 67.32   min || 5.93    min 
+
+
+phases_preds counts: [ 717  609   51 2363   82 2294] 	 6116
+phases_gt counts: [ 964  890  836 1709  211 1968] 	 6578
+{0: '0Act,0Obj', 1: '0Obj,Rep', 2: 'Dis,Pro', 3: 'Dis,Vau', 4: 'Fix,Pro', 5: 'Fix,Vau'}
+
+Video e8d7 Phase Report
+             	|   T Preds   |  T Targets  ||  Diff
+0Act,0Obj    	| 11.95   min | 16.07   min || -4.12   min
+0Obj,Rep     	| 10.15   min | 14.83   min || -4.68   min
+Dis,Pro      	| 0.85    min | 13.93   min || -13.08  min
+Dis,Vau      	| 39.38   min | 28.48   min || 10.90   min
+Fix,Pro      	| 1.37    min | 3.52    min || -2.15   min
+Fix,Vau      	| 38.23   min | 32.80   min || 5.43    min 
+
+
+
+Number of videos: 2
+Video graphing took 1.28 seconds
+
+Saved phase metric graphs to ./logs/LDSS-2508-2/spatdurphase1/eval/ribbons
+
+	 = = = = = 	 = = = = =
+		 Fold 3 done!
+	 = = = = = 	 = = = = =
+
+  Fold 4 splits:
+	train ['26d9', '315a', '436c', 'a334', 'a909', 'b670', 'b71b', 'e6a9', 'e8d7', 'f63b']
+	valid ['cf7c']
+	test ['5238', 'e8d3']
+
+    No 'path_spaceModel' found. Using pretrained resnet50 in l4-fine-tune mode.
+    Feature size of 2048 at node 'flatten'
+
+spacefmaps_f4
+Feature path (spacefmaps_f4) not found in None
+
+-------------- Epoch 1 --------------
+	  T [E1 B1]   scr: 0.0000
+	  T [E1 B1022]   scr: 0.6207
+	  T [E1 B2043]   scr: 0.6976
+	  T [E1 B3063]   scr: 0.7368
+	  V [E1 B1]   scr: 0.3750
+	  V [E1 B186]   scr: 0.4684
+	  V [E1 B371]   scr: 0.4726
+	  V [E1 B556]   scr: 0.4712
+Train Loss: 0.135426	Valid Loss: 0.346296
+
+* New best model (valid loss): inf --> 0.3463 *
+
+-------------- Epoch 2 --------------
+	  T [E2 B1]   scr: 0.7812
+	  T [E2 B1022]   scr: 0.8417
+	  T [E2 B2043]   scr: 0.8507
+	  T [E2 B3063]   scr: 0.8568
+	  V [E2 B1]   scr: 0.5000
+	  V [E2 B186]   scr: 0.5544
+	  V [E2 B371]   scr: 0.5548
+	  V [E2 B556]   scr: 0.5499
+Train Loss: 0.074821	Valid Loss: 0.402066
+-------------- Epoch 3 --------------
+	  T [E3 B1]   scr: 0.9688
+	  T [E3 B1022]   scr: 0.8831
+	  T [E3 B2043]   scr: 0.8856
+	  T [E3 B3063]   scr: 0.8887
+	  V [E3 B1]   scr: 0.5312
+	  V [E3 B186]   scr: 0.5138
+	  V [E3 B371]   scr: 0.5081
+	  V [E3 B556]   scr: 0.5129
+Train Loss: 0.058108	Valid Loss: 0.424184
+-------------- Epoch 4 --------------
+	  T [E4 B1]   scr: 0.9688
+	  T [E4 B1022]   scr: 0.9033
+	  T [E4 B2043]   scr: 0.9066
+	  T [E4 B3063]   scr: 0.9079
+	  V [E4 B1]   scr: 0.5625
+	  V [E4 B186]   scr: 0.5391
+	  V [E4 B371]   scr: 0.5377
+	  V [E4 B556]   scr: 0.5426
+Train Loss: 0.048016	Valid Loss: 0.501170
+-------------- Epoch 5 --------------
+	  T [E5 B1]   scr: 0.9062
+	  T [E5 B1022]   scr: 0.9208
+	  T [E5 B2043]   scr: 0.9199
+	  T [E5 B3063]   scr: 0.9214
+	  V [E5 B1]   scr: 0.4062
+	  V [E5 B186]   scr: 0.5158
+	  V [E5 B371]   scr: 0.5077
+	  V [E5 B556]   scr: 0.5069
+Train Loss: 0.041450	Valid Loss: 0.515605
+-------------- Epoch 6 --------------
+	  T [E6 B1]   scr: 0.8750
+	  T [E6 B1022]   scr: 0.9369
+	  T [E6 B2043]   scr: 0.9408
+	  T [E6 B3063]   scr: 0.9437
+	  V [E6 B1]   scr: 0.5000
+	  V [E6 B186]   scr: 0.5276
+	  V [E6 B371]   scr: 0.5223
+	  V [E6 B556]   scr: 0.5253
+Train Loss: 0.028950	Valid Loss: 0.552722
+
+* Stopped early *
+
+
+	Testing...
+	  T [B1]   scr: 0.6875
+	  T [B196]   scr: 0.7675
+	  T [B391]   scr: 0.7717
+	  T [B586]   scr: 0.7703
+Testing took 63.21 seconds
+{'0Act,0Obj': 0, '0Obj,Rep': 1, 'Dis,Pro': 2, 'Dis,Vau': 3, 'Fix,Pro': 4, 'Fix,Vau': 5}
+
+phases_preds counts: [2079 1042  651 4105   63 2846] 	 10786
+phases_gt counts: [2439 1014  359 4849  135 2530] 	 11326
+{0: '0Act,0Obj', 1: '0Obj,Rep', 2: 'Dis,Pro', 3: 'Dis,Vau', 4: 'Fix,Pro', 5: 'Fix,Vau'}
+
+Video 5238 Phase Report
+             	|   T Preds   |  T Targets  ||  Diff
+0Act,0Obj    	| 34.65   min | 40.65   min || -6.00   min
+0Obj,Rep     	| 17.37   min | 16.90   min || 0.47    min
+Dis,Pro      	| 10.85   min | 5.98    min || 4.87    min
+Dis,Vau      	| 68.42   min | 80.82   min || -12.40  min
+Fix,Pro      	| 1.05    min | 2.25    min || -1.20   min
+Fix,Vau      	| 47.43   min | 42.17   min || 5.27    min 
+
+
+phases_preds counts: [ 986    5  469 2510   42 3220] 	 7232
+phases_gt counts: [ 632    0  451 3121   57 3150] 	 7411
+{0: '0Act,0Obj', 1: '0Obj,Rep', 2: 'Dis,Pro', 3: 'Dis,Vau', 4: 'Fix,Pro', 5: 'Fix,Vau'}
+
+Video e8d3 Phase Report
+             	|   T Preds   |  T Targets  ||  Diff
+0Act,0Obj    	| 16.43   min | 10.53   min || 5.90    min
+0Obj,Rep     	| 0.08    min | 0.00    min || 0.08    min
+Dis,Pro      	| 7.82    min | 7.52    min || 0.30    min
+Dis,Vau      	| 41.83   min | 52.02   min || -10.18  min
+Fix,Pro      	| 0.70    min | 0.95    min || -0.25   min
+Fix,Vau      	| 53.67   min | 52.50   min || 1.17    min 
+
+
+
+Number of videos: 2
+Video graphing took 1.22 seconds
+
+Saved phase metric graphs to ./logs/LDSS-2508-2/spatdurphase1/eval/ribbons
+
+	 = = = = = 	 = = = = =
+		 Fold 4 done!
+	 = = = = = 	 = = = = =
+
+  Fold 5 splits:
+	train ['26d9', '315a', '436c', '5238', 'a334', 'b670', 'e6a9', 'e8d3', 'e8d7', 'f63b']
+	valid ['cf7c']
+	test ['a909', 'b71b']
+
+    No 'path_spaceModel' found. Using pretrained resnet50 in l4-fine-tune mode.
+    Feature size of 2048 at node 'flatten'
+
+spacefmaps_f5
+Feature path (spacefmaps_f5) not found in None
+
+-------------- Epoch 1 --------------
+	  T [E1 B1]   scr: 0.0000
+	  T [E1 B1014]   scr: 0.6244
+	  T [E1 B2027]   scr: 0.6992
+	  T [E1 B3040]   scr: 0.7390
+	  T [E1 B3041]   scr: 0.7390
+	  V [E1 B1]   scr: 0.5625
+	  V [E1 B186]   scr: 0.5455
+	  V [E1 B371]   scr: 0.5478
+	  V [E1 B556]   scr: 0.5496
+Train Loss: 0.135151	Valid Loss: 0.392001
+
+* New best model (valid loss): inf --> 0.3920 *
+
+-------------- Epoch 2 --------------
+	  T [E2 B1]   scr: 0.8125
+	  T [E2 B1014]   scr: 0.8473
+	  T [E2 B2027]   scr: 0.8523
+	  T [E2 B3040]   scr: 0.8593
+	  T [E2 B3041]   scr: 0.8593
+	  V [E2 B1]   scr: 0.6562
+	  V [E2 B186]   scr: 0.5682
+	  V [E2 B371]   scr: 0.5746
+	  V [E2 B556]   scr: 0.5772
+Train Loss: 0.073961	Valid Loss: 0.369781
+
+* New best model (valid loss): 0.3920 --> 0.3698 *
+
+-------------- Epoch 3 --------------
+	  T [E3 B1]   scr: 0.8438
+	  T [E3 B1014]   scr: 0.8891
+	  T [E3 B2027]   scr: 0.8904
+	  T [E3 B3040]   scr: 0.8928
+	  T [E3 B3041]   scr: 0.8928
+	  V [E3 B1]   scr: 0.4688
+	  V [E3 B186]   scr: 0.5734
+	  V [E3 B371]   scr: 0.5733
+	  V [E3 B556]   scr: 0.5775
+Train Loss: 0.056666	Valid Loss: 0.398551
+-------------- Epoch 4 --------------
+	  T [E4 B1]   scr: 1.0000
+	  T [E4 B1014]   scr: 0.9086
+	  T [E4 B2027]   scr: 0.9099
+	  T [E4 B3040]   scr: 0.9109
+	  T [E4 B3041]   scr: 0.9109
+	  V [E4 B1]   scr: 0.6250
+	  V [E4 B186]   scr: 0.5607
+	  V [E4 B371]   scr: 0.5630
+	  V [E4 B556]   scr: 0.5649
+Train Loss: 0.047028	Valid Loss: 0.401520
+-------------- Epoch 5 --------------
+	  T [E5 B1]   scr: 0.9062
+	  T [E5 B1014]   scr: 0.9229
+	  T [E5 B2027]   scr: 0.9222
+	  T [E5 B3040]   scr: 0.9234
+	  T [E5 B3041]   scr: 0.9234
+	  V [E5 B1]   scr: 0.7188
+	  V [E5 B186]   scr: 0.5501
+	  V [E5 B371]   scr: 0.5544
+	  V [E5 B556]   scr: 0.5538
+Train Loss: 0.040405	Valid Loss: 0.416254
+-------------- Epoch 6 --------------
+	  T [E6 B1]   scr: 0.9688
+	  T [E6 B1014]   scr: 0.9319
+	  T [E6 B2027]   scr: 0.9331
+	  T [E6 B3040]   scr: 0.9339
+	  T [E6 B3041]   scr: 0.9339
+	  V [E6 B1]   scr: 0.5625
+	  V [E6 B186]   scr: 0.5561
+	  V [E6 B371]   scr: 0.5502
+	  V [E6 B556]   scr: 0.5501
+Train Loss: 0.035115	Valid Loss: 0.457701
+-------------- Epoch 7 --------------
+	  T [E7 B1]   scr: 0.9375
+	  T [E7 B1014]   scr: 0.9467
+	  T [E7 B2027]   scr: 0.9494
+	  T [E7 B3040]   scr: 0.9515
+	  T [E7 B3041]   scr: 0.9515
+	  V [E7 B1]   scr: 0.5312
+	  V [E7 B186]   scr: 0.5860
+	  V [E7 B371]   scr: 0.5908
+	  V [E7 B556]   scr: 0.5868
+Train Loss: 0.025385	Valid Loss: 0.444987
+
+* Stopped early *
+
+
+	Testing...
+	  T [B1]   scr: 0.8750
+	  T [B203]   scr: 0.7783
+	  T [B405]   scr: 0.7742
+	  T [B607]   scr: 0.7744
+	  T [B608]   scr: 0.7744
+Testing took 63.76 seconds
+{'0Act,0Obj': 0, '0Obj,Rep': 1, 'Dis,Pro': 2, 'Dis,Vau': 3, 'Fix,Pro': 4, 'Fix,Vau': 5}
+
+phases_preds counts: [ 961  762  255 2826   39 3113] 	 7956
+phases_gt counts: [1737  802  274 2228   48 3168] 	 8257
+{0: '0Act,0Obj', 1: '0Obj,Rep', 2: 'Dis,Pro', 3: 'Dis,Vau', 4: 'Fix,Pro', 5: 'Fix,Vau'}
+
+Video a909 Phase Report
+             	|   T Preds   |  T Targets  ||  Diff
+0Act,0Obj    	| 16.02   min | 28.95   min || -12.93  min
+0Obj,Rep     	| 12.70   min | 13.37   min || -0.67   min
+Dis,Pro      	| 4.25    min | 4.57    min || -0.32   min
+Dis,Vau      	| 47.10   min | 37.13   min || 9.97    min
+Fix,Pro      	| 0.65    min | 0.80    min || -0.15   min
+Fix,Vau      	| 51.88   min | 52.80   min || -0.92   min 
+
+
+phases_preds counts: [ 949  837  395 5150   68 3301] 	 10700
+phases_gt counts: [ 748  733  316 5640  151 3583] 	 11171
+{0: '0Act,0Obj', 1: '0Obj,Rep', 2: 'Dis,Pro', 3: 'Dis,Vau', 4: 'Fix,Pro', 5: 'Fix,Vau'}
+
+Video b71b Phase Report
+             	|   T Preds   |  T Targets  ||  Diff
+0Act,0Obj    	| 15.82   min | 12.47   min || 3.35    min
+0Obj,Rep     	| 13.95   min | 12.22   min || 1.73    min
+Dis,Pro      	| 6.58    min | 5.27    min || 1.32    min
+Dis,Vau      	| 85.83   min | 94.00   min || -8.17   min
+Fix,Pro      	| 1.13    min | 2.52    min || -1.38   min
+Fix,Vau      	| 55.02   min | 59.72   min || -4.70   min 
+
+
+
+Number of videos: 2
+Video graphing took 1.23 seconds
+
+Saved phase metric graphs to ./logs/LDSS-2508-2/spatdurphase1/eval/ribbons
+
+	 = = = = = 	 = = = = =
+		 Fold 5 done!
+	 = = = = = 	 = = = = =
+
+  Fold 6 splits:
+	train ['26d9', '315a', '5238', 'a334', 'a909', 'b71b', 'e6a9', 'e8d3', 'e8d7', 'f63b']
+	valid ['cf7c']
+	test ['436c', 'b670']
+
+    No 'path_spaceModel' found. Using pretrained resnet50 in l4-fine-tune mode.
+    Feature size of 2048 at node 'flatten'
+
+spacefmaps_f6
+Feature path (spacefmaps_f6) not found in None
+
+-------------- Epoch 1 --------------
+	  T [E1 B1]   scr: 0.0000
+	  T [E1 B1005]   scr: 0.6320
+	  T [E1 B2009]   scr: 0.6978
+	  T [E1 B3012]   scr: 0.7335
+	  V [E1 B1]   scr: 0.6250
+	  V [E1 B186]   scr: 0.4923
+	  V [E1 B371]   scr: 0.4936
+	  V [E1 B556]   scr: 0.4893
+Train Loss: 0.138633	Valid Loss: 0.357011
+
+* New best model (valid loss): inf --> 0.3570 *
+
+-------------- Epoch 2 --------------
+	  T [E2 B1]   scr: 0.8438
+	  T [E2 B1005]   scr: 0.8385
+	  T [E2 B2009]   scr: 0.8446
+	  T [E2 B3012]   scr: 0.8506
+	  V [E2 B1]   scr: 0.6250
+	  V [E2 B186]   scr: 0.5039
+	  V [E2 B371]   scr: 0.4995
+	  V [E2 B556]   scr: 0.4994
+Train Loss: 0.078452	Valid Loss: 0.389702
+-------------- Epoch 3 --------------
+	  T [E3 B1]   scr: 0.7812
+	  T [E3 B1005]   scr: 0.8775
+	  T [E3 B2009]   scr: 0.8803
+	  T [E3 B3012]   scr: 0.8835
+	  V [E3 B1]   scr: 0.6562
+	  V [E3 B186]   scr: 0.5302
+	  V [E3 B371]   scr: 0.5259
+	  V [E3 B556]   scr: 0.5223
+Train Loss: 0.061450	Valid Loss: 0.401517
+-------------- Epoch 4 --------------
+	  T [E4 B1]   scr: 0.9375
+	  T [E4 B1005]   scr: 0.8989
+	  T [E4 B2009]   scr: 0.9006
+	  T [E4 B3012]   scr: 0.9020
+	  V [E4 B1]   scr: 0.5625
+	  V [E4 B186]   scr: 0.5534
+	  V [E4 B371]   scr: 0.5504
+	  V [E4 B556]   scr: 0.5528
+Train Loss: 0.051333	Valid Loss: 0.524877
+-------------- Epoch 5 --------------
+	  T [E5 B1]   scr: 0.8750
+	  T [E5 B1005]   scr: 0.9119
+	  T [E5 B2009]   scr: 0.9122
+	  T [E5 B3012]   scr: 0.9134
+	  V [E5 B1]   scr: 0.4375
+	  V [E5 B186]   scr: 0.5002
+	  V [E5 B371]   scr: 0.4971
+	  V [E5 B556]   scr: 0.4950
+Train Loss: 0.045004	Valid Loss: 0.505085
+-------------- Epoch 6 --------------
+	  T [E6 B1]   scr: 0.9375
+	  T [E6 B1005]   scr: 0.9301
+	  T [E6 B2009]   scr: 0.9339
+	  T [E6 B3012]   scr: 0.9363
+	  V [E6 B1]   scr: 0.5625
+	  V [E6 B186]   scr: 0.5543
+	  V [E6 B371]   scr: 0.5566
+	  V [E6 B556]   scr: 0.5546
+Train Loss: 0.032129	Valid Loss: 0.539285
+
+* Stopped early *
+
+
+	Testing...
+	  T [B1]   scr: 0.7188
+	  T [B213]   scr: 0.6988
+	  T [B425]   scr: 0.6955
+	  T [B637]   scr: 0.6958
+Testing took 68.19 seconds
+{'0Act,0Obj': 0, '0Obj,Rep': 1, 'Dis,Pro': 2, 'Dis,Vau': 3, 'Fix,Pro': 4, 'Fix,Vau': 5}
+
+phases_preds counts: [ 656  793  523 3334   94 3429] 	 8829
+phases_gt counts: [ 882  881 1022 2323  340 3777] 	 9225
+{0: '0Act,0Obj', 1: '0Obj,Rep', 2: 'Dis,Pro', 3: 'Dis,Vau', 4: 'Fix,Pro', 5: 'Fix,Vau'}
+
+Video 436c Phase Report
+             	|   T Preds   |  T Targets  ||  Diff
+0Act,0Obj    	| 10.93   min | 14.70   min || -3.77   min
+0Obj,Rep     	| 13.22   min | 14.68   min || -1.47   min
+Dis,Pro      	| 8.72    min | 17.03   min || -8.32   min
+Dis,Vau      	| 55.57   min | 38.72   min || 16.85   min
+Fix,Pro      	| 1.57    min | 5.67    min || -4.10   min
+Fix,Vau      	| 57.15   min | 62.95   min || -5.80   min 
+
+
+phases_preds counts: [ 562  865 1003 4741  120 3189] 	 10480
+phases_gt counts: [ 731  790  911 4940  618 3143] 	 11133
+{0: '0Act,0Obj', 1: '0Obj,Rep', 2: 'Dis,Pro', 3: 'Dis,Vau', 4: 'Fix,Pro', 5: 'Fix,Vau'}
+
+Video b670 Phase Report
+             	|   T Preds   |  T Targets  ||  Diff
+0Act,0Obj    	| 9.37    min | 12.18   min || -2.82   min
+0Obj,Rep     	| 14.42   min | 13.17   min || 1.25    min
+Dis,Pro      	| 16.72   min | 15.18   min || 1.53    min
+Dis,Vau      	| 79.02   min | 82.33   min || -3.32   min
+Fix,Pro      	| 2.00    min | 10.30   min || -8.30   min
+Fix,Vau      	| 53.15   min | 52.38   min || 0.77    min 
+
+
+
+Number of videos: 2
+Video graphing took 1.45 seconds
+
+Saved phase metric graphs to ./logs/LDSS-2508-2/spatdurphase1/eval/ribbons
+
+	 = = = = = 	 = = = = =
+		 Fold 6 done!
+	 = = = = = 	 = = = = =
+
+  Fold 7 splits:
+	train ['436c', '5238', 'a334', 'a909', 'b670', 'b71b', 'e6a9', 'e8d3', 'e8d7', 'f63b']
+	valid ['cf7c']
+	test ['26d9', '315a']
+
+    No 'path_spaceModel' found. Using pretrained resnet50 in l4-fine-tune mode.
+    Feature size of 2048 at node 'flatten'
+
+spacefmaps_f7
+Feature path (spacefmaps_f7) not found in None
+
+-------------- Epoch 1 --------------
+	  T [E1 B1]   scr: 0.0000
+	  T [E1 B1014]   scr: 0.6320
+	  T [E1 B2027]   scr: 0.7016
+	  T [E1 B3039]   scr: 0.7392
+	  V [E1 B1]   scr: 0.6250
+	  V [E1 B186]   scr: 0.5462
+	  V [E1 B371]   scr: 0.5441
+	  V [E1 B556]   scr: 0.5416
+Train Loss: 0.137227	Valid Loss: 0.369464
+
+* New best model (valid loss): inf --> 0.3695 *
+
+-------------- Epoch 2 --------------
+	  T [E2 B1]   scr: 0.9688
+	  T [E2 B1014]   scr: 0.8501
+	  T [E2 B2027]   scr: 0.8571
+	  T [E2 B3039]   scr: 0.8640
+	  V [E2 B1]   scr: 0.5625
+	  V [E2 B186]   scr: 0.5465
+	  V [E2 B371]   scr: 0.5419
+	  V [E2 B556]   scr: 0.5444
+Train Loss: 0.072813	Valid Loss: 0.477305
+-------------- Epoch 3 --------------
+	  T [E3 B1]   scr: 0.9375
+	  T [E3 B1014]   scr: 0.8890
+	  T [E3 B2027]   scr: 0.8911
+	  T [E3 B3039]   scr: 0.8934
+	  V [E3 B1]   scr: 0.4375
+	  V [E3 B186]   scr: 0.5346
+	  V [E3 B371]   scr: 0.5384
+	  V [E3 B556]   scr: 0.5393
+Train Loss: 0.056438	Valid Loss: 0.426031
+-------------- Epoch 4 --------------
+	  T [E4 B1]   scr: 1.0000
+	  T [E4 B1014]   scr: 0.9103
+	  T [E4 B2027]   scr: 0.9122
+	  T [E4 B3039]   scr: 0.9135
+	  V [E4 B1]   scr: 0.5000
+	  V [E4 B186]   scr: 0.5556
+	  V [E4 B371]   scr: 0.5484
+	  V [E4 B556]   scr: 0.5493
+Train Loss: 0.046240	Valid Loss: 0.465445
+-------------- Epoch 5 --------------
+	  T [E5 B1]   scr: 0.9688
+	  T [E5 B1014]   scr: 0.9225
+	  T [E5 B2027]   scr: 0.9238
+	  T [E5 B3039]   scr: 0.9240
+	  V [E5 B1]   scr: 0.5000
+	  V [E5 B186]   scr: 0.4778
+	  V [E5 B371]   scr: 0.4828
+	  V [E5 B556]   scr: 0.4815
+Train Loss: 0.039748	Valid Loss: 0.481172
+-------------- Epoch 6 --------------
+	  T [E6 B1]   scr: 0.8750
+	  T [E6 B1014]   scr: 0.9419
+	  T [E6 B2027]   scr: 0.9441
+	  T [E6 B3039]   scr: 0.9462
+	  V [E6 B1]   scr: 0.4688
+	  V [E6 B186]   scr: 0.5512
+	  V [E6 B371]   scr: 0.5485
+	  V [E6 B556]   scr: 0.5492
+Train Loss: 0.028100	Valid Loss: 0.533206
+
+* Stopped early *
+
+
+	Testing...
+	  T [B1]   scr: 0.6562
+	  T [B204]   scr: 0.7597
+	  T [B407]   scr: 0.7556
+	  T [B610]   scr: 0.7557
+Testing took 65.65 seconds
+{'0Act,0Obj': 0, '0Obj,Rep': 1, 'Dis,Pro': 2, 'Dis,Vau': 3, 'Fix,Pro': 4, 'Fix,Vau': 5}
+
+phases_preds counts: [ 874 1061  461 2571   58 4017] 	 9042
+phases_gt counts: [1031 1386  463 2223   42 4139] 	 9284
+{0: '0Act,0Obj', 1: '0Obj,Rep', 2: 'Dis,Pro', 3: 'Dis,Vau', 4: 'Fix,Pro', 5: 'Fix,Vau'}
+
+Video 26d9 Phase Report
+             	|   T Preds   |  T Targets  ||  Diff
+0Act,0Obj    	| 14.57   min | 17.18   min || -2.62   min
+0Obj,Rep     	| 17.68   min | 23.10   min || -5.42   min
+Dis,Pro      	| 7.68    min | 7.72    min || -0.03   min
+Dis,Vau      	| 42.85   min | 37.05   min || 5.80    min
+Fix,Pro      	| 0.97    min | 0.70    min || 0.27    min
+Fix,Vau      	| 66.95   min | 68.98   min || -2.03   min 
+
+
+phases_preds counts: [1312 1036  266 2261  260 4538] 	 9673
+phases_gt counts: [1812 1231  558 1536  172 4898] 	 10207
+{0: '0Act,0Obj', 1: '0Obj,Rep', 2: 'Dis,Pro', 3: 'Dis,Vau', 4: 'Fix,Pro', 5: 'Fix,Vau'}
+
+Video 315a Phase Report
+             	|   T Preds   |  T Targets  ||  Diff
+0Act,0Obj    	| 21.87   min | 30.20   min || -8.33   min
+0Obj,Rep     	| 17.27   min | 20.52   min || -3.25   min
+Dis,Pro      	| 4.43    min | 9.30    min || -4.87   min
+Dis,Vau      	| 37.68   min | 25.60   min || 12.08   min
+Fix,Pro      	| 4.33    min | 2.87    min || 1.47    min
+Fix,Vau      	| 75.63   min | 81.63   min || -6.00   min 
+
+
+
+Number of videos: 2
+Video graphing took 1.25 seconds
+
+Saved phase metric graphs to ./logs/LDSS-2508-2/spatdurphase1/eval/ribbons
+
+	 = = = = = 	 = = = = =
+		 Fold 7 done!
+	 = = = = = 	 = = = = =
+
+Collected 134498 predictions and 134498 targets
+Traceback (most recent call last):
+  File "learning.py", line 233, in <module>
+    learning(**config)
+  File "learning.py", line 194, in learning
+    environment.build_globalCM(Csr.path_preds, Csr.path_aprfc, dset.n_classes, dset.labelType, dset.labelToClassMap, the["device"])
+  File "/home/dcerveira/SurgeNet/src/environment.py", line 287, in build_globalCM
+    pred_indices = torch.tensor([label_to_idx[p] for p in overallBundle["Pred"]], device=DEVICE)
+  File "/home/dcerveira/SurgeNet/src/environment.py", line 287, in <listcomp>
+    pred_indices = torch.tensor([label_to_idx[p] for p in overallBundle["Pred"]], device=DEVICE)
+KeyError: 'Dis,Vau'

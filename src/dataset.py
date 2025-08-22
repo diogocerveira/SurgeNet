@@ -29,7 +29,7 @@ import matplotlib.pyplot as plt
 class SampledVideosDataset(Dataset):
   ''' Custom dataset of frames from sampled surgery videos
   '''
-  def __init__(self, DATA_SCOPE, labelType, path_samples, path_labels, transform):
+  def __init__(self, DATA_SCOPE, labelType, path_samples, path_labels, preprocessingType, headType=None):
     '''
       Args:
         path_labels (str): path to csv with annotations
@@ -43,8 +43,10 @@ class SampledVideosDataset(Dataset):
     self.datatype = "png"
     self.path_labels = path_labels
     self.labels = self._get_labels(path_labels) # frameId, videoId, frame_label
+    self.preprocessingType = preprocessingType
     # print(self.labels.index)
-    self.transform = transform
+    self.strength = 0.0  # strength of augmentation, used in dynamic augmentations
+    self.transform = self.get_transform(self.preprocessingType, strength=self.strength)
     # NOT WORKING
     # Filter labels to include only rows where the frame file exists
     # self.labels = self.filter_valid_frames(self.labels) # Useful when using short version of the dataset with the full labels.csv
@@ -57,6 +59,7 @@ class SampledVideosDataset(Dataset):
     
     self.labelToClassMap = self.get_labelToClassMap(self.labels)
     self.n_classes = len(self.labelToClassMap)
+    self.headType = headType.split('-') if headType else [self.n_classes]  # default to single head strct [4, 3]
     self.phases = self._get_phases()  # Get unique phases from labels
     print(f"Phases (#{len(self.phases)}): ", self.phases)
     self.classWeights = self.get_labelWeights(self.labels)
@@ -84,7 +87,7 @@ class SampledVideosDataset(Dataset):
     # Read images and labels
     img = torch.tensor(self.transform(cv2.cvtColor(cv2.imread(path_img), cv2.COLOR_BGR2RGB)))
     label = torch.tensor(self.labels.loc[idx, "frameLabels"])
-    if self.labelType.split('-')[0] == "multi":
+    if self.labelType[0] == "multi":
       target = self._multiHot([label], num_classes=self.n_classes)
     print("WARNING!! Wrong pipe\n\n")
     # print(f"img: {img.shape}, label: {label}, idx: {torch.tensor(idx)}")  # WTFFFF does not print
@@ -105,14 +108,13 @@ class SampledVideosDataset(Dataset):
     imgs = [cv2.cvtColor(cv2.imread(p), cv2.COLOR_BGR2RGB) for p in path_imgs]
     labels = self.labels.iloc[idxs]["frameLabels"].tolist()
     # self.export_images_raw(imgs[:5], prefix='before_transform')
-    if self.transform:
-      imgs = [self.transform(img) for img in imgs]
-    else:
-      imgs = [torch.tensor(img) for img in imgs]
+
+    imgs = [self.transform(img) for img in imgs]
+ 
     # print(f"Image shape: {imgs[0].shape}")  # should be [3, 224, 224]
     # self.export_images_tensor(imgs[:5], prefix='after_transform')
     imgs = torch.stack(imgs)
-    targets = self._get_targets(labels, self.labelType.split('-')[0])
+    targets = self._get_targets(labels, self.labelType)
     idxs = torch.tensor(idxs)
     # assert 1 == 0
     # print("idxs: ", idxs[:5])
@@ -146,26 +148,127 @@ class SampledVideosDataset(Dataset):
       # img = TF.to_pil_image(img)
 
       img.save(os.path.join(outdir, f"{prefix}_{i}.png"))
-
-  def _get_targets(self, labels, labelTypeLeft):
-    """Convert labels to numeric targets based on the labelType."""
-    # print(self.labelToClassMap)
-    if labelTypeLeft == "single":
-      # Assume labels like ['cutting', 'suturing', ...]
-      targets = [self.labelToClassMap[label.strip()] for label in labels]
-      targets = torch.tensor(targets, dtype=torch.long)
-    elif labelTypeLeft == "multi":
-      # Assume labels like ['cutting,suturing', 'suturing', ...]
-      label_indices = [[self.labelToClassMap[lbl.strip()] for lbl in multi.split(',')] for multi in labels]
-      targets = self._multiHot(label_indices, self.n_classes)
+  def get_transform(self, preprocessingType, normValues=None, strength=1.0):
+    ''' Get torch group of tranforms directly applied to torch Dataset object'''
+    normValues = ((0.416, 0.270, 0.271), (0.196, 0.157, 0.156))
+    # print(f"Preprocessing type: {preprocessingType}, strength: {strength}")
+    if self.preprocessingType == "ldss":
+      transform = transforms.Compose([
+        transforms.ToImage(), # only for v2
+        transforms.Resize((224, 224), antialias=True),
+        transforms.ToDtype(torch.float32, scale=True),
+        transforms.Normalize(normValues[0], normValues[1])
+      ])
+    elif self.preprocessingType == "imagenet":
+      transform = transforms.Compose([
+        transforms.ToImage(),
+        transforms.Resize((224, 224), antialias=True),  # squishes if needed
+        transforms.ToDtype(torch.float32, scale=True),                          # [0, 255] → [0.0, 1.0]
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], # ImageNet channel stats
+                            std=[0.229, 0.224, 0.225])
+      ])
+    elif self.preprocessingType == "ldss-aug":
+      transform = transforms.Compose([
+        # from 0-255 Image/numpy.ndarray to 0.0-1.0 torch.FloatTensor
+        transforms.ToImage(), # only for v2
+        transforms.Resize((224, 224), antialias=True),
+        transforms.ToDtype(torch.float32, scale=True),
+        transforms.Normalize(normValues[0], normValues[1]),
+        transforms.RandomRotation((-90, 90)),
+        # transforms.RandomHorizontalFlip(p=0.5),  # 50% chance to flip horizontally
+        # transforms.RandomVerticalFlip(p=0.5),    # 50% chance to flip vertically
+        transforms.RandomResizedCrop((224, 224), scale=(0.8, 1.0), ratio=(0.75, 1.333)),
+        transforms.RandomCrop((224, 224), padding=4, padding_mode='reflect'),  # pad and crop to 224x224
+        # transforms.ColorJitter(10, 2)
+      ])
+    elif self.preprocessingType == "imagenet-aug":
+      transform = transforms.Compose([
+        # from 0-255 Image/numpy.ndarray to 0.0-1.0 torch.FloatTensor
+        transforms.ToImage(), # only for v2
+        transforms.RandomRotation((-15, 15)),  # rotate randomly
+        transforms.RandomCrop((224, 224)),  # crop to 224x224
+        transforms.RandomHorizontalFlip(p=0.5),  # 50% chance to flip horizontally
+        transforms.RandomVerticalFlip(p=0.5),    # 50% chance to flip vertically
+        transforms.ToDtype(torch.float32, scale=True),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], # ImageNet channel stats
+                            std=[0.229, 0.224, 0.225])
+      ])
+    elif self.preprocessingType == "imagenet-dynaug":
+      transform = transforms.Compose([
+        # from 0-255 Image/numpy.ndarray to 0.0-1.0 torch.FloatTensor
+        transforms.ToImage(), # only for v2
+        transforms.RandomRotation((-15 * strength , 15 * strength)),  # rotate randomly
+        transforms.RandomCrop((224, 224)),  # crop to 224x224
+        transforms.RandomHorizontalFlip(p=0.5 * strength),  # 50% chance to flip horizontally
+        transforms.RandomVerticalFlip(p=0.5 * strength),    # 50% chance to flip vertically
+        transforms.ToDtype(torch.float32, scale=True),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], # ImageNet channel stats
+                            std=[0.229, 0.224, 0.225])
+      ])
+    elif not self.preprocessingType:
+      # make identity transform
+      transform = transforms.Compose([
+        transforms.ToImage(), # only for v2
+        transforms.ToDtype(torch.float32, scale=True),
+      ])
     else:
-      raise ValueError("Invalid labelType domain!")
-    return targets
+      raise ValueError("Invalid preprocessingType key")
+    return transform
 
-  def _multiHot(self, seq, n_classes):
+  def _get_targets(self, labels, labelType):
+    """
+    labels: list of strings per sample, e.g. ['cutting,suturing', 'suturing']
+    labelType: 
+    returns:
+        - single head: [B] or [B, n_classes]
+        - multi-head: list of tensors, one per head
+    """
+    if labelType[0] == "single":
+      # single-label per sample
+      targets = [self.labelToClassMap[label.strip()] for label in labels]
+      return torch.tensor(targets, dtype=torch.long)
+
+    elif labelType[0] == "multi":
+      # convert labels to global indices
+      label_indices = [
+        [self.labelToClassMap[lbl.strip()] for lbl in multi.split(',')]
+        for multi in labels
+      ]
+
+      if len(self.headType) == 1:
+        # single multi-label head
+        targets = self._multiHot(label_indices, self.n_classes)
+        return targets
+      else:
+        # multi-head
+        head_targets = []
+        # compute head splits from self.headType
+        splits = ((0, 1, 3, 5), (1, 4, 6))
+        for head_classes in splits:  # e.g., (0,1,3,5)
+          idx_map = {c:i for i,c in enumerate(head_classes)}
+          head_multi = self._multiHot(label_indices, len(head_classes), idx_map=idx_map)
+          head_targets.append(head_multi)
+
+        return head_targets
+
+    else:
+      raise ValueError(f"Invalid labelType: {labelType[0]}")
+
+
+  def _multiHot(self, seq, n_classes, idx_map=None):
+    """
+    seq: list of lists of global indices
+    n_classes: number of classes for this head
+    idx_map: dict {global_index: local_index} (optional) if not does normal multi-hot encoding
+    """
     hotSeq = torch.zeros(len(seq), n_classes, dtype=torch.float32)
     for i, indices in enumerate(seq):
-      hotSeq[i, indices] = 1.0
+      for j in indices:
+        if idx_map is not None:
+          if j in idx_map:
+            hotSeq[i, idx_map[j]] = 1.0
+        else:
+          hotSeq[i, j] = 1.0
     return hotSeq
 
   def _get_labels(self, path_labels):
@@ -447,10 +550,10 @@ class Cataloguer():
       path_video = os.path.join(path_from, videoId)
       if os.path.exists(path_annot):  # if video is annotated (to make a better check)
         phaseDelimiters = self._get_phaseDelimiters(path_annot)
-
-        if labelType.split('-')[1] == "phase":
+        
+        if labelType[1] == "phase":
           get_frameLabels = self._impl_label_phase
-        elif labelType.split('-')[1] == "time-to-next-phase":
+        elif labelType[1] == "time-to-next-phase":
           get_frameLabels = self._impl_label_timeToNextPhase
         # print("phaseDelimiters: ", phaseDelimiters)
         # get framesId from video folder that are not directories and do not start with . or _
@@ -525,9 +628,10 @@ class Cataloguer():
       else:
         found.append("0Obj")
       found = sorted(found)  # sort the labels to have a consistent order
-      if self.labelType.split('-')[0] == "single":
+      # print(self.labelType)
+      if self.labelType[0] == "single":
         found = '-'.join(found) # labels as strings like A-B-C
-      elif self.labelType.split('-')[0] == "multi":
+      elif self.labelType[0] == "multi":
         found = ','.join(found) # labels as strings like A,B,C
       else:
         raise ValueError("Invalid labelType domain!")
@@ -569,9 +673,9 @@ class Cataloguer():
           # print(phaseDelimiters[i][0], "  ", phaseDelimiters[i + 1][0], " : ", phaseDelimiters[i][1])
           break
       else: # appending anything if not a labelled phase
-        if self.labelType.split('-')[0] == "single":
+        if self.labelType[0] == "single":
           otherLabel = "0Act-0Obj"  # if no phase, append both Other labels
-        elif self.labelType.split('-')[0] == "multi":
+        elif self.labelType[0] == "multi":
           otherLabel = "0Act,0Obj"
         else:
           raise ValueError("Invalid labelType domain!")
@@ -579,60 +683,7 @@ class Cataloguer():
 
       # print("label(s): ", phaseDelimiters[i][1], '\n')
     return framesLabel
-  
-  def _get_preprocessing(self, preprocessingType, normValues=None):
-    ''' Get torch group of tranforms directly applied to torch Dataset object'''
-    normValues = ((0.416, 0.270, 0.271), (0.196, 0.157, 0.156))
-    if preprocessingType == "ldss":
-      transform = transforms.Compose([
-        transforms.ToImage(), # only for v2
-        transforms.Resize((224, 224), antialias=True),
-        transforms.ToDtype(torch.float32, scale=True),
-        transforms.Normalize(normValues[0], normValues[1])
-      ])
-    elif preprocessingType == "imagenet":
-      transform = transforms.Compose([
-        transforms.ToImage(),
-        transforms.Resize((224, 224), antialias=True),  # squishes if needed
-        transforms.ToDtype(torch.float32, scale=True),                          # [0, 255] → [0.0, 1.0]
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], # ImageNet channel stats
-                            std=[0.229, 0.224, 0.225])
-      ])
-    elif preprocessingType == "ldss-aug":
-      transform = transforms.Compose([
-        # from 0-255 Image/numpy.ndarray to 0.0-1.0 torch.FloatTensor
-        transforms.ToImage(), # only for v2
-        transforms.Resize((224, 224), antialias=True),
-        transforms.ToDtype(torch.float32, scale=True),
-        transforms.Normalize(normValues[0], normValues[1]),
-        transforms.RandomRotation((-90, 90)),
-        # transforms.RandomHorizontalFlip(p=0.5),  # 50% chance to flip horizontally
-        # transforms.RandomVerticalFlip(p=0.5),    # 50% chance to flip vertically
-        transforms.RandomResizedCrop((224, 224), scale=(0.8, 1.0), ratio=(0.75, 1.333)),
-        transforms.RandomCrop((224, 224), padding=4, padding_mode='reflect'),  # pad and crop to 224x224
-        # transforms.ColorJitter(10, 2)
-      ])
-    elif preprocessingType == "imagenet-aug":
-      transform = transforms.Compose([
-        # from 0-255 Image/numpy.ndarray to 0.0-1.0 torch.FloatTensor
-        transforms.ToImage(), # only for v2
-        transforms.RandomRotation((-15, 15)),  # rotate randomly
-        transforms.RandomCrop((224, 224)),  # crop to 224x224
-        transforms.RandomHorizontalFlip(p=0.5),  # 50% chance to flip horizontally
-        transforms.RandomVerticalFlip(p=0.5),    # 50% chance to flip vertically
-        transforms.ToDtype(torch.float32, scale=True),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], # ImageNet channel stats
-                            std=[0.229, 0.224, 0.225])
-      ])
-    elif not preprocessingType:
-      # make identity transform
-      transform = transforms.Compose([
-        transforms.ToImage(), # only for v2
-        transforms.ToDtype(torch.float32, scale=True),
-      ])
-    else:
-      raise ValueError("Invalid preprocessingType key")
-    return transform
+
 
   def get_mean_std(self, dataset):
     loader = DataLoader(dataset, batch_size=64, shuffle=False, num_workers=4)
@@ -654,13 +705,15 @@ class Cataloguer():
     return mean.tolist(), std.tolist()
 
 
-  def build_dataset(self, DATA_SCOPE, path_samples=None, path_labels=None):
+  def build_dataset(self, DATA_SCOPE, path_samples=None, path_labels=None, headType=None):
     ''' Get the Dataset objects according to the DATA_SCOPE'''
-    transform = self._get_preprocessing(self.preprocessingType)
-
     if DATA_SCOPE == "local":
-      dataset = SampledVideosDataset(DATA_SCOPE, self.labelType, path_samples, path_labels, transform)    
+      dataset = SampledVideosDataset(DATA_SCOPE, self.labelType, path_samples, path_labels, self.preprocessingType, headType=headType)    
     elif DATA_SCOPE == "external":
+      transform = transforms.Compose([
+        transforms.ToImage(), # only for v2
+        transforms.ToDtype(torch.float32, scale=True),
+      ])
       train_dataset = datasets.CIFAR10(root=f"./data/{DATA_SCOPE}", train=True, download=True, transform=transform)
       test_dataset = datasets.CIFAR10(root=f"./data/{DATA_SCOPE}", train=False, download=True, transform=transform)
       dataset = (train_dataset, test_dataset)
@@ -766,7 +819,7 @@ class Cataloguer():
 
       feats = torch.stack([featuresDict[i][featureLayer] for i in idxs]).squeeze(1) # to [n_frames, features_size] 
       labels = dset.labels.iloc[idxs]["frameLabels"].tolist() # use class column as np array for indexing labels
-      targets = dset._get_targets(labels, dset.labelType.split('-')[0])  # convert to targets
+      targets = dset._get_targets(labels, dset.labelType)  # convert to targets
       idxs = torch.tensor(idxs, dtype=torch.int64)  # convert to tensor
       # print(type(targets), targets.dtype)
       # print(targets[:5])  # show a few samples
@@ -805,7 +858,7 @@ class Cataloguer():
         # Load data
         vidFeats = torch.stack([featuresDict[i][featureLayer] for i in frameIdxs]).squeeze(1)  # [T, F]
         vidLabels = dset.labels.iloc[frameIdxs]["frameLabels"].tolist()
-        vidTargets = dset._get_targets(vidLabels, dset.labelType.split('-')[0]).to(self.DEVICE)
+        vidTargets = dset._get_targets(vidLabels, dset.labelType).to(self.DEVICE)
         vidIdxs = torch.tensor(frameIdxs, dtype=torch.int64, device=self.DEVICE)
         # Determine padding length
         if clip_size == 0:
@@ -877,7 +930,7 @@ class Cataloguer():
 
         vidFeats = torch.stack([featuresDict[i][featureLayer] for i in frameIdxs]).squeeze(1)
         vidLabels = dset.labels.iloc[frameIdxs]["frameLabels"].tolist()
-        vidTargets = dset._get_targets(vidLabels, dset.labelType.split('-')[0]).to(self.DEVICE)
+        vidTargets = dset._get_targets(vidLabels, dset.labelType).to(self.DEVICE)
         vidIdxs = torch.tensor(frameIdxs, dtype=torch.int64, device=self.DEVICE)
 
         for start in range(0, n_frames - clip_size + 1, stride):

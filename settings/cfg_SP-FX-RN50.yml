@@ -5,7 +5,7 @@ device:
 id_classroom:  # if empty creates new learning environment, else loads it (dataset-YYMM-DDHH)
 actions:
 # - train        # train (spatial, temporal, full)
-# - process       # process (sample-n-label, mode-filter, extractFeatures)
+- process       # process (sample-n-label, mode-filter, extractFeatures)
 # - eval         # eval (aprfc, phaseTiming, phaseChart)
 
 # DATA and TRAIN properties define an unique classroom
@@ -28,7 +28,7 @@ DATA:
     # - Fixation of the implant to the vault
     # - Fixation of the implant to the promontory
     # - Reperitonealisation
-  preprocessing: resnet  # ldss, imagenet, augmentation
+  preprocessing: imagenet  # ldss, imagenet, augmentation
   multiClips: False
   multiClipStride: 3  # stride for multi-clip mode (e.g. 1, 2, 3)
   datatype: png-image #, jpeg-image, feature-dict
@@ -78,6 +78,8 @@ PROCESS:  # Process
   path_bundle: True
   export_modedPreds: True  # if apply-mode-filter == True
   
+  build_globalCM: True  # builds a global confusion matrix from all folds predictions
+
   fx_spatial: False
   featureLayer:
   - flatten
@@ -93,6 +95,7 @@ MODEL:  # for models created/trained in the run
   spaceArch: resnet50
   spacePreweights: image-net # image-net
   path_spaceModel: #C:/Users/DC/Documents/Programming/python/ucl/ML_SurgeNet/logs/LDSS/run_20241104-00/checkpoints/LDSS-20241104-00-fold6-0.837800.pth # if empty, uses new untrained one
+  path_spaceFeats:
   add_timestamps: no # no | direct | mlp
 # temporal
   timeArch: tecno # tecno | phatima
@@ -122,4 +125,4 @@ EVAL:  # Eval
     confusionMatrix: True
   agg: macro  # overall, accuracy is locked to micro (see utils.py)
   updateRate: 1  # updates metrics with new data every batch
-  computeRate: 1000  # computes the metrics
+  computeRate: 3  # computes the metrics
