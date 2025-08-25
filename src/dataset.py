@@ -60,12 +60,18 @@ class SampledVideosDataset(Dataset):
     self.labelToClassMap = self.get_labelToClassMap(self.labels)
     self.n_classes = len(self.labelToClassMap)
     self.headType = headType.split('-') if headType else [self.n_classes]  # default to single head strct [4, 3]
+    self.headSplits = ((0, 2, 3, 5), (1, 4, 6))
+    classToLabelMap_inv = {v: k for k, v in self.labelToClassMap.items()}
+    if len(self.headType) == 2 and self.headType[0] == "multi" and self.headType[1] == "phase":
+      for i, head in enumerate(self.headSplits):
+        print(f"Head {i} classes: {[classToLabelMap_inv[c] for c in head]}")
+    
     self.phases = self._get_phases()  # Get unique phases from labels
 
     self.classWeights = self.get_labelWeights(self.labels)
     
      # check if the class distribution is balanced
-    if all([self.classWeights[i] == self.classWeights[i + 1] for i in range(len(self.classWeights) - 1)]):
+    if all(torch.all(cw == cw[0]).item() for cw in self.classWeights):
       self.BALANCED = True
     else:
       self.BALANCED = False
@@ -107,6 +113,7 @@ class SampledVideosDataset(Dataset):
     # imgs = [iio.imread(p) for p in path_imgs]
     imgs = [cv2.cvtColor(cv2.imread(p), cv2.COLOR_BGR2RGB) for p in path_imgs]
     labels = self.labels.iloc[idxs]["frameLabels"].tolist()
+    # print(labels[0])
     # self.export_images_raw(imgs[:5], prefix='before_transform')
 
     imgs = [self.transform(img) for img in imgs]
@@ -116,12 +123,19 @@ class SampledVideosDataset(Dataset):
     imgs = torch.stack(imgs)
     targets = self._get_targets(labels, self.labelType)
     idxs = torch.tensor(idxs)
+    # print(f"imgs:",imgs[0], f"targets:", targets[0], targets[1], f"idxs:", idxs[0])
+    samples = []
+    for i in range(len(imgs)):
+      # For each sample, get targets from each head
+      sample_targets = [head_targets[i] for head_targets in targets]
+      samples.append((imgs[i], sample_targets, idxs[i]))
     # assert 1 == 0
     # print("idxs: ", idxs[:5])
     # print(self.labels.iloc[idxs[:5]])
     # print("targets: ", targets[:5], '\n')
     # print(f"imgs: {imgs.shape}, targets: {targets}, idxs: {idxs}")
-    return list(zip(imgs, targets, idxs))
+    # print("hot", samples[0])
+    return samples
 
 
   def export_images_raw(self, imgs, prefix="raw", outdir="./debug_images"):
@@ -243,8 +257,7 @@ class SampledVideosDataset(Dataset):
         # multi-head
         multiHotTargets = []
         # compute head splits from self.headType
-        splits = ((0, 2, 3, 5), (1, 4, 6))
-        for headClassTargets in splits:  # e.g., (0,1,3,5)
+        for headClassTargets in self.headSplits:  # e.g., (0,1,3,5)
           idxMap = {c:i for i,c in enumerate(headClassTargets)}
           headTargets = self._multiHot(classTargets, len(headClassTargets), idx_map=idxMap)
           multiHotTargets.append(headTargets)
@@ -356,7 +369,14 @@ class SampledVideosDataset(Dataset):
     inv_cw = 1.0 / cw
     inv_cw = inv_cw / inv_cw.sum() * self.n_classes  # normalize
 
-    return torch.tensor(inv_cw, dtype=torch.float32)
+    inv_cw = torch.tensor(inv_cw, dtype=torch.float32)  # full weight tensor
+    if len(self.headType) == 2:
+      # split weights per head efficiently
+      weightList = [inv_cw[list(split)] for split in self.headSplits]
+    else:
+      weightList = [inv_cw]
+
+    return weightList
 
   
   def get_labelToClassMap(self, labels):
@@ -789,11 +809,11 @@ class Cataloguer():
     try:
       if dset.DATA_SCOPE == "local":
         if np.any(train_idxs):
-          loaders["trainloader"] = DataLoader(dataset=dset, batch_size=size_batch, num_workers=2, sampler=torch.utils.data.SubsetRandomSampler(train_idxs))
+          loaders["trainloader"] = DataLoader(dataset=dset, batch_size=size_batch, num_workers=2, sampler=torch.utils.data.SubsetRandomSampler(train_idxs), collate_fn=self.custom_collate)
         if np.any(valid_idxs):
-          loaders["validloader"] = DataLoader(dataset=dset, batch_size=size_batch, num_workers=2, sampler=torch.utils.data.SubsetRandomSampler(valid_idxs))
+          loaders["validloader"] = DataLoader(dataset=dset, batch_size=size_batch, num_workers=2, sampler=torch.utils.data.SubsetRandomSampler(valid_idxs), collate_fn=self.custom_collate)
         if np.any(test_idxs):
-          loaders["testloader"] = DataLoader(dataset=dset, batch_size=size_batch, num_workers=2, sampler=torch.utils.data.SubsetRandomSampler(test_idxs))
+          loaders["testloader"] = DataLoader(dataset=dset, batch_size=size_batch, num_workers=2, sampler=torch.utils.data.SubsetRandomSampler(test_idxs), collate_fn=self.custom_collate)
     except:
       print("Error in batch() for local dataset, assuming external dataset batch instead")
       # test_idxs actually carries the test part of the dataset when using CIFAR-10
@@ -827,12 +847,12 @@ class Cataloguer():
 
       # move to cpu for DataLoader
       feats = feats.cpu()
-      targets = targets.cpu()
+      targets = [t.cpu() for t in targets]
       idxs = idxs.cpu()
       # the dataset zips the tensors together to be feed to a dataloader (unzips them)
-      featset = TensorDataset(feats, targets, idxs)
+      featset = MultiHeadDataset(feats, targets, idxs)
       # print(featset[0][0].shape, featset[0][1].shape, featset[0][2].shape)
-      loader[split] = DataLoader(featset, batch_size=size_batch, num_workers=2, shuffle=True)
+      loader[split] = DataLoader(featset, batch_size=size_batch, num_workers=2, shuffle=True, collate_fn=self.custom_collate)
     exampleBatch = next(iter(loader[0]))
     print(f"\tBatch example shapes:\n\t[space features] {exampleBatch[0].shape}\n\t[labels] {exampleBatch[1].shape}\n\t[idxs] {exampleBatch[2].shape}\n")
     return loader
@@ -859,7 +879,8 @@ class Cataloguer():
         # Load data
         vidFeats = torch.stack([featuresDict[i][featureLayer] for i in frameIdxs]).squeeze(1)  # [T, F]
         vidLabels = dset.labels.iloc[frameIdxs]["frameLabels"].tolist()
-        vidTargets = dset._get_targets(vidLabels, dset.labelType).to(self.DEVICE)
+        vidTargets = dset._get_targets(vidLabels, dset.labelType)
+        vidTargets = [t.to(self.DEVICE) for t in vidTargets]
         vidIdxs = torch.tensor(frameIdxs, dtype=torch.int64, device=self.DEVICE)
         # Determine padding length
         if clip_size == 0:
@@ -870,19 +891,27 @@ class Cataloguer():
         if pad_len > 0:
           featureDim = vidFeats.shape[1]
           vidFeats = torch.cat([vidFeats, torch.zeros(pad_len, featureDim, device=self.DEVICE)], dim=0)
-          if len(vidTargets.shape) == 1:
-            targetPadding = torch.full((pad_len,), -1, dtype=torch.int64, device=self.DEVICE)
-          else:
-            targetPadding = torch.zeros(pad_len, vidTargets.shape[1], dtype=vidTargets.dtype, device=self.DEVICE)
-            targetPadding[:, 1] = -1
-          vidTargets = torch.cat([vidTargets, targetPadding], dim=0)
+          
+          # Pad each target tensor in the list
+          padded_targets = []
+          for tgt in vidTargets:
+            if len(tgt.shape) == 1:
+              padding = torch.full((pad_len,), -1, dtype=torch.int64, device=self.DEVICE)
+            else:
+              padding = torch.zeros(pad_len, tgt.shape[1], dtype=tgt.dtype, device=self.DEVICE)
+              padding[:, 1] = -1
+            padded_targets.append(torch.cat([tgt, padding], dim=0))
+          vidTargets = padded_targets
+          
           vidIdxs = torch.cat([vidIdxs, torch.full((pad_len,), -1, dtype=torch.int64, device=self.DEVICE)], dim=0)
+
         # Store either whole video or clips
         if clip_size == 0:
           splitFeats.append(vidFeats)          # [T, F]
           splitTargets.append(vidTargets)      # [T] or [T, C]
           splitIdxs.append(vidIdxs)            # [T]
         else:
+          assert 1 == 0, "clip_size > 0 not implemented yet in _batch_clipFeats"
           num_clips = vidFeats.shape[0] // clip_size
           F = vidFeats.shape[1]
           C = vidTargets.shape[1] if len(vidTargets.shape) > 1 else None
@@ -892,13 +921,14 @@ class Cataloguer():
           else:
             splitTargets.extend(vidTargets.view(num_clips, clip_size))
           splitIdxs.extend(vidIdxs.view(num_clips, clip_size))
-      # Stack and create loader
       feats = torch.stack(splitFeats).cpu()
-      targets = torch.stack(splitTargets).cpu()
+      # Don't stack targets - keep as list for MultiHeadDataset
+      targets = [[t.cpu() for t in target_list] for target_list in splitTargets]
       idxs = torch.stack(splitIdxs).cpu()
 
-      featset = TensorDataset(feats, targets, idxs)
-      loader[split] = DataLoader(featset, batch_size=size_batch, num_workers=2, shuffle=True)
+      featset = MultiHeadDataset(feats, targets, idxs)
+      loader[split] = DataLoader(featset, batch_size=size_batch, num_workers=2, shuffle=True, collate_fn=self.custom_collate)
+
     if loader[0]:
       exampleBatch = next(iter(loader[0]))
       print(f"\tBatch example shapes:\n\t[space features] {exampleBatch[0].shape}\n\t[labels] {exampleBatch[1].shape}\n\t[idxs] {exampleBatch[2].shape}")
@@ -931,13 +961,14 @@ class Cataloguer():
 
         vidFeats = torch.stack([featuresDict[i][featureLayer] for i in frameIdxs]).squeeze(1)
         vidLabels = dset.labels.iloc[frameIdxs]["frameLabels"].tolist()
-        vidTargets = dset._get_targets(vidLabels, dset.labelType).to(self.DEVICE)
+        vidTargets = dset._get_targets(vidLabels, dset.labelType)
+        vidTargets = [t.to(self.DEVICE) for t in vidTargets]
         vidIdxs = torch.tensor(frameIdxs, dtype=torch.int64, device=self.DEVICE)
 
         for start in range(0, n_frames - clip_size + 1, stride):
           end = start + clip_size
           featsList.append(vidFeats[start:end])
-          targetsList.append(vidTargets[start:end])
+          targetsList.append([t[start:end] for t in vidTargets])
           idxsList.append(vidIdxs[start:end])
 
       if not featsList:
@@ -945,18 +976,33 @@ class Cataloguer():
         continue
 
       feats = torch.stack(featsList).cpu()
-      targets = torch.stack(targetsList).cpu()
+      targets_cpu = [[t.cpu() for t in target_list] for target_list in targetsList]
       idxs = torch.stack(idxsList).cpu()
-      dataset = TensorDataset(feats, targets, idxs)
-      loader[split] = DataLoader(dataset, batch_size=size_batch, num_workers=2, shuffle=True)
-
+      dataset = MultiHeadDataset(feats, targets_cpu, idxs)
+      loader[split] = DataLoader(dataset, batch_size=size_batch, num_workers=2, shuffle=True, collate_fn=self.custom_collate)
     if loader[0]:
       xb = next(iter(loader[0]))
       print(f"\t[multiClip] Example batch:\n\t[features] {xb[0].shape} | [labels] {xb[1].shape} | [idxs] {xb[2].shape}")
       print(f"\t{xb[0].shape[0]} clips × {clip_size} frames\n")
 
     return loader
-
+  # Add this method to your batching class:
+    
+  def custom_collate(self, batch):
+    """
+    batch: list of tuples (features, [target_head1, target_head2, ...], idx)
+    """
+    if not batch:
+        return None, None, None
+        
+    inputs, targets_list, idxs = zip(*batch)
+    inputs = torch.stack(inputs, dim=0)
+    
+    targets = [torch.stack(targets, dim=0) for targets in zip(*targets_list)]
+    # print('here', targets[0].shape, targets[1].shape, len(targets))
+    idxs = torch.tensor(idxs, dtype=torch.long)
+    # print("EJDJEWD", inputs.shape, targets_list[0][0].shape, idxs.shape)
+    return inputs, targets, idxs
 
   def get_vidsIdxsAndSplits(self, dset, train_idxs=None, valid_idxs=None, test_idxs=None):
     '''
@@ -975,6 +1021,26 @@ class Cataloguer():
         groupedIdxs.setdefault(videoId, []).append(idx)
         splitVidsInt[split].add(videoId)
     return groupedIdxs, splitVidsInt
+  
+class MultiHeadDataset(torch.utils.data.Dataset):
+  def __init__(self, feats, targets, idxs):
+    """
+    feats: tensor [N, ...] or list of tensors
+    targets_list: list of lists - [[head1_targets, head2_targets], ...] for each sample
+                OR list of tensors [head1_tensor, head2_tensor] for single video
+    idxs: tensor [N] or list
+    """
+    self.feats = feats
+    self.targets_list = targets
+    self.idxs = idxs
+
+  def __len__(self):
+      return len(self.feats)
+
+  def __getitem__(self, i):
+    # Return: (features, [target_head1, target_head2, ...], idx)
+    print("BIOUOIOI")
+    return self.feats[i], [tgt[i] for tgt in self.targets], self.idxs[i]
 
 class Showcaser:
   def __init__(self):

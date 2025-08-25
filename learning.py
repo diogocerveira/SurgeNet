@@ -72,7 +72,7 @@ def learning(**the):
     print(f"    Feature size of {timeinator.featureSize} at node '{timeinator.featureNode}'\n")
     classifier = machine.Classinator(the["MODEL"], spaceinator.featureSize, timeinator.featureSize, dset.n_classes)
     model = machine.Phasinator(the["MODEL"]["domain"], spaceinator, timeinator, classifier, f"{Csr.studentId}_f{fold + 1}")
-    
+
     dset.path_spaceFeatures, featuresId = teaching.get_path_exportedfeatures(Csr.path_exportedSpaceFeatures, f"spacefmaps_f{fold + 1}")
     trainloader, validloader, testloader = Ctl.batch(dset, model.inputType, Csr.TRAIN["HYPER"], Csr.DATA["multiClips"], Csr.DATA["multiClipStride"], train_idxs=train_idxs, valid_idxs=valid_idxs, test_idxs=test_idxs)
 
@@ -81,20 +81,20 @@ def learning(**the):
 
     # TRAIN
     if "train" in the["actions"]:
-      trainedModel, valid_maxScore, betterState = Tch.teach(model, trainloader, validloader, Csr.TRAIN["HYPER"]["n_epochs"], Csr.path_state, dset.labels, Csr.TRAIN["path_resumeModel"])
+      model, valid_maxScore, betterState = Tch.teach(model, trainloader, validloader, Csr.TRAIN["HYPER"]["n_epochs"], Csr.path_state, dset.labels, Csr.TRAIN["path_resumeModel"])
       if Csr.TRAIN["save_betterState"]:
-        trainedModel.id = f"{trainedModel.id}-{valid_maxScore:.2f}" # update model id with the best validation score
+        model.id = f"{model.id}-{valid_maxScore:.2f}" # update model id with the best validation score
         torch.save(betterState, os.path.join(Csr.path_state, f"state_{model.id.split('_')[1]}.pt"))
       if Csr.TRAIN["save_lastState"]:
-        trainedModel.id = f"{trainedModel.id}-{trainedModel.valid_lastScore:.2f}"
-        torch.save(trainedModel.state_dict(), os.path.join(Csr.path_state, f"state_{model.id.split('_')[1]}.pt"))
+        model.id = f"{model.id}-{model.valid_lastScore:.2f}"
+        torch.save(model.state_dict(), os.path.join(Csr.path_state, f"state_{model.id.split('_')[1]}.pt"))
 
     # PROCESS - Feature extraction
     if the["PROCESS"]["fx_spatial"] and "process" in the["actions"]:
       t1 = time.time()
       if "train" in the["actions"]:
-        spaceinator.load_state_dict(trainedModel.state_dict(), strict=False)
-        fx_stateId = trainedModel.id
+        spaceinator.load_state_dict(model.state_dict(), strict=False)
+        fx_stateId = model.id
       elif the["PROCESS"]["fx_load_models"]:
         fx_stateDict, fx_stateId = teaching.get_testState(Csr.path_state, model.id)
         spaceinator.load_state_dict(fx_stateDict, strict=False)
@@ -108,8 +108,8 @@ def learning(**the):
     if the["PROCESS"]["fx_temporal"] and "process" in the["actions"]:
       t1 = time.time()
       if "train" in the["actions"]:
-        timeinator.load_state_dict(trainedModel.state_dict(), strict=False)
-        fx_stateId = trainedModel.id
+        timeinator.load_state_dict(model.state_dict(), strict=False)
+        fx_stateId = model.id
       elif the["PROCESS"]["fx_load_models"]:
         fx_stateDict, fx_stateId = teaching.get_testState(Csr.path_state, model.id)
         timeinator.load_state_dict(fx_stateDict, strict=False)
@@ -134,25 +134,27 @@ def learning(**the):
       elif the["EVAL"]["eval_from"] == "model":
         try:
           if "train" in the["actions"]: # use model just trained
-            model.load_state_dict(betterState, strict=False)
+            pass # model already loaded
           else: # load model from 
             if the["EVAL"]["path_model"]: # chose before running NOT WORKING
+              assert 1 == 0, "Choosing a specific model for testing is not yet implemented!"
               test_stateDict, test_stateId = torch.load(the["EVAL"]["path_model"], weights_only=False, map_location=the["device"])
               Tch.evaluate(test_bundle, the["EVAL"], fold + 1, Csr, Ctl.N_CLASSES, Csr.DATA["extradata"],
                   Csr.path_eval, Csr.path_aprfc, Csr.path_ribbons, the["TEST"]["path_preds"])
               print("Breaking testing loop on 'Fold 1' because a path_model was provided without 'train' action.")
               break
             else: # choose from the states folder (corresponding to fold)
-              test_stateDict, stateId = teaching.get_testState(Csr.path_state, model.id)
+              test_stateDict, modelId = teaching.get_testState(Csr.path_state, model.id)
               # path_model = environment.choose_in_path(Csr.path_state)
               # stateDict = torch.load(path_model, weights_only=False, map_location=the["device"])
             model.load_state_dict(test_stateDict, strict=False)
+            model.id = modelId
         except Exception as e:
           print(f"Error loading model state for testing: {e}\n")
           break
         t1 = time.time()
-        path_export = os.path.join(Csr.path_preds, f"preds_{model.id.split('_')[1]}")
-        test_bundle, test_score  = Tch.tester.test(model, testloader, dset.labelType, dset.labels, the["EVAL"]["export_testBundle"], path_export=path_export)
+        path_export = os.path.join(Csr.path_preds, f"preds_{model.id}")
+        test_bundle, test_score  = Tch.tester.test(model, testloader, dset.labels, the["EVAL"]["export_testBundle"], path_export=path_export)
         t2 = time.time()
         print(f"Test Score: {test_score:.04f} (took {t2 - t1:.2f}s)\n")
         # print(test_bundle.head())
@@ -187,9 +189,8 @@ def learning(**the):
       pass
     print(f"\n\t = = = = = \t = = = = =\n\t\t Fold {fold + 1} done!\n\t = = = = = \t = = = = =\n")
     # break # == 1 folc (debug)
-    # break
   if "process" in the["actions"] and the["PROCESS"]["build_globalCM"]:
-    environment.build_globalCM(Csr.path_preds, Csr.path_aprfc, dset.n_classes, dset.labelType, dset.labelToClassMap, the["device"])
+    environment.build_globalCM(Csr.path_preds, Csr.path_aprfc, dset.n_classes, dset.labelType, dset.headType, dset.labelToClassMap, the["device"])
 
   print(f"\n\n ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨\n\n")
   # os.system(f"tensorboard --logdir={Csr.path_classroom}")

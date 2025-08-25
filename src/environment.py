@@ -280,7 +280,7 @@ class Classroom():
           os.rename(old_path, new_path)
 
 
-def build_globalCM(path_preds, path_to, n_classes, labelType, labelToClassMap, DEVICE="cpu"):
+def build_globalCM(path_preds, path_to, n_classes, labelType, headType, labelToClassMap, DEVICE="cpu"):
   overallBundle = {"Pred": [], "Target": []}
 
   # collect predictions and targets
@@ -299,16 +299,24 @@ def build_globalCM(path_preds, path_to, n_classes, labelType, labelToClassMap, D
     return None
 
   # map string labels to integers
-  pred_indices = torch.tensor([labelToClassMap[p] for p in overallBundle["Pred"]], device=DEVICE)
-  target_indices = torch.tensor([labelToClassMap[t] for t in overallBundle["Target"]], device=DEVICE)
+  pred_indices = torch.tensor(expand_labels(overallBundle["Pred"], labelToClassMap), device=DEVICE)
+  target_indices = torch.tensor(expand_labels(overallBundle["Target"], labelToClassMap), device=DEVICE)
 
   # debug: check tensor shapes
   print(f"Pred tensor shape: {pred_indices.shape}, Target tensor shape: {target_indices.shape}")
 
-  cm = teaching.StillMetric("confusionMatrix", n_classes, DEVICE, labelType, labelToClassMap)
+  cm = teaching.StillMetric("confusionMatrix", n_classes, DEVICE, labelType, headType, labelToClassMap)
   cm.metric.update(pred_indices, target_indices)
 
   path_to = os.path.join(path_to, "cm_global")
   _ = cm.score(path_to)
  
-  
+def expand_labels(entries, labelToClassMap):
+  expanded = []
+  for e in entries:
+    if "," in e:  # multi-label case
+      parts = [p.strip() for p in e.split(",") if p.strip()]
+    else:         # single-label case (may contain "-" but it's still one class)
+      parts = [e.strip()]
+    expanded.extend([labelToClassMap[p] for p in parts])
+  return expanded

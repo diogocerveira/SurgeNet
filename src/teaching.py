@@ -31,18 +31,16 @@ class Teacher():
     self.N_PHASES = dataset.n_classes
     self.PHASES = dataset.phases
     self.labelType = dataset.labelType
+    print("Label type: ", self.labelType)
+    self.headType = dataset.headType
+    self.headSplits = dataset.headSplits
     self.DATASET_SIZE = dataset.__len__()
-    train_metric, valid_metric, test_metrics = self._get_metrics(TRAIN, EVAL, self.N_PHASES, dataset.labelToClassMap, dataset.labelType, DEVICE)
-    criterion = self._get_criterion(TRAIN["criterionId"], dataset.classWeights, DEVICE)
+    train_metric, valid_metric, test_metrics = self._get_metrics(TRAIN, EVAL, self.N_PHASES, dataset.labelToClassMap, dataset.labelType, dataset.headType, DEVICE)
+    criterions = self._get_criterion(TRAIN["criterionId"], dataset.classWeights, DEVICE)
 
-    if dataset.labelType[0] == "single":
-      assert isinstance(criterion, torch.nn.CrossEntropyLoss), "Use CrossEntropyLoss for single-label tasks"
-    else:
-      assert isinstance(criterion, torch.nn.BCEWithLogitsLoss), "Use BCEWithLogitsLoss for multi-label tasks"
-
-    self.trainer = Trainer(train_metric, criterion, TRAIN, DEVICE)
-    self.validater = Validater(valid_metric, criterion, DEVICE)
-    self.tester = Tester(test_metrics, dataset.labels, self.PHASES, dataset.labelToClassMap, DEVICE)
+    self.trainer = Trainer(train_metric, criterions, TRAIN, self.labelType, self.headType, self.headSplits, DEVICE)
+    self.validater = Validater(valid_metric, criterions, self.labelType, self.headType, self.headSplits, DEVICE)
+    self.tester = Tester(test_metrics, dataset.labels, self.PHASES, dataset.labelToClassMap, self.labelType, self.headType, self.headSplits, DEVICE)
 
     self.save_checkpoints = TRAIN["save_checkpoints"]
     self.highScore = -np.inf
@@ -76,9 +74,9 @@ class Teacher():
 
       print(f"-------------- Epoch {epoch + 1} --------------")
       print("        T")
-      train_loss, train_score = self.trainer.train(model, trainloader, self.labelType, labels, optimizer)
+      train_loss, train_score = self.trainer.train(model, trainloader, labels, optimizer)
       print("        V")
-      valid_loss, valid_score = self.validater.validate(model, validloader, self.labelType, labels)
+      valid_loss, valid_score = self.validater.validate(model, validloader, labels)
 
       self.writer.add_scalar("Loss/train", train_loss, epoch + 1)
       self.writer.add_scalar("Loss/valid", valid_loss, epoch + 1)
@@ -149,24 +147,30 @@ class Teacher():
       raise ValueError("Invalid scheduler chosen (step, cosine)")
     return scheduler
   
-  def _get_metrics(self, TRAIN, EVAL, N_PHASES, labelToClassMap, labelType, DEVICE):
+  def _get_metrics(self, TRAIN, EVAL, N_PHASES, labelToClassMap, labelType, headType, DEVICE):
 
-    train_metric = RunningMetric(TRAIN["train_metric"], N_PHASES, DEVICE, EVAL["agg"], EVAL["computeRate"], labelType, labelToClassMap, EVAL["updateRate"])
-    valid_metric = RunningMetric(TRAIN["valid_metric"], N_PHASES, DEVICE, EVAL["agg"], EVAL["computeRate"], labelType, labelToClassMap, EVAL["updateRate"])
-    test_metrics = MetricBunch(EVAL["test_metrics"], N_PHASES, labelToClassMap, EVAL["agg"], EVAL["computeRate"], DEVICE, labelType)
+    train_metric = RunningMetric(TRAIN["train_metric"], N_PHASES, DEVICE, EVAL["agg"], EVAL["computeRate"], labelType, headType, labelToClassMap, EVAL["updateRate"])
+    valid_metric = RunningMetric(TRAIN["valid_metric"], N_PHASES, DEVICE, EVAL["agg"], EVAL["computeRate"], labelType, headType, labelToClassMap, EVAL["updateRate"])
+    test_metrics = MetricBunch(EVAL["test_metrics"], N_PHASES, labelToClassMap, EVAL["agg"], EVAL["computeRate"], DEVICE, labelType, headType)
     return train_metric, valid_metric, test_metrics
 
   def _get_criterion(self, CRITERION_ID, classWeights, DEVICE):
+    assert len(classWeights) == len(self.headType), (
+        f"Number of classWeights ({len(classWeights)}) does not match number of heads ({len(self.headType)})"
+    )
     if CRITERION_ID == "cross-entropy":
-      return nn.CrossEntropyLoss()
+      assert int(self.labelType[2][-1]) == 1 or (self.labelType[0] == "single"), "CrossEntropyLoss is for top1 tasks"
+      return [nn.CrossEntropyLoss() for _ in range(len(self.headType))]
     elif CRITERION_ID == "weighted-cross-entropy":
-      return nn.CrossEntropyLoss(weight=classWeights.to(DEVICE))
-    elif CRITERION_ID == "binary-cross-entropy-logits":
-      classCounts = 1 / classWeights # inverse frequency
-      return nn.BCEWithLogitsLoss(pos_weight=classWeights.to(DEVICE))
+      assert int(self.labelType[2][-1]) == 1 or (self.labelType[0] == "single"), "CrossEntropyLoss is for top1 tasks"
+      print("Using weighted cross-entropy with class weights:", classWeights)
+      return [nn.CrossEntropyLoss(weight=classWeights[i].to(DEVICE)) for i in range(len(self.headType))]
+    if CRITERION_ID == "binary-cross-entropy-logits":
+      # classCounts = 1 / classWeights # inverse frequency
+      assert self.labelType[0] == "multi" and int(self.labelType[2][-1]) > 1, "BCEWithLogitsLoss is for multi-label tasks with top-k k>1"
+      a =  [nn.BCEWithLogitsLoss(pos_weight=classWeights[i].to(DEVICE)) for i in range(len(self.headType))]
     else:
       raise ValueError("Invalid criterion chosen (crossEntropy, )")
-    return criterion
 
   def save_checkpoint(self, model, optimizer, epoch, loss, path_checkpoint):
     checkpoint = {
@@ -190,7 +194,11 @@ class Teacher():
 
 def nextBatch(data, labels, model, labelType, batchStats, DEVICE):
   try:
-    inputs, targets, idxs = data[0].to(DEVICE), data[1].to(DEVICE), data[2].to(DEVICE) # data is a list of [inputs, labels]
+    # print(data[0].shape, data[1], data[2].shape)
+    inputs = data[0].to(DEVICE) # data is a list of [inputs, labels]
+    targets = [headTargets.to(DEVICE) for headTargets in data[1]] # list of lists of target tensors
+    idxs = data[2].to(DEVICE)  # sample indices in the dataset
+
     # print("inputs: ", inputs.shape, "\ttargets: ", targets.shape, '\n')
     # print(targets[:5])  # show a few samples
     if model.domain == "space-time" and ("dTsNet" in model.arch or "pTsNet" in model.arch):
@@ -204,19 +212,21 @@ def nextBatch(data, labels, model, labelType, batchStats, DEVICE):
       mask = targets[0] != -1
     else:  # multi-label
       targets = [tgt.reshape(-1, tgt.shape[-1]) for tgt in targets]
-      mask = targets[0][:, 1] != -1   # assuming column 1 encodes validity
+      mask = (targets[0] != -1).all(dim=1)  # True for samples where all columns are valid
     targets = [tgt[mask] for tgt in targets] 
     idxs = idxs.reshape(-1)[mask]
     
+    if batchStats[0] % batchStats[1] == 0 or (batchStats[0] + 1) == batchStats[2]:
+      print("idx: ", idxs[0].cpu().numpy())
+      if isinstance(inputs, tuple) or isinstance(inputs, list):
+        print("inputs shape: ", inputs[0].shape, inputs[1].shape)
+      else:
+        print("inputs shape: ", inputs.shape)
+      print([f"target: H{i} {tgt}" for i, tgt in enumerate(targets)])
   except Exception as e:
-    print(f"Error processing batch {batchStats[0]} data: {e}")
+    print(f"Error processing batch {batchStats[0]} data: {e}\n")
     raise
-  if batchStats[0] % batchStats[1] == 0 or (batchStats[0] + 1) == batchStats[2]:
-    if isinstance(inputs, tuple):
-      print("inputs shape: ", inputs[0].shape, inputs[1].shape)
-    else:
-      print("inputs shape: ", inputs.shape)
-    print("target: ", targets[0], " idx: ", idxs[0])
+  
   return inputs, targets, idxs, mask
 
 def nextOutputs(model, inputs, mask, batchStats):
@@ -225,30 +235,33 @@ def nextOutputs(model, inputs, mask, batchStats):
     # print("outputs: ", outputs.shape, "\ttargets: ", targets.shape, '\n')
     if not isinstance(outputs, list):
       outputs = [outputs]  # make it a list for uniform processing
-
+    
     outputs = [
       out.reshape(-1, out.shape[-1])[mask]  # reshape to (B*T, C) for output for every "head"
       for out in outputs
     ]
+    # print(outputs[0].shape, outputs[1].shape, len(outputs))
+    if batchStats[0] % batchStats[1] == 0 or (batchStats[0] + 1) == batchStats[2]:
+      print([f"output: H{i} {out[0].detach().cpu().numpy()}" for i, out in enumerate(outputs)])
   except Exception as e:
-    print(f"Error during model forward pass for batch {batchStats[0]}: {e}")
+    print(f"Error during model forward pass for batch {batchStats[0]}: {e}\n")
     raise
-  if batchStats[0] % batchStats[1] == 0 or (batchStats[0] + 1) == batchStats[2]:
-    print("output: ", outputs[0][0].cpu().detach().numpy())
+  
+
   return outputs
 
-def nextLoss(criterion, outputs, targets, batchStats):
+def nextLoss(criterions, outputs, targets, batchStats):
   try:
-    loss = sum(criterion(out, targets) for out in outputs)
+    loss = sum(criterion(out, tgt) for criterion, (out, tgt) in zip(criterions, zip(outputs, targets)))
 
     if batchStats[0] % batchStats[1] == 0 or (batchStats[0] + 1) == batchStats[2]:
       print(f"loss: {loss.item():.4f}")
   except Exception as e:
-    print(f"Error while computing loss for batch {batchStats[0]}: {e}")
+    print(f"Error while computing loss for batch {batchStats[0]}: {e}\n")
     raise
   return loss
 
-def nextPreds(outputs, targets, labelType, metric, batchStats):
+def nextPreds(outputs, targets, labelType, headType, headSplits, metric, batchStats):
   try:
     try:
       k = int(labelType[2][-1])  
@@ -262,33 +275,81 @@ def nextPreds(outputs, targets, labelType, metric, batchStats):
     for i in range(len(preds)):
       preds[i].scatter_(1, topkPreds[i], 1)
 
-    # merging possible multiple head preds depending on label type
-    if labelType[0] == "single":
-      merged = torch.stack(preds, dim=0).mean(dim=0) if len(preds) > 1 else preds[0]
-      # collapse one-hot to predicted index
-      merged = merged.argmax(dim=1)
-    elif labelType[0] == "multi":
-      merged = torch.stack(preds, dim=0).max(dim=0).values if len(preds) > 1 else preds[0]
+    # -------------------------------------------
+    # (1) SINGLE LABEL + SINGLE TASK
+    if labelType[0] == "single" and len(preds) == 1:
+      mergedPreds = preds[0].argmax(dim=1)  # vector of class indices [B]
+      mergedTargets = targets[0].to(torch.int64)
+      metric.update(mergedPreds, mergedTargets) # single-label metrics
+
+    # (2) SINGLE LABEL + MULTI HEAD
+    elif labelType[0] == "single" and len(preds) > 1:
+      assert 1 == 0, "Single-label multi-head not implemented yet"
+      # merge into full class space
+      total_classes = sum(len(split) for split in headSplits)
+      B = preds[0].shape[0]
+      merged_full = torch.zeros(B, total_classes, device=preds[0].device)
+      for head_idx, split in enumerate(headSplits):
+        merged_full[:, split] = preds[head_idx]
+      mergedPreds = merged_full.argmax(dim=1)
+      # merge targets similarly for metric
+      global_targets = torch.zeros(B, total_classes, device=mergedPreds.device)
+      for head_idx, split in enumerate(headSplits):
+        global_targets[:, split] = targets[head_idx]
+      metric.update(mergedPreds, global_targets.argmax(dim=1).to(torch.int64)) # single-label metrics
+
+    # (3) MULTI LABEL + SINGLE TASK
+    elif labelType[0] == "multi" and len(preds) == 1:
+      mergedPreds = preds[0]  # multi-hot [B, n_classes] (possibly top-k)
+      mergedTargets = targets[0].to(torch.int64)  # multi-hot [B, n_classes]
+      metric.update(mergedPreds, mergedTargets) # multi-label metrics
+
+    # (4) SINGLE LABEL + MULTI TASK
+    elif labelType[0] == "multi" and len(preds) > 1:
+      total_classes = sum(len(split) for split in headSplits) # assuming non-overlapping splits
+      B = preds[0].shape[0] # batch size
+      mergedPreds = torch.zeros(B, total_classes, device=preds[0].device)
+      mergedTargets = torch.zeros(B, total_classes, device=preds[0].device)
+      for head_idx, split in enumerate(headSplits):
+        mergedPreds[:, split] = preds[head_idx]  # one-hot in full space [B, n_classes]
+        mergedTargets[:, split] = targets[head_idx]  # multi-hot in full space [B, n_classes]
+        # update metric per head immediately with preds, not merged
+
+        # Convert head split tuple to tensor on the right device
+        split_tensor = torch.tensor(split, device=preds[0].device)
+
+        # Map local argmax indices to global indices
+        headPreds_local = preds[head_idx].argmax(dim=1)   # [B]
+        headTargets_local = targets[head_idx].argmax(dim=1)  # [B]
+
+        headPreds_global = split_tensor[headPreds_local]      # [B]
+        headTargets_global = split_tensor[headTargets_local]  # [B]
+
+        metric.update(headPreds_global, headTargets_global) # NOW using global class indices
     else:
       raise ValueError(f"Invalid labelType {labelType}")
 
-    metric.update(merged, targets.to(torch.int64))  # update metric with merged preds
     if batchStats[0] % batchStats[1] == 0 or (batchStats[0] + 1) == batchStats[2]:
-      print("preds: ", preds[0][0].cpu().detach().numpy())
-      print("merged: ", merged[0].cpu().detach().numpy())
+      print([f"pred: H{i} {pred.detach().cpu().numpy()}" for i, pred in enumerate(preds)])
+      if len(preds) > 1:
+        print([f"mergedPred: {mergedPreds[0].detach().cpu().numpy()}"])
+        print([f"mergedTarget: {mergedTargets[0].detach().cpu().numpy()}"])
       print(f"\t  [B{batchStats[0] + 1}]  scr: {metric.score():.4f}")
 
   except Exception as e:
-    print(f"Error while originating batch {batchStats[0]} predictions: {e}")
+    print(f"Error while originating batch {batchStats[0]} predictions: {e}\n")
     raise
-  return merged
+  return mergedPreds, mergedTargets
 
 class Trainer():
   ''' Part of the teacher that knows how to train models based on data
   '''
-  def __init__(self, metric, criterion, TRAIN, DEVICE):
+  def __init__(self, metric, criterions, TRAIN, labelType, headType, headSplits, DEVICE):
     self.train_metric = metric
-    self.criterion = criterion
+    self.criterions = criterions
+    self.labelType = labelType
+    self.headType = headType
+    self.headSplits = headSplits
 
     self.optimizerId = TRAIN["optimizerId"]
     self.learningRate = TRAIN["HYPER"]["learningRate"]
@@ -299,7 +360,7 @@ class Trainer():
 
     self.DEVICE = DEVICE
 
-  def train(self, model, trainloader, labelType, labels, optimizer):
+  def train(self, model, trainloader, labels, optimizer):
     ''' In: model, data, criterion (loss function), optimizer
         Out: train_loss, train_score
         Note - inputs can be samples (pics) or feature maps / outputs are logits and then pred/probabilities
@@ -312,20 +373,20 @@ class Trainer():
     model.train().to(self.DEVICE)
     for batch, data in enumerate(trainloader, 0):   # start at batch 0
       batchStats[0] = batch
-      inputs, targets, idxs, mask = nextBatch(data, labels, model, labelType, batchStats, self.DEVICE)
+      inputs, targets, idxs, mask = nextBatch(data, labels, model, self.labelType, batchStats, self.DEVICE)
       
       optimizer.zero_grad() # reset the parameter gradients before backward step
 
       outputs = nextOutputs(model, inputs, mask, batchStats)  # outputs is a list of size n_heads
 
-      loss = nextLoss(self.criterion, outputs, targets, batchStats)
+      loss = nextLoss(self.criterions, outputs, targets, batchStats)
       loss.backward() # backward pass
       optimizer.step()    # a single optimization step
 
-      preds = nextPreds(outputs, targets, labelType, self.train_metric, batchStats)  # preds is a list of size n_heads
+      preds, _ = nextPreds(outputs, targets, self.labelType, self.headType, self.headSplits, self.train_metric, batchStats)  # preds is a list of size n_heads
 
-      runningLoss += loss.item() * targets.numel()
-      totalSamples += targets.numel()
+      runningLoss += loss.item() * targets[0].numel() # all heads should have same number of samples
+      totalSamples += targets[0].numel()
 
     return runningLoss / totalSamples, self.train_metric.score()
 
@@ -334,12 +395,15 @@ class Trainer():
 class Validater():
   ''' Part of the teacher that knows how to validate a run of model training
   '''
-  def __init__(self, metric, criterion, DEVICE):
+  def __init__(self, metric, criterions, labelType, headType, headSplits, DEVICE):
     self.valid_metric = metric
-    self.criterion = criterion
+    self.criterions = criterions
+    self.labelType = labelType
+    self.headType = headType
+    self.headSplits = headSplits
     self.DEVICE = DEVICE
 
-  def validate(self, model, validloader, labelType, labels):
+  def validate(self, model, validloader, labels):
     ''' In: model, data, criterion (loss function)
         Out: valid_loss, valid_score
     '''
@@ -352,32 +416,35 @@ class Validater():
     with torch.no_grad(): # don't calculate gradients (for learning only)
       for batch, data in enumerate(validloader, 0):   # start at batch 0
         batchStats[0] = batch
-        inputs, targets, idxs, mask = nextBatch(data, labels, model, labelType, batchStats, self.DEVICE)
+        inputs, targets, idxs, mask = nextBatch(data, labels, model, self.labelType, batchStats, self.DEVICE)
 
         outputs = nextOutputs(model, inputs, mask, batchStats)  # outputs is a list of size n_heads
 
-        loss = sum(self.criterion(out, targets) for out in outputs)
+        loss = nextLoss(self.criterions, outputs, targets, batchStats)
         # print(loss.item())
 
-        preds = nextPreds(outputs, targets,labelType, self.valid_metric, batchStats)  # preds is a list of size n_heads
+        preds, _ = nextPreds(outputs, targets, self.labelType, self.headType, self.headSplits, self.valid_metric, batchStats)  # preds is a list of size n_heads
 
-        runningLoss += loss.item() * targets.numel()
-        totalSamples += targets.numel()
+        runningLoss += loss.item() * targets[0].numel()
+        totalSamples += targets[0].numel()
 
     return runningLoss / totalSamples, self.valid_metric.score()
 
 class Tester():
   ''' Part of the teacher that knows how to test a model knowledge in multiple ways
   '''
-  def __init__(self, metrics, labels, PHASES, labelToClassMap, DEVICE):
+  def __init__(self, metrics, labels, PHASES, labelToClassMap, labelType, headType, headSplits, DEVICE):
     self.test_metrics = metrics
     self.DEVICE = DEVICE
     self.labels = labels
     self.PHASES = PHASES
     self.labelToClassMap = labelToClassMap  # map from label to class index
+    self.labelType = labelType
+    self.headType = headType
+    self.headSplits = headSplits
     self.colormap = self.build_colormap_from_phases(PHASES)
 
-  def test(self, model, testloader, labelType, labels, export_bundle, path_export=None):
+  def test(self, model, testloader, labels, export_bundle, path_export=None):
     ''' Test the model - return Preds, labels and sampleIds
     '''
     self.test_metrics.reset()
@@ -391,11 +458,11 @@ class Tester():
     with torch.no_grad():
       for batch, data in enumerate(testloader, 0):   # start at batch 0
         batchStats[0] = batch
-        inputs, targets, idxs, mask = nextBatch(data, labels, model, labelType, batchStats, self.DEVICE)
+        inputs, targets, idxs, mask = nextBatch(data, labels, model, self.labelType, batchStats, self.DEVICE)
 
         outputs = nextOutputs(model, inputs, mask, batchStats)  # outputs is a list of size n_heads
 
-        preds = nextPreds(outputs, targets, labelType, self.test_metrics, batchStats)
+        preds, targets = nextPreds(outputs, targets, self.labelType, self.headType, self.headSplits, self.test_metrics, batchStats)
 
         predsList.append(preds)
         targetsList.append(targets)
@@ -406,7 +473,7 @@ class Tester():
     sampleIdsList = torch.cat(sampleIdsList).cpu().tolist()
 
     # print(f"Preds: {predsList}\n Targets: {targetsList}\n SampleIds: {sampleIdsList}")
-    test_bundle = self._get_bundle(predsList, targetsList, sampleIdsList, labelType)
+    test_bundle = self._get_bundle(predsList, targetsList, sampleIdsList, self.labelType)
     if export_bundle:
       # print("here", path_export)
       test_bundle.to_csv(path_export + ".csv", index=False)
@@ -462,7 +529,7 @@ class Tester():
 
   def _aprfc(self, writer, modelId, path_aprfc):
     # self.test_metrics.display()
-    fold = int(modelId.split("_")[1][1]) # get fold number from modelId
+    fold = int(modelId[1]) # get fold number from modelId
     if self.test_metrics.accuracy:
       writer.add_scalar(f"accuracy/test", self.test_metrics.get_accuracy(), fold)
     if self.test_metrics.precision:
@@ -472,7 +539,7 @@ class Tester():
     if self.test_metrics.f1score:
       writer.add_scalar(f"f1score/test", self.test_metrics.get_f1score(), fold)
     if self.test_metrics.confusionMatrix:
-      path_to = os.path.join(path_aprfc, f"cm_f{fold}.png")
+      path_to = os.path.join(path_aprfc, f"cm_{modelId}.png")
       cm = self.test_metrics.get_confusionMatrix(path_to)
       if cm is not None:
         image_cf = plt.imread(cm)
@@ -517,28 +584,50 @@ class Tester():
       print("phases_preds counts:", phases_preds_video.values, '\t', sum(phases_preds_video))
       print("phases_gt counts:", phases_gt_video.values, '\t', sum(phases_gt_video))
       print(phaseIntToLabelMap)
-      mix = list(zip(phases_preds_video / (60 * samplerate), phases_gt_video / (60 * samplerate), phases_diff_sum))
-      ot = f"\nVideo {video[:4]} Phase Report\n" + f"{'':<12} \t|   T Preds   |  T Targets  ||  Diff\n" + '\n'.join(
-            f"{phaseIntToLabelMap[i]:<12} \t| {mix[i][0]:<8.2f}min | {mix[i][1]:<8.2f}min || {(mix[i][0] - mix[i][1]):<8.2f}min"
+      mix = list(zip(phases_preds_video / (samplerate), phases_gt_video / (samplerate), phases_diff_sum))
+      ot = f"\nVideo {video[:4]} Phase Report\n" + f"{'':<10} | {'T Preds':^10} | {'T Targets':^10} || {'Error':^10}\n" + '\n'.join(
+            f"{phaseIntToLabelMap[i]:<10} | {self.get_hourMinSec_from_seconds(mix[i][0]):^10} | {self.get_hourMinSec_from_seconds(mix[i][1]):^10} || {self.get_hourMinSec_from_seconds(mix[i][2]):^10}"
             for i in range(N_PHASES)
         )
       outText.append(ot)
       print(ot, '\n')
-      self._export_textImg(ot, path_phaseTiming, f"timings_{modelId.split('_')[1]}_{video[:4]}")
+      self._export_textImg(ot, path_phaseTiming, f"timings_{modelId}_{video[:4]}")
     # Average Overall Results
-    phases_preds_avg = phases_preds_sum / len(videos) / (60 * samplerate)
-    phases_gt_avg = phases_gt_sum / len(videos) / (60 * samplerate)
-    phases_diff_avg = phases_diff_sum / len(videos) / (60 * samplerate)
+    phases_preds_avg = phases_preds_sum / len(videos) / (samplerate)
+    phases_gt_avg = phases_gt_sum / len(videos) / (samplerate)
+    phases_diff_avg = phases_diff_sum / len(videos) / (samplerate)
     mix = list(zip(phases_preds_avg, phases_gt_avg, phases_diff_avg))
-    
-    otavg = "\n\nOverall Average Phase Report\n" + f"{'':<12} \t| T Avg Preds |T Avg Targets|| Total AE\n" + '\n'.join(
-            f"{phaseIntToLabelMap[i]:<12} \t| {mix[i][0]:<8.2f}min | {mix[i][1]:<8.2f}min || {(mix[i][2]):<8.2f}min"
+
+    otavg = f"\n\nOverall Average Phase Report\n{'':12}\t|{'  T Avg Preds':<12}|{'  T Avg Targets':<12}||{'  Total AE':<12}\n" + '\n'.join(
+            f"{phaseIntToLabelMap[i]:<12}|{int(mix[i][0]):12}|{int(mix[i][1]):12}||{int(mix[i][2]):12}"
             for i in range(N_PHASES)
       )
     # print(otavg)
     # self._export_textImg(otavg, path_phaseTiming, f"{modelId}_overall-phaseTiming")
     outText.append(otavg)
   # phase_metric([1, 1, 2, 3, 3, 4, 0, 5], [0, 0, 0, 2, 3, 4, 5, 1])
+
+    # accumulate results to csv file
+    results_df = pd.DataFrame({
+        "Phase": [phaseIntToLabelMap[i] for i in range(N_PHASES)],
+        "Avg_Preds": phases_preds_avg,
+        "Avg_Targets": phases_gt_avg,
+        "Avg_Absolute_Error": phases_diff_avg
+    })
+    results_path = os.path.join(path_phaseTiming, f"timingsSummary.csv")
+
+    # aggregate with existing results if any (csv)
+    # Step 1: load existing
+    if os.path.isfile(results_path):
+      old_df = pd.read_csv(results_path)
+      combined_df = pd.concat([old_df, results_df], ignore_index=True)
+    else:
+      combined_df = results_df
+    # Step 2: aggregate by phase
+    agg_df = combined_df.groupby("Phase", as_index=False).mean()
+    # Step 3: save aggregated
+    print(f"Saving aggregated phase timing results to {results_path}")
+    agg_df.to_csv(results_path, index=False)
     return outText
 
   def _export_textImg(self, outText, path_to, name):
@@ -623,10 +712,11 @@ class Tester():
       used_set = set(map(str, data_video["Target"].values)) | set(map(str, data_video["Pred"].values))
 
       # Order legend entries by your global PHASES
-      used_phases = [p for p in self.PHASES if p in used_set]
-
+      standard_in_video = [p for p in self.PHASES if p in used_set]
+      nonstandard_in_video = [p for p in used_set if p not in self.PHASES]
+      used_phases = standard_in_video + nonstandard_in_video
       handles = [plt.Rectangle((0, 0), 1, 1, color=self.colormap.get(p, "#bbbbbb")) for p in used_phases]
-      labels  = used_phases  # strings like 'Dis,Pro' etc.
+      labels = used_phases
 
       legend = fig.legend(
           handles, labels,
@@ -640,7 +730,8 @@ class Tester():
       )
 
       plt.tight_layout()  # can keep to adjust spacing nicely
-      plt.savefig(os.path.join(path_phaseCharts, f"ribbons_{modelId.split('_')[1]}_{video[:4]}.png"), bbox_inches='tight')
+      # print(modelId)
+      plt.savefig(os.path.join(path_phaseCharts, f"ribbons_{modelId}_{video[:4]}.png"), bbox_inches='tight')
       plt.close(fig)
 
     t2 = time.time()
@@ -710,6 +801,18 @@ class Tester():
 
       return cmap
 
+  def get_hourMinSec_from_seconds(self, seconds):
+    hours = seconds // 3600
+    minutes = (seconds % 3600) // 60
+    secs = seconds % 60
+    h, m, s = '', '', ''
+    if hours > 0:
+      h = f"{int(hours)}h "
+    if minutes > 0:
+      m = f"{int(minutes)}m "
+    if secs > 0 or (hours == 0 and minutes == 0):
+      s = f"{int(secs)}s"
+    return f"{h}{m}{s}".strip()
 
 class EarlyStopper:
   ''' Controls the validation loss progress to keep it going down and improve times
@@ -742,44 +845,29 @@ class EarlyStopper:
         return True
     return False
   
-
-  
 class StillMetric:
   ''' For now uses torcheval metrics
       Performs metric update and computation based on a frequency provided
   '''
-  def __init__(self, metricName, n_classes, DEVICE, labelType, labelToClass, agg="micro"):
+  def __init__(self, metricName, n_classes, DEVICE, labelType, headType, labelToClass, agg="micro"):
     self.name = metricName
     self.labelToClass = labelToClass  # map from label to class index
     self.labelType = labelType  # single or multi
-    self.topK = 2 if labelType[0] == "multi" else 1
-    if labelType[1] == "1phase":
-      self.topK = 1
+    self.topK = int(self.labelType[2][-1])
+    self.headType = headType  # single or multi
     if metricName == "accuracy":
-      if labelType[0] == "single":
+      if labelType[0] == "single" or (labelType[0] == "multi" and int(labelType[2][-1]) == 1):  # single-label single-head or multi-label multi-head with topK=1
         self.metric = MulticlassAccuracy(average="micro", num_classes=n_classes, device=DEVICE)
       else:
         self.metric = TopKMultilabelAccuracy(device=DEVICE, k=self.topK) # criteria="hamming"
     elif metricName == "precision":
-      if labelType[0] == "single":
-        self.metric =  MulticlassPrecision(average=agg, num_classes=n_classes, device=DEVICE)
-      else:
-        self.metric = BinaryPrecision(device=DEVICE)
+      self.metric =  MulticlassPrecision(average=agg, num_classes=n_classes, device=DEVICE)
     elif metricName == "recall":
-      if labelType[0] == "single":
-        self.metric = MulticlassRecall(average=agg, num_classes=n_classes, device=DEVICE)
-      else:
-        self.metric = BinaryRecall(device=DEVICE)
+      self.metric = MulticlassRecall(average=agg, num_classes=n_classes, device=DEVICE)
     elif metricName == "f1score":
-      if labelType[0] == "single":
-        self.metric = MulticlassF1Score(average=agg, num_classes=n_classes, device=DEVICE)
-      else:
-        self.metric = BinaryF1Score(device=DEVICE)
+      self.metric = MulticlassF1Score(average=agg, num_classes=n_classes, device=DEVICE)
     elif metricName == "confusionMatrix":
-      if labelType[0] == "single":
-        self.metric = MulticlassConfusionMatrix(num_classes=n_classes, device=DEVICE, normalize='true')
-      else:
-        self.metric = BinaryConfusionMatrix(normalize='true')
+      self.metric = MulticlassConfusionMatrix(num_classes=n_classes, device=DEVICE, normalize="true")
     else:
       raise ValueError("Invalid Metric Name")
 
@@ -806,13 +894,13 @@ class StillMetric:
 
       fig, ax = plt.subplots(figsize=(10, 7))
       sns.heatmap(
-          cm_reordered,
+          cm,
           annot=True,
           fmt=".2f",
           cmap="rocket_r",
           vmin=0, vmax=1,
-          xticklabels=labels_reordered,
-          yticklabels=labels_reordered,
+          xticklabels=labels,
+          yticklabels=labels,
           ax=ax
       )
       ax.set_xlabel("Predicted")
@@ -828,50 +916,48 @@ class StillMetric:
 class RunningMetric(StillMetric):
   ''' Extends StillMetric to updates on the run
   '''
-  def __init__(self, metricName, n_classes, DEVICE, agg, computeRate, labelType, labelToClass, updateFreq=1):
-    super().__init__(metricName, n_classes, DEVICE, labelType, labelToClass, agg)
+  def __init__(self, metricName, n_classes, DEVICE, agg, computeRate, labelType, headType, labelToClass, updateFreq=1):
+    super().__init__(metricName, n_classes, DEVICE, labelType, headType, labelToClass, agg)
     self.computeRate = computeRate  # num of batches to show minus the last 
     self.updateFreq = updateFreq  # num of batches between update
   
   def update(self, outputs, targets):     
-    if self.labelType[0] == "multi" and self.name == "confusionMatrix":
-      k = self.labelType[1][0] if self.labelType[1][0].isdigit() else 2
+    if self.name == "confusionMatrix" and len(self.headType) == 1 and self.labelType[0] == "multi":
+      # multi-label single-head with top-k predictions
+      k = 1  # or infer from self.labelType[2][-1] if you want dynamic
       topk_preds = torch.topk(outputs, k=k, dim=1).indices  # [B, k]
-      # Create a 1D tensor for each top-k prediction
-      preds_flat = topk_preds.flatten()  # shape [B*k]
-      # Flatten targets to match each top-k prediction
-      # Repeat each row k times, then for each predicted class, take the target value at that class
-      targets_flat = targets.repeat_interleave(k, dim=0)  # [B*k, C]
-      targets_flat = targets_flat.gather(1, topk_preds.flatten().unsqueeze(1)).squeeze(1)  # 0/1
-
-      print(f"Preds flat: {preds_flat[:5]}, Targets flat: {targets_flat[:5]}")
+      # Predicted class ids [B*k]
+      preds_flat = topk_preds.flatten()
+      # True label at each predicted class
+      targets_flat = targets.gather(1, topk_preds).flatten()
       self.metric.update(preds_flat, targets_flat)
     else:
       self.metric.update(outputs, targets)
-
 
 class MetricBunch:
   ''' Gets a bunch of still metrics at cheap price
       Accuracy locked at agg==micro for now
   '''
-  def __init__(self, metricSwitches, n_classes, labelToClass, agg, computeRate, DEVICE, labelType):  # metricSwitches is a boolean dict switch for getting metrics
+  def __init__(self, metricSwitches, n_classes, labelToClass, agg, computeRate, DEVICE, labelType, headType):  # metricSwitches is a boolean dict switch for getting metrics
     self.metricSwitches = metricSwitches
     self.labelToClass = labelToClass
     self.agg = agg
     self.computeRate = computeRate
 
-    if labelType[0] == "single":
-      self.accuracy = RunningMetric("accuracy", n_classes, DEVICE, "micro", computeRate, labelType, labelToClass) if self.metricSwitches["accuracy"] else None
-      self.precision = RunningMetric("precision", n_classes, DEVICE, agg, computeRate, labelType, labelToClass) if self.metricSwitches["precision"] else None
-      self.recall = RunningMetric("recall", n_classes, DEVICE, agg, computeRate, labelType, labelToClass) if self.metricSwitches["recall"] else None
-      self.f1score = RunningMetric("f1score", n_classes, DEVICE, agg, computeRate, labelType, labelToClass) if self.metricSwitches["f1score"] else None
-      self.confusionMatrix = RunningMetric("confusionMatrix", n_classes, DEVICE, agg, computeRate, labelType, labelToClass) if self.metricSwitches["confusionMatrix"] else None
-    else:  # multi-label
-      self.accuracy = RunningMetric("accuracy", n_classes, DEVICE, "micro", computeRate, labelType, labelToClass) if self.metricSwitches["accuracy"] else None
+    if labelType[0] == "single" or (labelType[0] == "multi" and int(labelType[2][-1]) == 1):  # single-label single-head or multi-label multi-head
+      self.accuracy = RunningMetric("accuracy", n_classes, DEVICE, "micro", computeRate, labelType, headType, labelToClass) if self.metricSwitches["accuracy"] else None
+      self.precision = RunningMetric("precision", n_classes, DEVICE, agg, computeRate, labelType, headType, labelToClass) if self.metricSwitches["precision"] else None
+      self.recall = RunningMetric("recall", n_classes, DEVICE, agg, computeRate, labelType, headType, labelToClass) if self.metricSwitches["recall"] else None
+      self.f1score = RunningMetric("f1score", n_classes, DEVICE, agg, computeRate, labelType, headType, labelToClass) if self.metricSwitches["f1score"] else None
+      self.confusionMatrix = RunningMetric("confusionMatrix", n_classes, DEVICE, agg, computeRate, labelType, headType, labelToClass) if self.metricSwitches["confusionMatrix"] else None
+    elif labelType[0] == "multi" and int(labelType[2][-1]) > 1:  # multi-label single-head (for now)
+      self.accuracy = RunningMetric("accuracy", n_classes, DEVICE, "micro", computeRate, labelType, headType, labelToClass) if self.metricSwitches["accuracy"] else None
       self.precision = None
       self.recall = None
       self.f1score = None
-      self.confusionMatrix = RunningMetric("confusionMatrix", n_classes, DEVICE, agg, computeRate, labelType, labelToClass) if self.metricSwitches["confusionMatrix"] else None
+      self.confusionMatrix = RunningMetric("confusionMatrix", n_classes, DEVICE, agg, computeRate, labelType, headType, labelToClass) if self.metricSwitches["confusionMatrix"] else None
+    else:
+      raise ValueError("Invalid labelType")
   def score(self):
      assert self.accuracy, "Accuracy metric not initialized! Can't compute Bunch score."
      return self.accuracy.score()
@@ -942,6 +1028,7 @@ def get_testState(path_states, modelId):
       path_state = os.path.join(path_states, stateId)
       print(f"    Loading state from model {stateId}")
       stateDict = torch.load(path_state, weights_only=False)
+      stateId = os.path.splitext(stateId)[0].split('_')[1]  # remove .pt and state_
       return stateDict, stateId
   else:
     raise ValueError(f"Model {modelId} not found in {path_states}")

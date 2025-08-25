@@ -26,6 +26,7 @@ class Phasinator(nn.Module):
       head = classinator
       inputType = "images-frame"
       arch = (spaceinator.arch, classinator.arch)
+      print("here")
     elif domain == "space-time":
       if timeinator.arch == "dTsNet" or timeinator.arch == "pTsNet":
         backbone = [spaceinator, timeinator]
@@ -496,4 +497,4 @@ class TwoHeadLinearClassifier(nn.Module):
   def forward(self, x):
     x1 = self.linear1(x)  # → [B, N_CLASSES]
     x2 = self.linear2(x)
-    return x1, x2
+    return [x1, x2]
