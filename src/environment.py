@@ -70,6 +70,7 @@ class Classroom():
       id_classroom = self.match_learningEnvironment(TRAIN, DATA)
       if id_classroom:  # found match
         classroomStatus = "Matched"
+        print("here")
       else:
         classroomStatus = "New"
         id_classroom = f"{DATA['id_dataset'].split('-')[0]}-{datetime.datetime.now().strftime('%y%m')}-1" # create new classroom  
@@ -81,7 +82,7 @@ class Classroom():
     self.path_classroom = os.path.join(self.path_root, "logs", id_classroom)
     self.id = id_classroom
     self.status = classroomStatus
-
+  
     id_student = self.match_studentProfile(MODEL)
     if id_student:  # found match
       studentStatus = "Matched"
@@ -96,14 +97,12 @@ class Classroom():
       os.makedirs(os.path.join(self.path_classroom, id_student), exist_ok=True)
 
     self.path_student = os.path.join(self.path_classroom, id_student)
-
     
     self.studentId = id_student
     self.studentStatus = studentStatus
 
     for attrKey, attrValue in self._setup_paths(DATA["id_dataset"], id_student, TRAIN, DATA, MODEL):
       setattr(self, attrKey, attrValue) # set all paths as attributes
-    
 
     # Update settings dict if a classroom is chosen
     if self.status == "Chosen":
@@ -116,8 +115,8 @@ class Classroom():
         self.DATA = loaded_data["DATA"]
     
     self.DATA["labelType"] = tuple(DATA["labelType"].split('-'))  # e.g. ('single', 'head1', 'phase,etc')
-
-    self.path_exportedSpaceFeatures = MODEL["path_spaceFeats"]
+    
+    self.path_spaceFeats = MODEL["path_spaceFeats"]
 
   def get_modelId(self, MODEL):
     # learnMode = {"space": "SP", "time": "TP", "spatio-temporal": "ST"}
@@ -130,10 +129,10 @@ class Classroom():
     modelId = []
 
     if "space" in domain:
-      modelId.append(spaceTransferMode[MODEL["spaceTransferMode"]])  # e.g. "FT" or "FX"
+      modelId.append(spaceTransferMode[MODEL["spaceTransferMode"]]) if MODEL["spaceTransferMode"] in spaceTransferMode else None  # e.g. "FT" or "FX"
       modelId.append(spaceArch[MODEL["spaceArch"]])
     elif "time" in domain:
-      modelId.append(timeTransferMode[MODEL["timeTransferMode"]])  # e.g. "FT" or "FX"
+      modelId.append(timeTransferMode[MODEL["timeTransferMode"]]) if MODEL["timeTransferMode"] in timeTransferMode else None  # e.g. "FT" or "FX"
       modelId.append(timeArch[MODEL["timeArch"]])
 
     modelId.append(classifierArch[MODEL["classifierArch"]])
@@ -155,6 +154,7 @@ class Classroom():
   
   def match_studentProfile(self, MODEL):
     students = [m for m in os.listdir(self.path_classroom) if os.path.isdir(os.path.join(self.path_classroom, m))] # list of students in the classroom
+
     for id_student in students:
       # print(f"Checking student {id_student} in classroom {self.id}")
       if not os.path.exists(os.path.join(self.path_classroom, id_student, "student-profile.yml")):
@@ -163,8 +163,12 @@ class Classroom():
       with open(os.path.join(self.path_classroom, id_student, "student-profile.yml"), 'r') as f:
         studentProfile = yaml.safe_load(f)
         # if new learning parameters match a previous classroom with same "subject" (id_dataset)
-        if studentProfile["MODEL"] == MODEL:
-          return id_student
+        try:
+          if studentProfile["MODEL"] == MODEL:
+            return id_student
+        except Exception as e:
+          print(f"Error reading student profile for {id_student}: {e}")
+          pass
     return None
 
   def _setup_paths(self, id_dataset, id_student, TRAIN, DATA, MODEL):

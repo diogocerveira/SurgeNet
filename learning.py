@@ -42,12 +42,17 @@ def learning(**the):
   print(f"   [preprocessing] {Ctl.preprocessingType}")
   print(f"   [classes] #{dset.n_classes} ({'Balanced' if dset.BALANCED else 'Unbalanced'}) {list(dset.labelToClassMap.keys())}")
   print(f"   [weights] {dset.classWeights}")
-  print(f"   [phases] #{len(dset.phases)}) ", dset.phases, '\n')
+  print(f"   [phases] #{len(dset.phases)} ", dset.phases, '\n')
 
   # teaching.py (metrics, train validation, test)
   Tch = teaching.Teacher(Csr.TRAIN, the["EVAL"], dset, the["device"])
   print(f"C. [training] {Csr.TRAIN['train_point']} on [device] {the['device']}")
-  print(f"   [folds] #{Csr.TRAIN['k_folds']} [epochs] #{Csr.TRAIN['HYPER']['n_epochs']} [batch sizes] s{Csr.TRAIN['HYPER']['spaceBatchSize']} / t{Csr.TRAIN['HYPER']['timeBatchSize']}\n")
+  print(f"   [folds] #{Csr.TRAIN['k_folds']} [epochs] #{Csr.TRAIN['HYPER']['n_epochs']} [batch sizes] s{Csr.TRAIN['HYPER']['spaceBatchSize']} / t{Csr.TRAIN['HYPER']['timeBatchSize']}")
+  print(f"   [headtype] {dset.headType} ")
+  if len(dset.headType) == 2 and dset.headType[0] == "multi" and dset.headType[1] == "phase":
+    for i, head in enumerate(dset.headSplits):
+      print(f"      Head {i} classes: {[dset.classToLabelMap[c] for c in head]}")
+  print()
   highScore = 0.0
   # print(Ctl.get_mean_std(dset))
 
@@ -73,8 +78,8 @@ def learning(**the):
     classifier = machine.Classinator(the["MODEL"], spaceinator.featureSize, timeinator.featureSize, dset.n_classes)
     model = machine.Phasinator(the["MODEL"]["domain"], spaceinator, timeinator, classifier, f"{Csr.studentId}_f{fold + 1}")
 
-    dset.path_spaceFeatures, featuresId = teaching.get_path_exportedfeatures(Csr.path_exportedSpaceFeatures, f"spacefmaps_f{fold + 1}")
-    trainloader, validloader, testloader = Ctl.batch(dset, model.inputType, Csr.TRAIN["HYPER"], Csr.DATA["multiClips"], Csr.DATA["multiClipStride"], train_idxs=train_idxs, valid_idxs=valid_idxs, test_idxs=test_idxs)
+    path_spaceFeats, featuresId = teaching.get_path_spaceFeat(Csr.path_spaceFeats, f"f{fold + 1}")
+    trainloader, validloader, testloader = Ctl.batch(dset, model.inputType, Csr.TRAIN["HYPER"], path_spaceFeats, Csr.DATA["multiClips"], Csr.DATA["multiClipStride"], train_idxs=train_idxs, valid_idxs=valid_idxs, test_idxs=test_idxs)
 
     if "train" in the["actions"] or "eval" in the["actions"]:
       Tch.writer = SummaryWriter(log_dir=os.path.join(Csr.path_events, model.id.split('_')[1])) # object for logging stats
@@ -201,7 +206,7 @@ if __name__ == "__main__":
   # configIds = ["cfg_SP-RN50.yml", "cfg_SP-FX-RN50.yml", "cfg_SP-l4FT-RN50.yml", "cfg_SP-FT-RN50.yml",
   #             "cfg_SP-FX-RN50-aug.yml", "cfg_SP-l4FT-RN50-aug.yml", 
   #             "cfg_SP-l4FT-dTsRN50-aug.yml", "cfg_SP-l4FT-pTsRN50-aug.yml"]
-  configIds = ["cfg_default.yml"]
+  configIds = ["cfg_SP-l4FT-tecno-pTsRN50-aug.yml"]
 
   for configId in configIds:
     with open(os.path.join("settings", configId), "r") as file:
@@ -228,5 +233,5 @@ if __name__ == "__main__":
       config["actions"] = []  # default actions if none specified
     if config["device"] == "auto" or not config["device"]: # where to save torch tensors (e.g. during training)
       config["device"] = "cuda" if torch.cuda.is_available() else "cpu"
-    print()
+    print(f"Running {configId}...\n")
     learning(**config)

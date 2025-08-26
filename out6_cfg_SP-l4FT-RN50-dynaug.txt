@@ -1,0 +1,25 @@
+nohup: ignoring input
+Running 6cfg_SP-l4FT-RN50-dynaug.yml...
+
+here
+A. [classroom] LDSS-SP-imdynaug (Matched)
+   [model] pFT-RN50-1L (Matched)
+   For ('train', 'process', 'eval')
+
+   Warning: Skipping annotation for 96c7 (./data/LDSS-local/annotations/96c7.json not found)
+   Skipping hidden file _becb
+   Skipping hidden file .DS_Store
+   Skipping hidden file _2e98
+   Skipping hidden file _d699
+   Warning: Skipping annotation for b5bf (./data/LDSS-local/annotations/b5bf.json not found)
+
+   A new labels.csv was created ./data/LDSS-local/labels/single-phase-top1.csv
+
+B. [dataset] LDSS-local (#134498)
+   [label] single-phase-top1
+   [preprocessing] imagenet-dynaug
+   [classes] #6 (Unbalanced) ['0Act-0Obj', '0Obj-Rep', 'Dis-Pro', 'Dis-Vau', 'Fix-Pro', 'Fix-Vau']
+   [weights] [tensor([0.3846, 0.6755, 1.0557, 0.2113, 3.4933, 0.1796])]
+   [phases] #6  ['0Act-0Obj', '0Obj-Rep', 'Dis-Pro', 'Dis-Vau', 'Fix-Pro', 'Fix-Vau'] 
+
+Label type:  ('single', 'phase', 'top1')

@@ -60,11 +60,10 @@ class SampledVideosDataset(Dataset):
     self.labelToClassMap = self.get_labelToClassMap(self.labels)
     self.n_classes = len(self.labelToClassMap)
     self.headType = headType.split('-') if headType else [self.n_classes]  # default to single head strct [4, 3]
+    
     self.headSplits = ((0, 2, 3, 5), (1, 4, 6))
-    classToLabelMap_inv = {v: k for k, v in self.labelToClassMap.items()}
-    if len(self.headType) == 2 and self.headType[0] == "multi" and self.headType[1] == "phase":
-      for i, head in enumerate(self.headSplits):
-        print(f"Head {i} classes: {[classToLabelMap_inv[c] for c in head]}")
+    self.classToLabelMap = {v: k for k, v in self.labelToClassMap.items()}
+    
     
     self.phases = self._get_phases()  # Get unique phases from labels
 
@@ -88,6 +87,7 @@ class SampledVideosDataset(Dataset):
   
   def __getitem__(self, idx):
     """Retrieve a single item from the dataset based on an index"""
+    assert 1 == 0, "wrong pipe"
     path_img = os.path.join(self.path_samples, self.labels.loc[idx, "videoId"],
       self.labels.iloc[idx, "frameId"] + '.' + self.datatype)
     # Read images and labels
@@ -239,7 +239,7 @@ class SampledVideosDataset(Dataset):
     """
     if labelType[0] == "single":
       # single-label per sample
-      classTargets = [self.labelToClassMap[label.strip()] for label in labels]
+      classTargets = [self.labelToClassMap[label.strip()] for label in labels]  # string to int
       return [torch.tensor(classTargets, dtype=torch.long)]
 
     elif labelType[0] == "multi":
@@ -785,7 +785,7 @@ class Cataloguer():
     # print(f"Train idxs: {train_idxs}\nValid idxs: {valid_idxs}\nTest idxs: {test_idxs}")
     # return train_idxs, valid_idxs, test_idxs
 
-  def batch(self, dset, inputType, HYPER, multiclips=False, multiClipStride=1, train_idxs=None, valid_idxs=None, test_idxs=None):
+  def batch(self, dset, inputType, HYPER, path_spaceFeats, multiclips=False, multiClipStride=1, train_idxs=None, valid_idxs=None, test_idxs=None):
     ''' helper for loading data, features or stopping when fx_mode == 'export'
     '''
     inputTypeLeft, inputTypeRight = inputType.split('-')
@@ -794,12 +794,12 @@ class Cataloguer():
       return self._batch_dataset(dset, HYPER["spaceBatchSize"], train_idxs, valid_idxs, test_idxs)
     elif inputTypeLeft == "fmaps":
       if inputTypeRight == "frame":  # classifier training on space features
-        return self._batch_frameFeats(dset, HYPER["spaceBatchSize"], train_idxs, valid_idxs, test_idxs)
+        return self._batch_frameFeats(dset, path_spaceFeats, HYPER["spaceBatchSize"], train_idxs, valid_idxs, test_idxs)
       elif inputTypeRight == "clip" and not multiclips: # temporal model training on space features
-        return self._batch_clipFeats(dset, HYPER["timeBatchSize"], HYPER["clipSize"], train_idx=train_idxs, valid_idx=valid_idxs, test_idx=test_idxs)
+        return self._batch_clipFeats(dset, path_spaceFeats, HYPER["timeBatchSize"], HYPER["clipSize"], train_idxs=train_idxs, valid_idxs=valid_idxs, test_idxs=test_idxs)
       elif inputTypeRight == "clip" and multiclips:  # temporal model training on space features
         assert HYPER["clipSize"] > 0, "clipSize must be greater than 0 for multiclips!"
-        return self._batch_multiClipFeats(dset, HYPER["timeBatchSize"], HYPER["clipSize"], multiClipStride, train_idxs, valid_idxs, test_idxs)
+        return self._batch_multiClipFeats(dset, path_spaceFeats, HYPER["timeBatchSize"], HYPER["clipSize"], multiClipStride, train_idxs, valid_idxs, test_idxs)
 
     else:
       raise ValueError("Invalid Batch Mode!")
@@ -809,11 +809,11 @@ class Cataloguer():
     try:
       if dset.DATA_SCOPE == "local":
         if np.any(train_idxs):
-          loaders["trainloader"] = DataLoader(dataset=dset, batch_size=size_batch, num_workers=2, sampler=torch.utils.data.SubsetRandomSampler(train_idxs), collate_fn=self.custom_collate)
+          loaders["trainloader"] = DataLoader(dataset=dset, batch_size=size_batch, num_workers=2, sampler=torch.utils.data.SubsetRandomSampler(train_idxs), collate_fn=self.frame_collate)
         if np.any(valid_idxs):
-          loaders["validloader"] = DataLoader(dataset=dset, batch_size=size_batch, num_workers=2, sampler=torch.utils.data.SubsetRandomSampler(valid_idxs), collate_fn=self.custom_collate)
+          loaders["validloader"] = DataLoader(dataset=dset, batch_size=size_batch, num_workers=2, sampler=torch.utils.data.SubsetRandomSampler(valid_idxs), collate_fn=self.frame_collate)
         if np.any(test_idxs):
-          loaders["testloader"] = DataLoader(dataset=dset, batch_size=size_batch, num_workers=2, sampler=torch.utils.data.SubsetRandomSampler(test_idxs), collate_fn=self.custom_collate)
+          loaders["testloader"] = DataLoader(dataset=dset, batch_size=size_batch, num_workers=2, sampler=torch.utils.data.SubsetRandomSampler(test_idxs), collate_fn=self.frame_collate)
     except:
       print("Error in batch() for local dataset, assuming external dataset batch instead")
       # test_idxs actually carries the test part of the dataset when using CIFAR-10
@@ -826,9 +826,9 @@ class Cataloguer():
       # print(next(trainloader).shape)
     return loaders.values()
 
-  def _batch_frameFeats(self, dset, size_batch, train_idxs=None, valid_idxs=None, test_idxs=None):
-    assert os.path.exists(dset.path_spaceFeatures), f"No exported space features found in {dset.path_spaceFeatures}!"
-    featuresDict = torch.load(dset.path_spaceFeatures, weights_only=False)
+  def _batch_frameFeats(self, dset, path_spaceFeats, size_batch, train_idxs=None, valid_idxs=None, test_idxs=None):
+    assert os.path.exists(path_spaceFeats), f"No exported space features found in {path_spaceFeats}!"
+    featuresDict = torch.load(path_spaceFeats, weights_only=False)
     firstKey = next(iter(featuresDict))
     featureLayer = list(featuresDict[firstKey].keys())[-1]  # get the last layer of features
     print(f"Using feature layer: {featureLayer}")
@@ -852,21 +852,23 @@ class Cataloguer():
       # the dataset zips the tensors together to be feed to a dataloader (unzips them)
       featset = MultiHeadDataset(feats, targets, idxs)
       # print(featset[0][0].shape, featset[0][1].shape, featset[0][2].shape)
-      loader[split] = DataLoader(featset, batch_size=size_batch, num_workers=2, shuffle=True, collate_fn=self.custom_collate)
+      loader[split] = DataLoader(featset, batch_size=size_batch, num_workers=2, shuffle=True, collate_fn=self.frame_collate)
     exampleBatch = next(iter(loader[0]))
     print(f"\tBatch example shapes:\n\t[space features] {exampleBatch[0].shape}\n\t[labels] {exampleBatch[1].shape}\n\t[idxs] {exampleBatch[2].shape}\n")
     return loader
 
-  def _batch_clipFeats(self, dset, size_batch, clip_size=0, train_idxs=None, valid_idxs=None, test_idxs=None):
-    assert os.path.exists(dset.path_spaceFeatures), f"No exported space features found in {dset.path_spaceFeatures}!"
-    featuresDict = torch.load(dset.path_spaceFeatures, weights_only=False, map_location=self.DEVICE)
+  def _batch_clipFeats(self, dset, path_spaceFeats, size_batch, clip_size=0, train_idxs=None, valid_idxs=None, test_idxs=None):
+    assert os.path.exists(path_spaceFeats), f"No exported space features found in {path_spaceFeats}!"
+
+    featuresDict = torch.load(path_spaceFeats, weights_only=False, map_location=self.DEVICE)
     firstKey = next(iter(featuresDict))
     availableLayers = list(featuresDict[firstKey].keys())
     featureLayer = availableLayers[-1]
     print(f"  Available feature layers: {availableLayers} / Using last layer: {featureLayer}\n")
 
-    # Get per-video frame indices + split grouping
+    # Get dict with frame indices for each vid int and a map from vid int to belonging split
     groupedIdxs, splitVidsInt = self.get_vidsIdxsAndSplits(dset, train_idxs, valid_idxs, test_idxs)
+    # print("groupedIdx: ", groupedIdxs, "splitVidsInt: ", splitVidsInt)
     # Compute global max length if using full videos
     maxFrames = max(len(frames) for frames in groupedIdxs.values()) if clip_size == 0 else None
     loader = [[], [], []]
@@ -907,9 +909,10 @@ class Cataloguer():
 
         # Store either whole video or clips
         if clip_size == 0:
-          splitFeats.append(vidFeats)          # [T, F]
-          splitTargets.append(vidTargets)      # [T] or [T, C]
-          splitIdxs.append(vidIdxs)            # [T]
+          splitFeats.append(vidFeats)          # list of [T, F]
+          splitTargets.append(vidTargets)      # list of list of ([T] or [T, C])
+          splitIdxs.append(vidIdxs)            # list of [T]
+          # print(splitFeats[-1].shape, len(splitTargets[-1]), splitIdxs[-1].shape)
         else:
           assert 1 == 0, "clip_size > 0 not implemented yet in _batch_clipFeats"
           num_clips = vidFeats.shape[0] // clip_size
@@ -923,27 +926,28 @@ class Cataloguer():
           splitIdxs.extend(vidIdxs.view(num_clips, clip_size))
       feats = torch.stack(splitFeats).cpu()
       # Don't stack targets - keep as list for MultiHeadDataset
-      targets = [[t.cpu() for t in target_list] for target_list in splitTargets]
+      targets = [[tgt.cpu() for tgt in vidTargets] for vidTargets in splitTargets]
       idxs = torch.stack(splitIdxs).cpu()
 
       featset = MultiHeadDataset(feats, targets, idxs)
-      loader[split] = DataLoader(featset, batch_size=size_batch, num_workers=2, shuffle=True, collate_fn=self.custom_collate)
+      loader[split] = DataLoader(featset, batch_size=size_batch, num_workers=2, shuffle=True, collate_fn=self.clip_collate)
 
     if loader[0]:
-      exampleBatch = next(iter(loader[0]))
-      print(f"\tBatch example shapes:\n\t[space features] {exampleBatch[0].shape}\n\t[labels] {exampleBatch[1].shape}\n\t[idxs] {exampleBatch[2].shape}")
+      exampleBatch = next(iter(loader))  # each video is a tuple (feats, targets (list of a tensor for each head), idxs)
+      feats, targets, idxs = exampleBatch  # take the single video tuple
+      print(f"\tBatch example shapes:\n\t[space features] {feats.shape}\n\t[labels h1] {targets[0].shape}\n\t[idxs] {idxs.shape}")
       if clip_size == 0:
-        print(f"    Batch contains {exampleBatch[0].shape[0]} video(s), each with up to {exampleBatch[0].shape[1]} frames\n")
+        print(f"    Batch contains {exampleBatch.shape[0]} video(s), each with up to {exampleBatch[0].shape[0]} frames\n")
       else:
-        print(f"    Batch contains {exampleBatch[0].shape[0]} clip(s), each with {clip_size} frames\n")
+        print(f"    Batch contains {exampleBatch.shape[0]} clip(s), each with {clip_size} frames\n")
     return loader
 
-  def _batch_multiClipFeats(self, dset, size_batch, clip_size, stride=None, train_idxs=None, valid_idxs=None, test_idxs=None):
+  def _batch_multiClipFeats(self, dset, path_spaceFeats, size_batch, clip_size, stride=None, train_idxs=None, valid_idxs=None, test_idxs=None):
     assert clip_size > 0, "clip_size must be > 0 in multi-clip mode"
     stride = stride or clip_size
-    assert os.path.exists(dset.path_spaceFeatures), f"No features at {dset.path_spaceFeatures}!"
+    assert os.path.exists(path_spaceFeats), f"No features at {path_spaceFeats}!"
 
-    featuresDict = torch.load(dset.path_spaceFeatures, weights_only=False, map_location=self.DEVICE)
+    featuresDict = torch.load(path_spaceFeats, weights_only=False, map_location=self.DEVICE)
     featureLayer = list(featuresDict[next(iter(featuresDict))].keys())[-1]
     print(f"  [multiClip] Using feature layer: {featureLayer}\n")
 
@@ -976,19 +980,19 @@ class Cataloguer():
         continue
 
       feats = torch.stack(featsList).cpu()
-      targets_cpu = [[t.cpu() for t in target_list] for target_list in targetsList]
+      targets = [[tgt.cpu() for tgt in vidTargets] for vidTargets in splitTargets]
       idxs = torch.stack(idxsList).cpu()
-      dataset = MultiHeadDataset(feats, targets_cpu, idxs)
-      loader[split] = DataLoader(dataset, batch_size=size_batch, num_workers=2, shuffle=True, collate_fn=self.custom_collate)
+      dataset = MultiHeadDataset(feats, targets, idxs)
+      loader[split] = DataLoader(dataset, batch_size=size_batch, num_workers=2, shuffle=True, collate_fn=self.clip_collate)
     if loader[0]:
       xb = next(iter(loader[0]))
-      print(f"\t[multiClip] Example batch:\n\t[features] {xb[0].shape} | [labels] {xb[1].shape} | [idxs] {xb[2].shape}")
+      print(f"\t[multiClip] Example batch:\n\t[features] {xb[0].shape} | [labels h1] {xb[1][0].shape} | [idxs] {xb[2].shape}")
       print(f"\t{xb[0].shape[0]} clips × {clip_size} frames\n")
 
     return loader
   # Add this method to your batching class:
     
-  def custom_collate(self, batch):
+  def frame_collate(self, batch):
     """
     batch: list of tuples (features, [target_head1, target_head2, ...], idx)
     """
@@ -1004,6 +1008,13 @@ class Cataloguer():
     # print("EJDJEWD", inputs.shape, targets_list[0][0].shape, idxs.shape)
     return inputs, targets, idxs
 
+  def clip_collate(self, batch):
+    feats, targets, idxs = zip(*batch)  # each is a tuple of videos
+    feats = list(feats)
+    targets = list(targets)
+    idxs = list(idxs)
+    return feats, targets, idxs
+    
   def get_vidsIdxsAndSplits(self, dset, train_idxs=None, valid_idxs=None, test_idxs=None):
     '''
     Returns:
@@ -1030,17 +1041,19 @@ class MultiHeadDataset(torch.utils.data.Dataset):
                 OR list of tensors [head1_tensor, head2_tensor] for single video
     idxs: tensor [N] or list
     """
-    self.feats = feats
-    self.targets_list = targets
+    self.feats = feats # tensor of features
+    self.targets = targets # list of sample targets - list of targets for each head
     self.idxs = idxs
 
   def __len__(self):
       return len(self.feats)
 
   def __getitem__(self, i):
-    # Return: (features, [target_head1, target_head2, ...], idx)
-    print("BIOUOIOI")
-    return self.feats[i], [tgt[i] for tgt in self.targets], self.idxs[i]
+    # print(f"i={i}, feats={self.feats[i].shape}, idxs={self.idxs[i].shape}")
+    # for j, tgt in enumerate(self.targets[i]):
+    #   print(f"  target[{j}] {tgt.shape}")
+    # Return: (features, [headTarget1, headTarget2, ...], idx)
+    return self.feats[i], self.targets[i], self.idxs[i]
 
 class Showcaser:
   def __init__(self):

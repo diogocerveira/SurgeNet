@@ -1,12 +1,12 @@
 path_root: . #/batataclan
 path_data: #/workspace/raid-diogo/
 seed: 53  # 5 --> 3 or 3 --> 5  DO NOT CHANGE SEED (it messes up with fold training)
-device: cpu
+device: 
 id_classroom:  # if empty creates new learning environment, else loads it (dataset-YYMM-DDHH)
 actions:
-# - train        # train (spatial, temporal, full)
-# - process       # process (sample-n-label, mode-filter, extractFeatures)
-# - eval         # eval (aprfc, phaseTiming, phaseChart)
+- train        # train (spatial, temporal, full)
+- process       # process (sample-n-label, mode-filter, extractFeatures)
+- eval         # eval (aprfc, phaseTiming, phaseChart)
 
 # DATA and TRAIN properties define an unique classroom
 DATA:
@@ -28,7 +28,7 @@ DATA:
     # - Fixation of the implant to the vault
     # - Fixation of the implant to the promontory
     # - Reperitonealisation
-  preprocessing: imagenet-aug  # ldss, imagenet, augmentation
+  preprocessing: imagenet-dynaug  # ldss, imagenet, augmentation
   multiClips: False
   multiClipStride: 3  # stride for multi-clip mode (e.g. 1, 2, 3)
   datatype: png-image #, jpeg-image, feature-dict

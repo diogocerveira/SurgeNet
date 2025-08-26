@@ -37,7 +37,7 @@ class Teacher():
     self.DATASET_SIZE = dataset.__len__()
     train_metric, valid_metric, test_metrics = self._get_metrics(TRAIN, EVAL, self.N_PHASES, dataset.labelToClassMap, dataset.labelType, dataset.headType, DEVICE)
     criterions = self._get_criterion(TRAIN["criterionId"], dataset.classWeights, DEVICE)
-
+    print("first")
     self.trainer = Trainer(train_metric, criterions, TRAIN, self.labelType, self.headType, self.headSplits, DEVICE)
     self.validater = Validater(valid_metric, criterions, self.labelType, self.headType, self.headSplits, DEVICE)
     self.tester = Tester(test_metrics, dataset.labels, self.PHASES, dataset.labelToClassMap, self.labelType, self.headType, self.headSplits, DEVICE)
@@ -73,9 +73,9 @@ class Teacher():
         print(f"\n Dataset augmentation strength increased to {self.dataset.strength} \n")
 
       print(f"-------------- Epoch {epoch + 1} --------------")
-      print("        T")
+      print("     T")
       train_loss, train_score = self.trainer.train(model, trainloader, labels, optimizer)
-      print("        V")
+      print("     V")
       valid_loss, valid_score = self.validater.validate(model, validloader, labels)
 
       self.writer.add_scalar("Loss/train", train_loss, epoch + 1)
@@ -216,13 +216,13 @@ def nextBatch(data, labels, model, labelType, batchStats, DEVICE):
     targets = [tgt[mask] for tgt in targets] 
     idxs = idxs.reshape(-1)[mask]
     
-    if batchStats[0] % batchStats[1] == 0 or (batchStats[0] + 1) == batchStats[2]:
-      print("idx: ", idxs[0].cpu().numpy())
-      if isinstance(inputs, tuple) or isinstance(inputs, list):
-        print("inputs shape: ", inputs[0].shape, inputs[1].shape)
-      else:
-        print("inputs shape: ", inputs.shape)
-      print([f"target: H{i} {tgt}" for i, tgt in enumerate(targets)])
+    # if batchStats[0] % batchStats[1] == 0 or (batchStats[0] + 1) == batchStats[2]:
+    #   print("idx: ", idxs[0].cpu().numpy())
+    #   if isinstance(inputs, tuple) or isinstance(inputs, list):
+    #     print("inputs shape: ", inputs[0].shape, inputs[1].shape)
+    #   else:
+    #     print("inputs shape: ", inputs.shape)
+    #   print([f"target: H{i} {tgt[0]}" for i, tgt in enumerate(targets)])
   except Exception as e:
     print(f"Error processing batch {batchStats[0]} data: {e}\n")
     raise
@@ -241,8 +241,8 @@ def nextOutputs(model, inputs, mask, batchStats):
       for out in outputs
     ]
     # print(outputs[0].shape, outputs[1].shape, len(outputs))
-    if batchStats[0] % batchStats[1] == 0 or (batchStats[0] + 1) == batchStats[2]:
-      print([f"output: H{i} {out[0].detach().cpu().numpy()}" for i, out in enumerate(outputs)])
+    # if batchStats[0] % batchStats[1] == 0 or (batchStats[0] + 1) == batchStats[2]:
+    #   print([f"output: H{i} {out[0].detach().cpu().numpy()}" for i, out in enumerate(outputs)])
   except Exception as e:
     print(f"Error during model forward pass for batch {batchStats[0]}: {e}\n")
     raise
@@ -254,8 +254,8 @@ def nextLoss(criterions, outputs, targets, batchStats):
   try:
     loss = sum(criterion(out, tgt) for criterion, (out, tgt) in zip(criterions, zip(outputs, targets)))
 
-    if batchStats[0] % batchStats[1] == 0 or (batchStats[0] + 1) == batchStats[2]:
-      print(f"loss: {loss.item():.4f}")
+    # if batchStats[0] % batchStats[1] == 0 or (batchStats[0] + 1) == batchStats[2]:
+    #   print(f"loss: {loss.item():.4f}")
   except Exception as e:
     print(f"Error while computing loss for batch {batchStats[0]}: {e}\n")
     raise
@@ -330,10 +330,10 @@ def nextPreds(outputs, targets, labelType, headType, headSplits, metric, batchSt
       raise ValueError(f"Invalid labelType {labelType}")
 
     if batchStats[0] % batchStats[1] == 0 or (batchStats[0] + 1) == batchStats[2]:
-      print([f"pred: H{i} {pred.detach().cpu().numpy()}" for i, pred in enumerate(preds)])
-      if len(preds) > 1:
-        print([f"mergedPred: {mergedPreds[0].detach().cpu().numpy()}"])
-        print([f"mergedTarget: {mergedTargets[0].detach().cpu().numpy()}"])
+      # print([f"pred: H{i} {pred[0].detach().cpu().numpy()}" for i, pred in enumerate(preds)])
+      # if len(preds) > 1:
+      #   print([f"mergedPred: {mergedPreds[0].detach().cpu().numpy()}"])
+      #   print([f"mergedTarget: {mergedTargets[0].detach().cpu().numpy()}"])
       print(f"\t  [B{batchStats[0] + 1}]  scr: {metric.score():.4f}")
 
   except Exception as e:
@@ -529,7 +529,7 @@ class Tester():
 
   def _aprfc(self, writer, modelId, path_aprfc):
     # self.test_metrics.display()
-    fold = int(modelId[1]) # get fold number from modelId
+    fold = int(modelId.split('_')[1][1]) # get fold number from modelId
     if self.test_metrics.accuracy:
       writer.add_scalar(f"accuracy/test", self.test_metrics.get_accuracy(), fold)
     if self.test_metrics.precision:
@@ -1022,7 +1022,7 @@ class MetricBunch:
   
 def get_testState(path_states, modelId):
   # problem if 2 models with same id (e.g. last and best state)
-  fold = modelId.split("_")[1]  # get fold number from modelId
+  fold = modelId.split("_")[-1][1]  # get fold number from modelId
   for stateId in os.listdir(path_states):
     if fold in stateId:
       path_state = os.path.join(path_states, stateId)
@@ -1033,9 +1033,9 @@ def get_testState(path_states, modelId):
   else:
     raise ValueError(f"Model {modelId} not found in {path_states}")
 
-def get_path_exportedfeatures(path_features, featureName):
+def get_path_spaceFeat(path_features, featureName):
   # problem if 2 models with same id (e.g. last and best state)
-  print(featureName)
+  # print(featureName)
   for featureId in os.listdir(path_features):
     if featureName in featureId:
       path_features = os.path.join(path_features, featureId)

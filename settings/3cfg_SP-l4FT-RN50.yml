@@ -11,7 +11,7 @@ actions:
 # DATA and TRAIN properties define an unique classroom
 DATA:
   id_dataset: LDSS-local  # (LDSS-local, LDSSi-local, TEST-local, cifar10-ext)
-  labelType: single-phase # time-to-next-phase, single-phase, time-to-video-end, time-since-video-start
+  labelType: single-phase-top1 # time-to-next-phase, single-phase, time-to-video-end, time-since-video-start
   actionLabels:
     - dissection
     - fixation
@@ -28,7 +28,7 @@ DATA:
     # - Fixation of the implant to the vault
     # - Fixation of the implant to the promontory
     # - Reperitonealisation
-  preprocessing: imagenet-aug  # ldss, imagenet, augmentation
+  preprocessing: imagenet  # ldss, imagenet, augmentation
   multiClips: False
   multiClipStride: 3  # stride for multi-clip mode (e.g. 1, 2, 3)
   datatype: png-image #, jpeg-image, feature-dict

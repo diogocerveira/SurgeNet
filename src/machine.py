@@ -23,14 +23,14 @@ class Phasinator(nn.Module):
     # the modular approach allows to have modules with no conditional on the forward pass
     if domain == "space":
       backbone = [spaceinator]
-      head = classinator
+      head = [classinator]
       inputType = "images-frame"
       arch = (spaceinator.arch, classinator.arch)
-      print("here")
+     
     elif domain == "space-time":
       if timeinator.arch == "dTsNet" or timeinator.arch == "pTsNet":
         backbone = [spaceinator, timeinator]
-        head = classinator
+        head = [classinator]
         inputType = "images-frame"
         arch = (spaceinator.arch, timeinator.arch, classinator.arch)
         spaceinator.feed_ts = True  # Enable time feature feeding
@@ -40,7 +40,7 @@ class Phasinator(nn.Module):
     elif domain == "time":
       if timeinator.arch == "phatima":
         backbone = [timeinator]
-        head = classinator
+        head = [classinator]
         assert 1 == 0, "Not implemented yet!"
       elif timeinator.arch == "tecno":
         backbone = []
@@ -49,20 +49,20 @@ class Phasinator(nn.Module):
       arch = (timeinator.arch,)
     elif domain == "full":
       backbone = [spaceinator]
-      head = timeinator
+      head = [timeinator]
       inputType = "images-frame"
       arch = "full"
       assert 1 == 0, "Not implemented yet!"
     elif domain == "linear":
       backbone = []
-      head = classinator
+      head = [classinator]
       inputType = "images-frame"
       arch = "linear"
       assert 1 == 0, "Not implemented yet!"
     else:
       raise ValueError("Invalid domain choice!")
     
-    self.inators = nn.Sequential(*(backbone + [head]))
+    self.inators = nn.Sequential(*(backbone + head))
     self.domain = domain
     self.arch = arch
     self.inputType = inputType
@@ -100,7 +100,7 @@ class Spaceinator(nn.Module):
     self.neuron = nn.Linear(1, 1)
 
     if self.domain == "time" and MODEL["path_spaceModel"]:
-      self.exportedFeatures = torch.load(MODEL["path_spaceModel"], weights_only=False, map_location="cpu")
+      self.exportedFeats = torch.load(MODEL["path_spaceModel"], weights_only=False, map_location="cpu")
 
     self.feed_ts = False
     # print(self.model)
@@ -238,7 +238,9 @@ class Timeinator(nn.Module):
     self.featureNode = fxs.get_graph_node_names(self.model)[0][-1]
 
     if self.domain == "class" and MODEL["path_timeModel"]:
-      self.exportedFeatures = torch.load(MODEL["path_spaceModel"], weights_only=False, map_location="cpu")
+      self.exportedFeats = torch.load(MODEL["path_spaceModel"], weights_only=False, map_location="cpu")
+    # print(self.model)
+    # print(fxs.get_graph_node_names(self.model)[0])
   
   def forward(self, x):
     x = self.model(x)
