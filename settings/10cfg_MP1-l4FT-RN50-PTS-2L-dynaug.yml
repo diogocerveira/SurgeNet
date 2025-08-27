@@ -1,7 +1,7 @@
 path_root: . #/batataclan
 path_data: #/workspace/raid-diogo/
 seed: 53  # 5 --> 3 or 3 --> 5  DO NOT CHANGE SEED (it messes up with fold training)
-device: cpu
+device:
 id_classroom:  # if empty creates new learning environment, else loads it (dataset-YYMM-DDHH)
 actions:
 - train        # train (spatial, temporal, full)
@@ -11,7 +11,7 @@ actions:
 # DATA and TRAIN properties define an unique classroom
 DATA:
   id_dataset: LDSS-local  # (LDSS-local, LDSSi-local, TEST-local, cifar10-ext)
-  labelType: single-phase-top1 # time-to-next-phase, single-phase, time-to-video-end, time-since-video-start
+  labelType: multi-phase-top1 # time-to-next-phase, single-phase, time-to-video-end, time-since-video-start
   actionLabels:
     - dissection
     - fixation
@@ -98,15 +98,15 @@ MODEL:  # for models created/trained in the run
   path_spaceFeats:
 # temporal
   timeTransferMode: # fine-tune | feat-xtract
-  timeArch: dTsNet # tecno | phatima | dTsNet | pTsNet
+  timeArch: pTsNet # tecno | phatima | dTsNet | pTsNet
   n_stages: 3
   n_filters: 64  # number of convolution kernels per filter == number of channels
   tf_filter: 3  # size in time (timeframe, # of frames)
   n_blocks: 2 # inside the stage
   proj_channels: 5 # ts-net projection channels
 # classification
-  classifierArch: one-linear # one-liner | two-linear
-  headType: 
+  classifierArch: two-linear # one-liner | two-linear
+  headType: "4-3"
   n_classes:   # normally gets from dataset itself 
 
 EVAL:  # Eval

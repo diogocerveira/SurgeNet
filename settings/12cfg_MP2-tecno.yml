@@ -1,17 +1,17 @@
 path_root: . #/batataclan
 path_data: #/workspace/raid-diogo/
 seed: 53  # 5 --> 3 or 3 --> 5  DO NOT CHANGE SEED (it messes up with fold training)
-device:
+device: 
 id_classroom:  # if empty creates new learning environment, else loads it (dataset-YYMM-DDHH)
 actions:
-# - train        # train (spatial, temporal, full)
-# - process       # process (sample-n-label, mode-filter, extractFeatures)
-# - eval         # eval (aprfc, phaseTiming, phaseChart)
+- train        # train (spatial, temporal, full)
+- process       # process (sample-n-label, mode-filter, extractFeatures)
+- eval         # eval (aprfc, phaseTiming, phaseChart)
 
 # DATA and TRAIN properties define an unique classroom
 DATA:
   id_dataset: LDSS-local  # (LDSS-local, LDSSi-local, TEST-local, cifar10-ext)
-  labelType: single-phase # time-to-next-phase, single-phase, time-to-video-end, time-since-video-start
+  labelType: multi-phase-top2 # time-to-next-phase, single-phase, time-to-video-end, time-since-video-start
   actionLabels:
     - dissection
     - fixation
@@ -28,7 +28,7 @@ DATA:
     # - Fixation of the implant to the vault
     # - Fixation of the implant to the promontory
     # - Reperitonealisation
-  preprocessing: imagenet-aug  # ldss, imagenet, augmentation
+  preprocessing: imagenet-dynaug  # ldss, imagenet, augmentation
   multiClips: False
   multiClipStride: 3  # stride for multi-clip mode (e.g. 1, 2, 3)
   datatype: png-image #, jpeg-image, feature-dict
@@ -43,7 +43,7 @@ TRAIN: # to fix because the top ones should not define a classroom
   log_events: True
   skipFolds: [] # 0 for fold 1... after a break (e.g. crash) allows to skip folds and restart from a checkpoint
 
-  criterionId: weighted-cross-entropy # cross-entropy | weighted-cross-entropy | binary-cross-entropy-logits
+  criterionId: binary-cross-entropy-logits  # cross-entropy | weighted-cross-entropy | binary-cross-entropy-logits
   optimizerId: adam # adam | sgd
   schedulerId: plateau # step | cosine | plateau
   train_metric: accuracy
@@ -88,24 +88,25 @@ PROCESS:  # Process
   fx_load_models: True  #loads models to extract features if not training
   
 MODEL:  # for models created/trained in the run
-  type: phase
-  domain: spatial # spatial, temporal, full, classifier
+  type: phase # images-frame # images-frame | imagesTs-frame | fmaps-clip
+  domain: time # space, time, linear
 # spatial
-  spaceTransferLearning: l4-fine-tune # fine-tune | feat-xtract | l4-fine-tune
+  spaceTransferMode: l4-fine-tune # fine-tune | feat-xtract | l4-fine-tune
   spaceArch: resnet50
   spacePreweights: image-net # image-net
   path_spaceModel: #C:/Users/DC/Documents/Programming/python/ucl/ML_SurgeNet/logs/LDSS/run_20241104-00/checkpoints/LDSS-20241104-00-fold6-0.837800.pth # if empty, uses new untrained one
-  path_spaceFeats:
-  add_timestamps: no # no | direct | mlp
-
+  path_spaceFeats: logs/LDSS-SP-imaug-BROKEN/l4FT-pTsRN50/process/feats
 # temporal
-  timeArch: tecno # tecno | phatima
-  n_stages: 3
+  timeTransferMode: # fine-tune | feat-xtract
+  timeArch: tecno # tecno | multiTecno | phatima | dTsNet | pTsNet
+  n_stages: 2
   n_filters: 64  # number of convolution kernels per filter == number of channels
   tf_filter: 3  # size in time (timeframe, # of frames)
   n_blocks: 2 # inside the stage
+  proj_channels: 5 # ts-net projection channels
 # classification
-  classifierType: # space | time
+  classifierArch: # one-liner | two-linear
+  headType:
   n_classes:   # normally gets from dataset itself 
 
 EVAL:  # Eval

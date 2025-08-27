@@ -25,6 +25,7 @@ import imageio.v3 as iio
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+import gc
 
 class SampledVideosDataset(Dataset):
   ''' Custom dataset of frames from sampled surgery videos
@@ -67,7 +68,7 @@ class SampledVideosDataset(Dataset):
     
     self.phases = self._get_phases()  # Get unique phases from labels
 
-    self.classWeights = self.get_labelWeights(self.labels)
+    self.classWeights = self.get_classWeights(self.labels)
     
      # check if the class distribution is balanced
     if all(torch.all(cw == cw[0]).item() for cw in self.classWeights):
@@ -162,59 +163,77 @@ class SampledVideosDataset(Dataset):
       # img = TF.to_pil_image(img)
 
       img.save(os.path.join(outdir, f"{prefix}_{i}.png"))
+
+  def set_preprocessing(self, key, strength=0.0):
+    mode, preproc = key  # e.g., ("train", "imagenet-dynaug")
+    self.preprocessingType = preproc
+
+    if mode == "train":
+      table = {
+      "ldss": self.get_transform("ldss"),
+      "imagenet": self.get_transform("imagenet"),
+      "imagenet-aug": self.get_transform("imagenet-aug"),
+      "imagenet-dynaug": self.get_transform("imagenet-dynaug", strength=strength),
+      }
+    else:  # eval/test → no aug
+      table = {
+      "ldss": self.get_transform("ldss"),
+      "imagenet": self.get_transform("imagenet"),
+      "imagenet-aug": self.get_transform("imagenet"),      # map aug → plain
+      "imagenet-dynaug": self.get_transform("imagenet"),   # map dynaug → plain
+      }
+
+    if preproc not in table:
+      raise ValueError(f"Unknown preprocessingType: {preproc}")
+    self.transform = table[preproc]
+    # print(f"    [preprocessing] {self.transform}")
+
+
   def get_transform(self, preprocessingType, normValues=None, strength=1.0):
     ''' Get torch group of tranforms directly applied to torch Dataset object'''
     normValues = ((0.416, 0.270, 0.271), (0.196, 0.157, 0.156))
     # print(f"Preprocessing type: {preprocessingType}, strength: {strength}")
-    if self.preprocessingType == "ldss":
+    if preprocessingType == "ldss":
       transform = transforms.Compose([
         transforms.ToImage(), # only for v2
-        transforms.Resize((224, 224), antialias=True),
+        transforms.Resize((244, 244), antialias=True),   # keeps aspect ratio
+        # transforms.CenterCrop(224),
         transforms.ToDtype(torch.float32, scale=True),
         transforms.Normalize(normValues[0], normValues[1])
       ])
-    elif self.preprocessingType == "imagenet":
+    elif preprocessingType == "imagenet":
       transform = transforms.Compose([
         transforms.ToImage(),
-        transforms.Resize((224, 224), antialias=True),  # squishes if needed
+        transforms.Resize((244, 244), antialias=True),   # keeps aspect ratio
+        # transforms.CenterCrop(224),               # randomness without warping
         transforms.ToDtype(torch.float32, scale=True),                          # [0, 255] → [0.0, 1.0]
         transforms.Normalize(mean=[0.485, 0.456, 0.406], # ImageNet channel stats
                             std=[0.229, 0.224, 0.225])
       ])
-    elif self.preprocessingType == "ldss-aug":
+    elif preprocessingType == "imagenet-aug":
       transform = transforms.Compose([
         # from 0-255 Image/numpy.ndarray to 0.0-1.0 torch.FloatTensor
         transforms.ToImage(), # only for v2
-        transforms.Resize((224, 224), antialias=True),
-        transforms.ToDtype(torch.float32, scale=True),
-        transforms.Normalize(normValues[0], normValues[1]),
-        transforms.RandomRotation((-90, 90)),
-        # transforms.RandomHorizontalFlip(p=0.5),  # 50% chance to flip horizontally
-        # transforms.RandomVerticalFlip(p=0.5),    # 50% chance to flip vertically
-        transforms.RandomResizedCrop((224, 224), scale=(0.8, 1.0), ratio=(0.75, 1.333)),
-        transforms.RandomCrop((224, 224), padding=4, padding_mode='reflect'),  # pad and crop to 224x224
-        # transforms.ColorJitter(10, 2)
-      ])
-    elif self.preprocessingType == "imagenet-aug":
-      transform = transforms.Compose([
-        # from 0-255 Image/numpy.ndarray to 0.0-1.0 torch.FloatTensor
-        transforms.ToImage(), # only for v2
-        transforms.RandomRotation((-15, 15)),  # rotate randomly
-        transforms.RandomCrop((224, 224)),  # crop to 224x224
-        transforms.RandomHorizontalFlip(p=0.5),  # 50% chance to flip horizontally
-        transforms.RandomVerticalFlip(p=0.5),    # 50% chance to flip vertically
+        transforms.Pad(16, padding_mode='reflect'),         
+        transforms.RandomRotation((-15, 15), interpolation=transforms.InterpolationMode.BILINEAR, fill=0),
+        transforms.Resize((256, 256), antialias=True),
+        transforms.RandomCrop(224),               # randomness without warping
+        # transforms.RandomHorizontalFlip(p=0.5 * self.strength),  # 50% chance to flip horizontally
+        # transforms.RandomVerticalFlip(p=0.5 * self.strength),    # 50% chance to flip vertically
         transforms.ToDtype(torch.float32, scale=True),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], # ImageNet channel stats
                             std=[0.229, 0.224, 0.225])
       ])
-    elif self.preprocessingType == "imagenet-dynaug":
+    elif preprocessingType == "imagenet-dynaug":
       transform = transforms.Compose([
         # from 0-255 Image/numpy.ndarray to 0.0-1.0 torch.FloatTensor
         transforms.ToImage(), # only for v2
-        transforms.RandomRotation((-15 * strength , 15 * strength)),  # rotate randomly
-        transforms.RandomCrop((224, 224)),  # crop to 224x224
-        transforms.RandomHorizontalFlip(p=0.5 * strength),  # 50% chance to flip horizontally
-        transforms.RandomVerticalFlip(p=0.5 * strength),    # 50% chance to flip vertically
+        transforms.Pad(16, padding_mode='reflect'), 
+        transforms.RandomRotation((-15.0 * strength , 15.0 * strength)),
+        transforms.Resize((256, 256), antialias=True),
+        transforms.RandomCrop(224),               # randomness without warping
+        # transforms.RandomHorizontalFlip(p=0.5 * strength),  # 50% chance to flip horizontally
+        # transforms.RandomVerticalFlip(p=0.5 * strength),    # 50% chance to flip vertically
         transforms.ToDtype(torch.float32, scale=True),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], # ImageNet channel stats
                             std=[0.229, 0.224, 0.225])
@@ -351,7 +370,7 @@ class SampledVideosDataset(Dataset):
     # print(list_out)
     return list_out
       
-  def get_labelWeights(self, labels):
+  def get_classWeights(self, labels):
     ''' Get inverse class weights from dataset labels '''
     labels_counts = Counter()
     for multi in labels["frameLabels"]:
@@ -370,11 +389,14 @@ class SampledVideosDataset(Dataset):
     inv_cw = inv_cw / inv_cw.sum() * self.n_classes  # normalize
 
     inv_cw = torch.tensor(inv_cw, dtype=torch.float32)  # full weight tensor
-    if len(self.headType) == 2:
-      # split weights per head efficiently
-      weightList = [inv_cw[list(split)] for split in self.headSplits]
+    if self.labelType[0] == "multi":
+      if len(self.headType) == 2:
+        # split weights per head efficiently
+        weightList = [inv_cw[list(split)] for split in self.headSplits]
+      else:
+        weightList = [inv_cw]
     else:
-      weightList = [inv_cw]
+      weightList = [inv_cw for _ in range(len(self.headType))]
 
     return weightList
 
@@ -430,13 +452,12 @@ class Cataloguer():
       Pipeline: [sample] -> [label] -> [preprocess] -> [batch]
       Out - split and batched dataset to a Teacher
   '''
-  def __init__(self, DATA, path_annots, DEVICE):
+  def __init__(self, DATA, path_annots):
     self.path_annots = path_annots
     self.preprocessingType = DATA["preprocessing"]
     self.labelType = DATA["labelType"]
     self.actionLabelsPossible = DATA["actionLabels"]
     self.objectLabelsPossible = DATA["objectLabels"]
-    self.DEVICE = DEVICE
     # updated when dataset is built
     self.features = None  # Default dict with for each frameId: {layerX: tensor, layerY: tensor, ...}
 
@@ -788,16 +809,17 @@ class Cataloguer():
   def batch(self, dset, inputType, HYPER, path_spaceFeats, multiclips=False, multiClipStride=1, train_idxs=None, valid_idxs=None, test_idxs=None):
     ''' helper for loading data, features or stopping when fx_mode == 'export'
     '''
-    inputTypeLeft, inputTypeRight = inputType.split('-')
     # print(inputType)
-    if inputTypeLeft == "images": # regular resnet training on images
+    torch.cuda.empty_cache()
+    gc.collect()
+    if inputType[0] == "images": # regular resnet training on images
       return self._batch_dataset(dset, HYPER["spaceBatchSize"], train_idxs, valid_idxs, test_idxs)
-    elif inputTypeLeft == "fmaps":
-      if inputTypeRight == "frame":  # classifier training on space features
+    elif inputType[0] == "fmaps":
+      if inputType[1] == "frame":  # classifier training on space features
         return self._batch_frameFeats(dset, path_spaceFeats, HYPER["spaceBatchSize"], train_idxs, valid_idxs, test_idxs)
-      elif inputTypeRight == "clip" and not multiclips: # temporal model training on space features
+      elif inputType[1] == "clip" and not multiclips: # temporal model training on space features
         return self._batch_clipFeats(dset, path_spaceFeats, HYPER["timeBatchSize"], HYPER["clipSize"], train_idxs=train_idxs, valid_idxs=valid_idxs, test_idxs=test_idxs)
-      elif inputTypeRight == "clip" and multiclips:  # temporal model training on space features
+      elif inputType[1] == "clip" and multiclips:  # temporal model training on space features
         assert HYPER["clipSize"] > 0, "clipSize must be greater than 0 for multiclips!"
         return self._batch_multiClipFeats(dset, path_spaceFeats, HYPER["timeBatchSize"], HYPER["clipSize"], multiClipStride, train_idxs, valid_idxs, test_idxs)
 
@@ -809,11 +831,11 @@ class Cataloguer():
     try:
       if dset.DATA_SCOPE == "local":
         if np.any(train_idxs):
-          loaders["trainloader"] = DataLoader(dataset=dset, batch_size=size_batch, num_workers=2, sampler=torch.utils.data.SubsetRandomSampler(train_idxs), collate_fn=self.frame_collate)
+          loaders["trainloader"] = DataLoader(dataset=dset, batch_size=size_batch, num_workers=4, sampler=torch.utils.data.SubsetRandomSampler(train_idxs), collate_fn=self.frame_collate, persistent_workers=False)
         if np.any(valid_idxs):
-          loaders["validloader"] = DataLoader(dataset=dset, batch_size=size_batch, num_workers=2, sampler=torch.utils.data.SubsetRandomSampler(valid_idxs), collate_fn=self.frame_collate)
+          loaders["validloader"] = DataLoader(dataset=dset, batch_size=size_batch, num_workers=0, sampler=torch.utils.data.SubsetRandomSampler(valid_idxs), collate_fn=self.frame_collate)
         if np.any(test_idxs):
-          loaders["testloader"] = DataLoader(dataset=dset, batch_size=size_batch, num_workers=2, sampler=torch.utils.data.SubsetRandomSampler(test_idxs), collate_fn=self.frame_collate)
+          loaders["testloader"] = DataLoader(dataset=dset, batch_size=size_batch, num_workers=0, sampler=torch.utils.data.SubsetRandomSampler(test_idxs), collate_fn=self.frame_collate)
     except:
       print("Error in batch() for local dataset, assuming external dataset batch instead")
       # test_idxs actually carries the test part of the dataset when using CIFAR-10
@@ -828,7 +850,7 @@ class Cataloguer():
 
   def _batch_frameFeats(self, dset, path_spaceFeats, size_batch, train_idxs=None, valid_idxs=None, test_idxs=None):
     assert os.path.exists(path_spaceFeats), f"No exported space features found in {path_spaceFeats}!"
-    featuresDict = torch.load(path_spaceFeats, weights_only=False)
+    featuresDict = torch.load(path_spaceFeats, weights_only=False, map_location="cpu")
     firstKey = next(iter(featuresDict))
     featureLayer = list(featuresDict[firstKey].keys())[-1]  # get the last layer of features
     print(f"Using feature layer: {featureLayer}")
@@ -845,14 +867,13 @@ class Cataloguer():
       # print(type(targets), targets.dtype)
       # print(targets[:5])  # show a few samples
 
-      # move to cpu for DataLoader
-      feats = feats.cpu()
-      targets = [t.cpu() for t in targets]
-      idxs = idxs.cpu()
       # the dataset zips the tensors together to be feed to a dataloader (unzips them)
       featset = MultiHeadDataset(feats, targets, idxs)
       # print(featset[0][0].shape, featset[0][1].shape, featset[0][2].shape)
-      loader[split] = DataLoader(featset, batch_size=size_batch, num_workers=2, shuffle=True, collate_fn=self.frame_collate)
+      if split == 0:
+        loader[split] = DataLoader(featset, batch_size=size_batch, num_workers=4, shuffle=True, collate_fn=self.frame_collate, persistent_workers=False)
+      else:
+        loader[split] = DataLoader(featset, batch_size=size_batch, num_workers=0, shuffle=False, collate_fn=self.frame_collate)
     exampleBatch = next(iter(loader[0]))
     print(f"\tBatch example shapes:\n\t[space features] {exampleBatch[0].shape}\n\t[labels] {exampleBatch[1].shape}\n\t[idxs] {exampleBatch[2].shape}\n")
     return loader
@@ -860,7 +881,7 @@ class Cataloguer():
   def _batch_clipFeats(self, dset, path_spaceFeats, size_batch, clip_size=0, train_idxs=None, valid_idxs=None, test_idxs=None):
     assert os.path.exists(path_spaceFeats), f"No exported space features found in {path_spaceFeats}!"
 
-    featuresDict = torch.load(path_spaceFeats, weights_only=False, map_location=self.DEVICE)
+    featuresDict = torch.load(path_spaceFeats, weights_only=False, map_location="cpu")
     firstKey = next(iter(featuresDict))
     availableLayers = list(featuresDict[firstKey].keys())
     featureLayer = availableLayers[-1]
@@ -882,8 +903,7 @@ class Cataloguer():
         vidFeats = torch.stack([featuresDict[i][featureLayer] for i in frameIdxs]).squeeze(1)  # [T, F]
         vidLabels = dset.labels.iloc[frameIdxs]["frameLabels"].tolist()
         vidTargets = dset._get_targets(vidLabels, dset.labelType)
-        vidTargets = [t.to(self.DEVICE) for t in vidTargets]
-        vidIdxs = torch.tensor(frameIdxs, dtype=torch.int64, device=self.DEVICE)
+        vidIdxs = torch.tensor(frameIdxs, dtype=torch.int64)
         # Determine padding length
         if clip_size == 0:
           pad_len = maxFrames - n_frames
@@ -892,20 +912,20 @@ class Cataloguer():
         # Pad features
         if pad_len > 0:
           featureDim = vidFeats.shape[1]
-          vidFeats = torch.cat([vidFeats, torch.zeros(pad_len, featureDim, device=self.DEVICE)], dim=0)
+          vidFeats = torch.cat([vidFeats, torch.zeros(pad_len, featureDim)], dim=0)
           
           # Pad each target tensor in the list
           padded_targets = []
           for tgt in vidTargets:
             if len(tgt.shape) == 1:
-              padding = torch.full((pad_len,), -1, dtype=torch.int64, device=self.DEVICE)
+              padding = torch.full((pad_len,), -1, dtype=torch.int64)
             else:
-              padding = torch.zeros(pad_len, tgt.shape[1], dtype=tgt.dtype, device=self.DEVICE)
+              padding = torch.zeros(pad_len, tgt.shape[1], dtype=tgt.dtype)
               padding[:, 1] = -1
             padded_targets.append(torch.cat([tgt, padding], dim=0))
           vidTargets = padded_targets
           
-          vidIdxs = torch.cat([vidIdxs, torch.full((pad_len,), -1, dtype=torch.int64, device=self.DEVICE)], dim=0)
+          vidIdxs = torch.cat([vidIdxs, torch.full((pad_len,), -1, dtype=torch.int64)], dim=0)
 
         # Store either whole video or clips
         if clip_size == 0:
@@ -924,30 +944,30 @@ class Cataloguer():
           else:
             splitTargets.extend(vidTargets.view(num_clips, clip_size))
           splitIdxs.extend(vidIdxs.view(num_clips, clip_size))
-      feats = torch.stack(splitFeats).cpu()
-      # Don't stack targets - keep as list for MultiHeadDataset
-      targets = [[tgt.cpu() for tgt in vidTargets] for vidTargets in splitTargets]
-      idxs = torch.stack(splitIdxs).cpu()
 
-      featset = MultiHeadDataset(feats, targets, idxs)
-      loader[split] = DataLoader(featset, batch_size=size_batch, num_workers=2, shuffle=True, collate_fn=self.clip_collate)
+      featset = MultiHeadDataset(splitFeats, splitTargets, splitIdxs)
+      if split == 0:
+        loader[split] = DataLoader(featset, batch_size=size_batch, num_workers=4, shuffle=True, collate_fn=self.clip_collate, persistent_workers=False)
+      else:
+        loader[split] = DataLoader(featset, batch_size=size_batch, num_workers=0, shuffle=False, collate_fn=self.clip_collate)
 
     if loader[0]:
-      exampleBatch = next(iter(loader))  # each video is a tuple (feats, targets (list of a tensor for each head), idxs)
+      exampleBatch = next(iter(loader[0]))  # each video is a tuple (feats, targets (list of a tensor for each head), idxs)
       feats, targets, idxs = exampleBatch  # take the single video tuple
-      print(f"\tBatch example shapes:\n\t[space features] {feats.shape}\n\t[labels h1] {targets[0].shape}\n\t[idxs] {idxs.shape}")
+      print(f"\tBatch example shapes:\n\t[space feature] {feats[0].shape}\n\t[labels] {[tgt.shape for tgt in targets[0]]}\n\t[idx] {idxs[0].shape}")
       if clip_size == 0:
-        print(f"    Batch contains {exampleBatch.shape[0]} video(s), each with up to {exampleBatch[0].shape[0]} frames\n")
+        print(f"    Batch contains {len(feats)} video(s), each with up to {feats[0].shape[0]} frames\n")
       else:
-        print(f"    Batch contains {exampleBatch.shape[0]} clip(s), each with {clip_size} frames\n")
+        print(f"    Batch contains {len(feats)} clip(s), each with {clip_size} frames\n")
     return loader
 
   def _batch_multiClipFeats(self, dset, path_spaceFeats, size_batch, clip_size, stride=None, train_idxs=None, valid_idxs=None, test_idxs=None):
     assert clip_size > 0, "clip_size must be > 0 in multi-clip mode"
+    assert 1 == 0, "multi clip not implemented"
     stride = stride or clip_size
     assert os.path.exists(path_spaceFeats), f"No features at {path_spaceFeats}!"
 
-    featuresDict = torch.load(path_spaceFeats, weights_only=False, map_location=self.DEVICE)
+    featuresDict = torch.load(path_spaceFeats, weights_only=False, map_location="cpu")
     featureLayer = list(featuresDict[next(iter(featuresDict))].keys())[-1]
     print(f"  [multiClip] Using feature layer: {featureLayer}\n")
 
@@ -955,7 +975,7 @@ class Cataloguer():
     loader = [[], [], []]
 
     for split, vidsInt in splitVidsInt.items():
-      featsList, targetsList, idxsList = [], [], []
+      splitFeats, splitTargets, splitIdxs = [], [], []
 
       for vid in vidsInt:
         frameIdxs = groupedIdxs[vid]
@@ -966,24 +986,23 @@ class Cataloguer():
         vidFeats = torch.stack([featuresDict[i][featureLayer] for i in frameIdxs]).squeeze(1)
         vidLabels = dset.labels.iloc[frameIdxs]["frameLabels"].tolist()
         vidTargets = dset._get_targets(vidLabels, dset.labelType)
-        vidTargets = [t.to(self.DEVICE) for t in vidTargets]
-        vidIdxs = torch.tensor(frameIdxs, dtype=torch.int64, device=self.DEVICE)
+        vidIdxs = torch.tensor(frameIdxs, dtype=torch.int64)
 
         for start in range(0, n_frames - clip_size + 1, stride):
           end = start + clip_size
-          featsList.append(vidFeats[start:end])
-          targetsList.append([t[start:end] for t in vidTargets])
-          idxsList.append(vidIdxs[start:end])
+          splitFeats.append(vidFeats[start:end])
+          splitTargets.append([t[start:end] for t in vidTargets])
+          splitIdxs.append(vidIdxs[start:end])
 
-      if not featsList:
+      if not splitFeats:
         loader[split] = None
         continue
 
-      feats = torch.stack(featsList).cpu()
-      targets = [[tgt.cpu() for tgt in vidTargets] for vidTargets in splitTargets]
-      idxs = torch.stack(idxsList).cpu()
-      dataset = MultiHeadDataset(feats, targets, idxs)
-      loader[split] = DataLoader(dataset, batch_size=size_batch, num_workers=2, shuffle=True, collate_fn=self.clip_collate)
+      featset = MultiHeadDataset(splitFeats, splitTargets, splitIdxs)
+      if split == 0:
+        loader[split] = DataLoader(featset, batch_size=size_batch, num_workers=4, shuffle=True, collate_fn=self.clip_collate, persistent_workers=False)
+      else:
+        loader[split] = DataLoader(featset, batch_size=size_batch, num_workers=0, shuffle=False, collate_fn=self.clip_collate)
     if loader[0]:
       xb = next(iter(loader[0]))
       print(f"\t[multiClip] Example batch:\n\t[features] {xb[0].shape} | [labels h1] {xb[1][0].shape} | [idxs] {xb[2].shape}")
@@ -1009,10 +1028,15 @@ class Cataloguer():
     return inputs, targets, idxs
 
   def clip_collate(self, batch):
-    feats, targets, idxs = zip(*batch)  # each is a tuple of videos
-    feats = list(feats)
-    targets = list(targets)
-    idxs = list(idxs)
+    # batch: list of (feats[T,...], [head1[T or TxC], head2[...], ...], idxs[T])
+    feats, targets_list, idxs = zip(*batch)
+    # stack videos into a batch
+    feats = torch.stack(feats, dim=0)              # -> [B, T, F] (or [B, T, ...])
+    # collate targets per head, keeping shape [B, T] or [B, T, C]
+    targets = [torch.stack(t, dim=0) for t in zip(*targets_list)]
+    # stack idxs -> [B, T]
+    idxs = torch.stack(idxs, dim=0)
+
     return feats, targets, idxs
     
   def get_vidsIdxsAndSplits(self, dset, train_idxs=None, valid_idxs=None, test_idxs=None):
@@ -1054,6 +1078,10 @@ class MultiHeadDataset(torch.utils.data.Dataset):
     #   print(f"  target[{j}] {tgt.shape}")
     # Return: (features, [headTarget1, headTarget2, ...], idx)
     return self.feats[i], self.targets[i], self.idxs[i]
+
+  def set_preprocessing(self, key, strength=0.0):
+    # print("   No data augmentation, ignore updates...")
+    pass
 
 class Showcaser:
   def __init__(self):

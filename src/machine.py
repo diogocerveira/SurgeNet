@@ -1,3 +1,4 @@
+import gc
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -11,6 +12,7 @@ import copy
 import torchvision.models.feature_extraction as fxs
 import numpy as np
 import math
+from pathlib import Path
 
 class Phasinator(nn.Module):
   ''' Receives [batch_size, in_channels, in_length] 1st guesses
@@ -24,14 +26,14 @@ class Phasinator(nn.Module):
     if domain == "space":
       backbone = [spaceinator]
       head = [classinator]
-      inputType = "images-frame"
+      inputType = ("images", "frame")
       arch = (spaceinator.arch, classinator.arch)
      
     elif domain == "space-time":
       if timeinator.arch == "dTsNet" or timeinator.arch == "pTsNet":
         backbone = [spaceinator, timeinator]
         head = [classinator]
-        inputType = "images-frame"
+        inputType = ("images", "frame")
         arch = (spaceinator.arch, timeinator.arch, classinator.arch)
         spaceinator.feed_ts = True  # Enable time feature feeding
         print(f"[DEBUG] Spaceinator will feed time features: {spaceinator.feed_ts}")
@@ -42,21 +44,22 @@ class Phasinator(nn.Module):
         backbone = [timeinator]
         head = [classinator]
         assert 1 == 0, "Not implemented yet!"
-      elif timeinator.arch == "tecno":
+      elif timeinator.arch == "tecno" or timeinator.arch == "multiTecno":
         backbone = []
         head = [timeinator]
-      inputType = "fmaps-clip"
+      
+      inputType = ("fmaps", "clip")
       arch = (timeinator.arch,)
     elif domain == "full":
       backbone = [spaceinator]
       head = [timeinator]
-      inputType = "images-frame"
+      inputType = ("images", "frame")
       arch = "full"
       assert 1 == 0, "Not implemented yet!"
     elif domain == "linear":
       backbone = []
       head = [classinator]
-      inputType = "images-frame"
+      inputType = ("images", "frame")
       arch = "linear"
       assert 1 == 0, "Not implemented yet!"
     else:
@@ -197,10 +200,11 @@ class Spaceinator(nn.Module):
     return fx.create_feature_extractor(self.model, return_nodes=nodesToExtract)(images)
 
   def export_features(self, dataloader, path_export, nodesToExtract, device):
+
     # _features features maps to external file
     self.model.fc = nn.Identity()  # Remove classification layer
     out_features = defaultdict(dict)  # default: ddict of features (at multiple nodes/layers) for each frame
-    self.model.eval().to(device) 
+    self.model.eval()
     with torch.no_grad():
       for batch, data in enumerate(dataloader):
         images, ids = data[0].to(device), [int(id) for id in data[2]]
@@ -208,10 +212,11 @@ class Spaceinator(nn.Module):
         for layer in features:
           # print(f"{layer}: {features[layer].shape}")
           for imageId, ftrs in zip(ids, features[layer]): # Save features from chosen nodes/layers for each image ID
-            out_features[imageId][layer] = ftrs.unsqueeze(0).to(device)
+            out_features[imageId][layer] = ftrs.unsqueeze(0).cpu()
             # print(list(out_features.items()))
             # break
     # { "image_id": {layer: feature, ... }, ... }
+    print("\nExporting features...")
     torch.save(out_features, path_export)
     # print(out_features)
     print(f"* Exported space features as {os.path.basename(path_export)} *\n")
@@ -232,8 +237,12 @@ class Timeinator(nn.Module):
     self.arch = MODEL["timeArch"]
     preweights = None
     transferMode = None
-    self.model = self._get_model(self.arch, MODEL, in_channels, n_classes)  # to implement my own in model.py 
-    
+
+    self.heads = [int(head) for head in MODEL["headType"].split("-")] if MODEL["headType"] else [n_classes]
+    if self.arch:
+      assert sum(self.heads) == n_classes, "Incompatible head configuration"
+    self.model = self._get_model(self.arch, MODEL, in_channels, self.heads)  # to implement my own in model.py 
+
     self.featureSize = self.model.featureSize
     self.featureNode = fxs.get_graph_node_names(self.model)[0][-1]
 
@@ -253,9 +262,12 @@ class Timeinator(nn.Module):
   def _get_model(self, arch, MODEL, in_channels, n_classes):
     # Choose model architecture - backbones
     if arch == "phatima":
-      model = Phatima(MODEL, in_channels, n_classes)
+      model = Phatima(MODEL, in_channels, n_classes[0])
     elif arch == "tecno":
-      model = Tecno(MODEL, in_channels, n_classes)
+      model = Tecno(MODEL, in_channels, n_classes[0])
+    elif arch == "multiTecno":
+      assert len(n_classes) > 1, "Multi-label architecture requires multiple classes values"
+      model = MultiLabelTecno(MODEL, in_channels, n_classes)
     elif arch == "dTsNet" or arch == "pTsNet":
       model = TsNet(MODEL, in_channels)
     else:
@@ -265,7 +277,7 @@ class Timeinator(nn.Module):
     # _features features maps to external file
     self.model.fc = nn.Identity()  # Remove classification layer
     out_features = defaultdict(dict)  # default: ddict of features (at multiple nodes/layers) for each frame
-    self.model.eval().to(device) 
+    self.model.eval()
     with torch.no_grad():
       for batch, data in enumerate(dataloader):
         images, ids = data[0].to(device), [int(id) for id in data[2]]
@@ -273,10 +285,11 @@ class Timeinator(nn.Module):
         for layer in features:
           # print(f"{layer}: {features[layer].shape}")
           for imageId, ftrs in zip(ids, features[layer]): # Save features from chosen nodes/layers for each image ID
-            out_features[imageId][layer] = ftrs.unsqueeze(0).to(device)
+            out_features[imageId][layer] = ftrs.unsqueeze(0).cpu()
             # print(list(out_features.items()))
             # break
     # { "image_id": {layer: feature, ... }, ... }
+    print("\nExporting features...")
     torch.save(out_features, path_export)
     # print(out_features)
     print(f"* Exported space features as {os.path.basename(path_export)} *\n")
@@ -355,18 +368,54 @@ class Tecno(nn.Module):
     self.featureSize = n_classes # (batchSize, n_classes)
 
   def forward(self, x):
-    # print("Before predStage Shape: ", x.shape)
-    x = x.transpose(1, 2)  # [batch_size, in_length, in_channels] -> [batch_size, in_channels, in_length]
-    # print("After transpose Shape: ", x.shape)
-    x = self.predStage(x) # first pred logits
-    # print("After predStage Shape: ", x.shape)
-    x_acm = x.unsqueeze(0)  # add dimension for accumulation stage results
+    # x: [B, T, C]
+    x = x.transpose(1, 2)             # [B, C, T] for conv layers
+    # prediction head
+    headOut = self.predStage(x)           # [B, C, T]
+    outputs = [headOut.permute(0, 2, 1)]  # [B, T, C]
+    # refinement heads
     for stage in self.refStages:
-      x = stage(F.softmax(x, dim=1)) # get probabilities from logits
-      # print("After conv1x1_out Shape: ", x.shape)
-      x_acm = torch.cat((x_acm, x.unsqueeze(0)), dim=0) # accumulate stage results
-    # print(list(x_acm)[0], list(x_acm)[-1])  # print accumulated results for debugging
-    return x_acm.permute(0, 1, 3, 2) # x_acm for more in depth (returning last state guess)
+      headOut = stage(F.softmax(headOut, dim=1))   # still [B, C, T]
+      outputs.append(headOut.permute(0, 2, 1)) # convert to [B, T, C]
+    return tuple(outputs)   # (head0, head1, ...)
+
+class MultiLabelTecno(nn.Module):
+  ''' Receives [batch_size, in_channels == feature size, in_length == length of clip of vid] feature tensors
+      Outputs [batch_size, N_CLASSES, in_length] further guesses
+  '''
+  def __init__(self, MODEL, in_channels, n_classes):
+    super().__init__()
+    assert len(n_classes) > 1, "More than one n_classes values is required"
+    N_STAGES = MODEL["n_stages"]
+    N_BLOCKS = MODEL["n_blocks"] 
+    self.N_FILTERS = MODEL["n_filters"]
+    TF_FILTER = MODEL["tf_filter"]
+    self.n_classes = n_classes
+    self.predStage = _MultiLabelTecnoStage(in_channels, n_classes, N_BLOCKS, self.N_FILTERS, TF_FILTER)  # stage for prediction
+
+    self.refStageLeft = nn.ModuleList([copy.deepcopy(_TecnoStage(n_classes[0], n_classes[0], N_BLOCKS, self.N_FILTERS, TF_FILTER)) for s in range(N_STAGES - 1)])
+    self.refStageRight = nn.ModuleList([copy.deepcopy(_TecnoStage(n_classes[1], n_classes[1], N_BLOCKS, self.N_FILTERS, TF_FILTER)) for s in range(N_STAGES - 1)])
+    self.featureSize = n_classes # (batchSize, n_classes)
+
+  def forward(self, x):
+    # x: [B, T, C] -> convs need [B, C, T]
+    x = x.transpose(1, 2)
+
+    # stage 0 (prediction)
+    predHeadOuts = self.predStage(x)                     # ( [B,C1,T], [B,C2,T] )
+    leftHead  = [predHeadOuts[0].permute(0, 2, 1)]       # [B,T,C1]
+    rightHead = [predHeadOuts[1].permute(0, 2, 1)]       # [B,T,C2]
+
+    # refinement: chain from the previous stage of the SAME head
+    predLeft, predRight = predHeadOuts                     # logits
+    for stageLeft, stageRight in zip(self.refStageLeft, self.refStageRight):
+      curLeft  = stageLeft(F.softmax(predLeft,  dim=1))   # -> logits [B,C1,T]
+      curRight = stageRight(F.softmax(predRight, dim=1))  # -> logits [B,C2,T]
+      leftHead.append(curLeft.permute(0, 2, 1))          # [B,T,C1]
+      rightHead.append(curRight.permute(0, 2, 1))        # [B,T,C2]
+
+    return (tuple(leftHead), tuple(rightHead))           # len==2 (heads); each is tuple over stages
+
 
 class _TecnoStage(nn.Module):
   def __init__(self, in_channels, out_channels, n_blocks, n_filters, tf_filter, dilation=1):
@@ -384,6 +433,26 @@ class _TecnoStage(nn.Module):
     x = self.conv1x1_out(x)
     # print("After conv1x1_out Shape: ", x.shape)
     return x
+
+class _MultiLabelTecnoStage(nn.Module):
+  def __init__(self, in_channels, out_channels, n_blocks, n_filters, tf_filter, dilation=1):
+    super().__init__()
+    assert len(out_channels) > 1, "More than one output channel values is required"
+    self.conv1x1_in = nn.Conv1d(in_channels, n_filters, kernel_size=1) # adapts fv channel dimension
+    self.blocks = nn.ModuleList([copy.deepcopy(_IdentityResBlock(n_filters, n_filters, tf_filter, 2**b)) for b in range(n_blocks)])
+    self.conv1x1_outLeft = nn.Conv1d(n_filters, out_channels[0], kernel_size=1)
+    self.conv1x1_outRight = nn.Conv1d(n_filters, out_channels[1], kernel_size=1)
+  def forward(self, x):
+    # print("Before conv1x1_in Shape: ", x.shape)
+    x = self.conv1x1_in(x)
+    # print("After conv1x1_in Shape: ", x.shape)
+    for block in self.blocks:
+      x = block(x)
+    # print("After blocks Shape: ", x.shape)
+    x1 = self.conv1x1_outLeft(x)
+    x2 = self.conv1x1_outRight(x)
+    # print("After conv1x1_out Shape: ", x.shape)
+    return (x1, x2) # double output
 
 class _IdentityResBlock(nn.Module):
   # Dilated Residual Block of Layers
@@ -456,7 +525,8 @@ class Classinator(nn.Module):
     self.FEATURE_SIZE = spaceFeatureSize if MODEL["domain"] in ["space", "spacetime"] else timeFeatureSize
     self.arch = MODEL["classifierArch"]
     self.heads = [int(head) for head in MODEL["headType"].split("-")] if MODEL["headType"] else [N_CLASSES]
-    assert sum(self.heads) == N_CLASSES, "Incompatible head configuration"
+    if self.arch:
+      assert sum(self.heads) == N_CLASSES, "Incompatible head configuration"
     self.model = self._get_model(self.arch, MODEL, self.FEATURE_SIZE, self.heads)  # to implement my own in model.py
 
   def forward(self, x):
@@ -472,16 +542,18 @@ class Classinator(nn.Module):
     # Choose model architecture - backbones
     if arch == "one-linear":
       assert len(n_classes) == 1, "Single head classifier expects single integer for n_classes"
-      model = SingleHeadLinearClassifier(MODEL, in_channels, n_classes[0])
+      model = SingleHeadLinearClassifier(in_channels, n_classes[0], MODEL)
     elif arch == "two-linear":
       assert len(n_classes) == 2, "Two head classifier expects tuple of size two for n_classes"
-      model = TwoHeadLinearClassifier(MODEL, in_channels, n_classes)
+      model = TwoHeadLinearClassifier(in_channels, n_classes, MODEL)
+    elif not arch:
+      model = nn.Identity()
     else:
       raise ValueError("Invalid classifier architecture choice!")
     return model
   
 class SingleHeadLinearClassifier(nn.Module):
-  def __init__(self, MODEL, featureSize, n_classes):
+  def __init__(self, featureSize, n_classes, MODEL=None):
     super().__init__()
     self.linear = nn.Linear(featureSize, n_classes)
 
@@ -490,7 +562,7 @@ class SingleHeadLinearClassifier(nn.Module):
     return x
   
 class TwoHeadLinearClassifier(nn.Module):
-  def __init__(self, MODEL, featureSize, n_classes):
+  def __init__(self, featureSize, n_classes, MODEL=None):
     super().__init__()
     n_classes1, n_classes2 = n_classes # tuple of size two
     self.linear1 = nn.Linear(featureSize, n_classes1)
@@ -499,4 +571,4 @@ class TwoHeadLinearClassifier(nn.Module):
   def forward(self, x):
     x1 = self.linear1(x)  # → [B, N_CLASSES]
     x2 = self.linear2(x)
-    return [x1, x2]
+    return (x1, x2)

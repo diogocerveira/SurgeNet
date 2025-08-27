@@ -20,7 +20,7 @@ def learning(**the):
   # Csr.update_fileIds()
   
   # dataset.py (dataset, data handling)
-  Ctl = dataset.Cataloguer(Csr.DATA, Csr.path_annots, the["device"])
+  Ctl = dataset.Cataloguer(Csr.DATA, Csr.path_annots)
   if "process" in the["actions"]:
     if the["PROCESS"]["sample"]:  # video to image frames
       Ctl.sample(the["PROCESS"]["path_rawVideos"], the["PROCESS"]["path_sample"], samplerate=the["PROCESS"]["samplerate"], sampleFormat=the["PROCESS"]["sampleFormat"], processing="", filter_annotated=the["PROCESS"]["filter_annotated"])
@@ -38,7 +38,7 @@ def learning(**the):
 
   dset = Ctl.build_dataset(Csr.DATA["id_dataset"].split('-')[1], Csr.path_samples, Csr.path_labels, headType=the["MODEL"]["headType"]) # for now the dataset is still used from inside the cataloguer
   print(f"B. [dataset] {the['DATA']['id_dataset']} (#{len(dset)})")
-  print(f"   [label] {'-'.join(list(dset.labelType))}")
+  print(f"   [label type] {'-'.join(list(dset.labelType))}")
   print(f"   [preprocessing] {Ctl.preprocessingType}")
   print(f"   [classes] #{dset.n_classes} ({'Balanced' if dset.BALANCED else 'Unbalanced'}) {list(dset.labelToClassMap.keys())}")
   print(f"   [weights] {dset.classWeights}")
@@ -48,6 +48,7 @@ def learning(**the):
   Tch = teaching.Teacher(Csr.TRAIN, the["EVAL"], dset, the["device"])
   print(f"C. [training] {Csr.TRAIN['train_point']} on [device] {the['device']}")
   print(f"   [folds] #{Csr.TRAIN['k_folds']} [epochs] #{Csr.TRAIN['HYPER']['n_epochs']} [batch sizes] s{Csr.TRAIN['HYPER']['spaceBatchSize']} / t{Csr.TRAIN['HYPER']['timeBatchSize']}")
+  print(f"   [criterions] {Tch.criterions} w/ weights {Tch.criterionWeights}")
   print(f"   [headtype] {dset.headType} ")
   if len(dset.headType) == 2 and dset.headType[0] == "multi" and dset.headType[1] == "phase":
     for i, head in enumerate(dset.headSplits):
@@ -76,14 +77,14 @@ def learning(**the):
     timeinator = machine.Timeinator(the["MODEL"], spaceinator.featureSize, dset.n_classes)
     print(f"    Feature size of {timeinator.featureSize} at node '{timeinator.featureNode}'\n")
     classifier = machine.Classinator(the["MODEL"], spaceinator.featureSize, timeinator.featureSize, dset.n_classes)
-    model = machine.Phasinator(the["MODEL"]["domain"], spaceinator, timeinator, classifier, f"{Csr.studentId}_f{fold + 1}")
+    model = machine.Phasinator(the["MODEL"]["domain"], spaceinator, timeinator, classifier, f"{Csr.studentId}_f{fold + 1}").to(the["device"])
 
     path_spaceFeats, featuresId = teaching.get_path_spaceFeat(Csr.path_spaceFeats, f"f{fold + 1}")
     trainloader, validloader, testloader = Ctl.batch(dset, model.inputType, Csr.TRAIN["HYPER"], path_spaceFeats, Csr.DATA["multiClips"], Csr.DATA["multiClipStride"], train_idxs=train_idxs, valid_idxs=valid_idxs, test_idxs=test_idxs)
 
     if "train" in the["actions"] or "eval" in the["actions"]:
       Tch.writer = SummaryWriter(log_dir=os.path.join(Csr.path_events, model.id.split('_')[1])) # object for logging stats
-
+   
     # TRAIN
     if "train" in the["actions"]:
       model, valid_maxScore, betterState = Tch.teach(model, trainloader, validloader, Csr.TRAIN["HYPER"]["n_epochs"], Csr.path_state, dset.labels, Csr.TRAIN["path_resumeModel"])
@@ -93,9 +94,12 @@ def learning(**the):
       if Csr.TRAIN["save_lastState"]:
         model.id = f"{model.id}-{model.valid_lastScore:.2f}"
         torch.save(model.state_dict(), os.path.join(Csr.path_state, f"state_{model.id.split('_')[1]}.pt"))
+    
+    torch.cuda.ipc_collect()  # collect from CUDA IPC
 
     # PROCESS - Feature extraction
     if the["PROCESS"]["fx_spatial"] and "process" in the["actions"]:
+      print(f"D. [Processing] Extract Spatial Features")
       t1 = time.time()
       if "train" in the["actions"]:
         spaceinator.load_state_dict(model.state_dict(), strict=False)
@@ -111,6 +115,7 @@ def learning(**the):
       torch.cuda.empty_cache()
       gc.collect()
     if the["PROCESS"]["fx_temporal"] and "process" in the["actions"]:
+      print(f"D. [Processing] Extract Temporal Features")
       t1 = time.time()
       if "train" in the["actions"]:
         timeinator.load_state_dict(model.state_dict(), strict=False)
@@ -129,9 +134,10 @@ def learning(**the):
     # EVALUATE 
     if "eval" in the["actions"]:
       if the["EVAL"]["eval_from"] == "predictions":
+        print(f"E. [Evaluating] from preds {the['EVAL']['path_preds']}")
         ## path_pred = utils.choose_in_path(Csr.path_preds)
         try:
-          with open(the["path_pred"], 'rb') as f:  # Load the DataFrame
+          with open(the["EVAL"]["path_preds"], 'rb') as f:  # Load the DataFrame
             test_bundle = pickle.load(f)
         except Exception as e:
           print(f"No predictions (test_bundle) provided for evaluation: {e}\n")
@@ -139,9 +145,11 @@ def learning(**the):
       elif the["EVAL"]["eval_from"] == "model":
         try:
           if "train" in the["actions"]: # use model just trained
+            print(f"E. [Evaluating] from trained model {model.id}")
             pass # model already loaded
           else: # load model from 
             if the["EVAL"]["path_model"]: # chose before running NOT WORKING
+              print(f"E. [Evaluating] from saved model {the['EVAL']['path_model']}")
               assert 1 == 0, "Choosing a specific model for testing is not yet implemented!"
               test_stateDict, test_stateId = torch.load(the["EVAL"]["path_model"], weights_only=False, map_location=the["device"])
               Tch.evaluate(test_bundle, the["EVAL"], fold + 1, Csr, Ctl.N_CLASSES, Csr.DATA["extradata"],
@@ -150,6 +158,7 @@ def learning(**the):
               break
             else: # choose from the states folder (corresponding to fold)
               test_stateDict, modelId = teaching.get_testState(Csr.path_state, model.id)
+              print(f"E. [Evaluating] from saved model {modelId}")
               # path_model = environment.choose_in_path(Csr.path_state)
               # stateDict = torch.load(path_model, weights_only=False, map_location=the["device"])
             model.load_state_dict(test_stateDict, strict=False)
@@ -159,16 +168,17 @@ def learning(**the):
           break
         t1 = time.time()
         path_export = os.path.join(Csr.path_preds, f"preds_{model.id}")
+        testloader.dataset.set_preprocessing(("test", dset.preprocessingType))  # set preprocessing for test set
         test_bundle, test_score  = Tch.tester.test(model, testloader, dset.labels, the["EVAL"]["export_testBundle"], path_export=path_export)
         t2 = time.time()
-        print(f"Test Score: {test_score:.04f} (took {t2 - t1:.2f}s)\n")
+        print(f"\nTest Score: {test_score:.04f} (took {t2 - t1:.2f}s)\n")
         # print(test_bundle.head())
       else:
         raise ValueError("Invalid evalFrom choice!")
       
       # PROCESS - Filterting
       if the["PROCESS"]["apply_modeFilter"] and "process" in the["actions"]:
-
+        print(f"F. [Processing] Applying mode filter to preds {Csr.path_preds}")
         ## path_bundle = utils.choose_in_path(Csr.path_modeFilter)
         with open(Csr.path_preds, 'rb') as f:
           test_bundle = pickle.load(f)
@@ -185,7 +195,6 @@ def learning(**the):
         except Exception as e:
           print(f"No predictions (test_bundle) provided for processing: {e}")
           continue
-
       Tch.evaluate(test_bundle, the["EVAL"]["eval_tests"], model.id, Csr)
 
     try: # not defined if only processing
@@ -195,6 +204,7 @@ def learning(**the):
     print(f"\n\t = = = = = \t = = = = =\n\t\t Fold {fold + 1} done!\n\t = = = = = \t = = = = =\n")
     # break # == 1 folc (debug)
   if "process" in the["actions"] and the["PROCESS"]["build_globalCM"]:
+    print(f"G. [Processing] Generating all-fold confusion matrix {Csr.path_preds}")
     environment.build_globalCM(Csr.path_preds, Csr.path_aprfc, dset.n_classes, dset.labelType, dset.headType, dset.labelToClassMap, the["device"])
 
   print(f"\n\n ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨\n\n")
@@ -206,7 +216,7 @@ if __name__ == "__main__":
   # configIds = ["cfg_SP-RN50.yml", "cfg_SP-FX-RN50.yml", "cfg_SP-l4FT-RN50.yml", "cfg_SP-FT-RN50.yml",
   #             "cfg_SP-FX-RN50-aug.yml", "cfg_SP-l4FT-RN50-aug.yml", 
   #             "cfg_SP-l4FT-dTsRN50-aug.yml", "cfg_SP-l4FT-pTsRN50-aug.yml"]
-  configIds = ["cfg_SP-l4FT-tecno-pTsRN50-aug.yml"]
+  configIds = ["5cfg_SP-l4FT-RN50-aug.yml"]
 
   for configId in configIds:
     with open(os.path.join("settings", configId), "r") as file:
@@ -232,6 +242,6 @@ if __name__ == "__main__":
     if not config["actions"]:
       config["actions"] = []  # default actions if none specified
     if config["device"] == "auto" or not config["device"]: # where to save torch tensors (e.g. during training)
-      config["device"] = "cuda" if torch.cuda.is_available() else "cpu"
+      config["device"] = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
     print(f"Running {configId}...\n")
     learning(**config)

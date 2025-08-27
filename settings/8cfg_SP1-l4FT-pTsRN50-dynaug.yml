@@ -1,7 +1,7 @@
 path_root: . #/batataclan
 path_data: #/workspace/raid-diogo/
 seed: 53  # 5 --> 3 or 3 --> 5  DO NOT CHANGE SEED (it messes up with fold training)
-device: cpu
+device:
 id_classroom:  # if empty creates new learning environment, else loads it (dataset-YYMM-DDHH)
 actions:
 - train        # train (spatial, temporal, full)
@@ -89,16 +89,16 @@ PROCESS:  # Process
   
 MODEL:  # for models created/trained in the run
   type: phase # images-frame # images-frame | imagesTs-frame | fmaps-clip
-  domain: time # space, time, linear
+  domain: space-time # space, time, linear
 # spatial
   spaceTransferMode: l4-fine-tune # fine-tune | feat-xtract | l4-fine-tune
   spaceArch: resnet50
   spacePreweights: image-net # image-net
   path_spaceModel: #C:/Users/DC/Documents/Programming/python/ucl/ML_SurgeNet/logs/LDSS/run_20241104-00/checkpoints/LDSS-20241104-00-fold6-0.837800.pth # if empty, uses new untrained one
-  path_spaceFeats: 
+  path_spaceFeats:
 # temporal
   timeTransferMode: # fine-tune | feat-xtract
-  timeArch: tecno # tecno | phatima | dTsNet | pTsNet
+  timeArch: pTsNet # tecno | phatima | dTsNet | pTsNet
   n_stages: 3
   n_filters: 64  # number of convolution kernels per filter == number of channels
   tf_filter: 3  # size in time (timeframe, # of frames)

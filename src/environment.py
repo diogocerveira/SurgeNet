@@ -70,7 +70,6 @@ class Classroom():
       id_classroom = self.match_learningEnvironment(TRAIN, DATA)
       if id_classroom:  # found match
         classroomStatus = "Matched"
-        print("here")
       else:
         classroomStatus = "New"
         id_classroom = f"{DATA['id_dataset'].split('-')[0]}-{datetime.datetime.now().strftime('%y%m')}-1" # create new classroom  
@@ -94,6 +93,7 @@ class Classroom():
         if id_student not in os.listdir(self.path_classroom):
           break
         num += 1
+        print("diff model with same name")
       os.makedirs(os.path.join(self.path_classroom, id_student), exist_ok=True)
 
     self.path_student = os.path.join(self.path_classroom, id_student)
@@ -120,23 +120,26 @@ class Classroom():
 
   def get_modelId(self, MODEL):
     # learnMode = {"space": "SP", "time": "TP", "spatio-temporal": "ST"}
-    spaceTransferMode = {'': '', "feat-xtract": "FX", "fine-tune": "FT", "l4-fine-tune": "pFT"}
+    spaceTransferMode = {None: None, "feat-xtract": "FX", "fine-tune": "FT", "l4-fine-tune": "pFT"}
     spaceArch = {"resnet50": "RN50"}
-    timeTransferMode = {'': '', "feat-xtract": "FX", "fine-tune": "FT"}
-    timeArch = {"tecno": "TECNO", "phatima": "PHA", "dTsNet": "DTS", "pTsNet": "PTS"}
-    classifierArch = {"one-linear": "1L", "two-linear": "2L"}
+    timeTransferMode = {None: None, "feat-xtract": "FX", "fine-tune": "FT"}
+    timeArch = {"tecno": "TECNO", "multiTecno": "mTECNO", "phatima": "PHA", "dTsNet": "DTS", "pTsNet": "PTS"}
+    classifierArch = {None: None, "one-linear": "1L", "two-linear": "2L"}
     domain = MODEL["domain"].split('-')  # e.g. ['space', 'time'] or ['space', time']
     modelId = []
-
+    
     if "space" in domain:
-      modelId.append(spaceTransferMode[MODEL["spaceTransferMode"]]) if MODEL["spaceTransferMode"] in spaceTransferMode else None  # e.g. "FT" or "FX"
+      modelId.append(spaceTransferMode[MODEL["spaceTransferMode"]])
       modelId.append(spaceArch[MODEL["spaceArch"]])
-    elif "time" in domain:
-      modelId.append(timeTransferMode[MODEL["timeTransferMode"]]) if MODEL["timeTransferMode"] in timeTransferMode else None  # e.g. "FT" or "FX"
+    if "time" in domain:
+      modelId.append(timeTransferMode[MODEL["timeTransferMode"]])
       modelId.append(timeArch[MODEL["timeArch"]])
+     
 
     modelId.append(classifierArch[MODEL["classifierArch"]])
     # print(modelId)
+    # drop modelId None values
+    modelId = [m for m in modelId if m is not None]
     return '-'.join(modelId)
   
   def match_learningEnvironment(self, TRAIN, DATA):

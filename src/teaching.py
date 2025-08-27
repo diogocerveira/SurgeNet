@@ -31,15 +31,15 @@ class Teacher():
     self.N_PHASES = dataset.n_classes
     self.PHASES = dataset.phases
     self.labelType = dataset.labelType
-    print("Label type: ", self.labelType)
     self.headType = dataset.headType
     self.headSplits = dataset.headSplits
     self.DATASET_SIZE = dataset.__len__()
     train_metric, valid_metric, test_metrics = self._get_metrics(TRAIN, EVAL, self.N_PHASES, dataset.labelToClassMap, dataset.labelType, dataset.headType, DEVICE)
-    criterions = self._get_criterion(TRAIN["criterionId"], dataset.classWeights, DEVICE)
-    print("first")
-    self.trainer = Trainer(train_metric, criterions, TRAIN, self.labelType, self.headType, self.headSplits, DEVICE)
-    self.validater = Validater(valid_metric, criterions, self.labelType, self.headType, self.headSplits, DEVICE)
+    self.criterions = self._get_criterion(TRAIN["criterionId"], dataset.classWeights, DEVICE)
+    self.criterionWeights = dataset.classWeights
+
+    self.trainer = Trainer(train_metric, self.criterions, TRAIN, self.labelType, self.headType, self.headSplits, DEVICE)
+    self.validater = Validater(valid_metric, self.criterions, self.labelType, self.headType, self.headSplits, DEVICE)
     self.tester = Tester(test_metrics, dataset.labels, self.PHASES, dataset.labelToClassMap, self.labelType, self.headType, self.headSplits, DEVICE)
 
     self.save_checkpoints = TRAIN["save_checkpoints"]
@@ -65,26 +65,29 @@ class Teacher():
       model, optimizer, startEpoch, cpLoss = self.load_checkpoint(model, optimizer, path_resume)
     else:
       startEpoch = 0
-
+    self.dataset.strength = 0.0
+    prev_lr = optimizer.param_groups[0]["lr"]
     for epoch in range(startEpoch, n_epochs):
-      if earlyStopper.counter == self.patience - 1:  # if about to stop, increase augmentation strength
+      if model.domain != "time" and earlyStopper.counter == self.patience - 2:  # one epoch before decrease the learning rate, increase augmentation strength
         self.dataset.strength = min(1.0, round(self.dataset.strength + 0.2, 2))  # increase strength every 5 epochs to max at 1.0
-        self.dataset.transform = self.dataset.get_transform(self.dataset.preprocessingType, strength=self.dataset.strength  )  # increase strength every 5 epochs to max at 1.0
-        print(f"\n Dataset augmentation strength increased to {self.dataset.strength} \n")
+        print(f"\n* Dataset augmentation strength increased to {self.dataset.strength} *\n")
 
       print(f"-------------- Epoch {epoch + 1} --------------")
-      print("     T")
+      print("     T"), torch.cuda.empty_cache(), gc.collect()
+      trainloader.dataset.set_preprocessing(("train", self.dataset.preprocessingType), self.dataset.strength)
       train_loss, train_score = self.trainer.train(model, trainloader, labels, optimizer)
-      print("     V")
+      print("     V"), torch.cuda.empty_cache(), gc.collect()
+      validloader.dataset.set_preprocessing(("valid", self.dataset.preprocessingType), self.dataset.strength)
       valid_loss, valid_score = self.validater.validate(model, validloader, labels)
-
+      torch.cuda.empty_cache(), gc.collect()
       self.writer.add_scalar("Loss/train", train_loss, epoch + 1)
       self.writer.add_scalar("Loss/valid", valid_loss, epoch + 1)
       self.writer.add_scalar("Acc/train", train_score, epoch + 1)
       self.writer.add_scalar("Acc/valid", valid_score, epoch + 1)
       print(f"Train Loss: {train_loss:4f}\tValid Loss: {valid_loss:4f}")
-      scheduler.step(valid_loss) # Adjust learning rate based on validation loss stagnation
 
+      scheduler.step(valid_loss) # Adjust learning rate based on validation loss stagnation
+      
       if (valid_minLoss - valid_loss) > earlyStopper.minDelta:  # if valid loss decreased by more than minDelta == good
         print(f"\n* New best model (valid loss): {valid_minLoss:.4f} --> {valid_loss:.4f} *\n")
         valid_minLoss = valid_loss
@@ -94,7 +97,12 @@ class Teacher():
       if earlyStopper.early_stop(valid_loss): # same as prev if but for a [patience] number of epochs in a row
         print(f"\n* Stopped early *\n")
         break
-        
+      
+      lr = optimizer.param_groups[0]["lr"]
+      if lr != prev_lr:
+        print(f"\n* Learning rate changed to {lr:.6f} *")
+      prev_lr = lr
+
       if ((epoch + 1) % 5) == 0:  # Save checkpoint every 5 epochs
         if self.save_checkpoints:
           print(f"\n* Checkpoint reached ({epoch + 1}/{n_epochs}) *\n")
@@ -103,8 +111,10 @@ class Teacher():
       model.valid_lastScore = valid_score
 
       # clear GPU memory
-      torch.cuda.empty_cache()
-      gc.collect()
+      torch.cuda.synchronize()               # wait for kernels to finish
+      torch.cuda.empty_cache()               # release cached blocks to the driver
+      gc.collect()                           # reclaim Python refs
+
     return model, valid_maxScore, betterState
 
   def evaluate(self, test_bundle, eval_tests, modelId, Csr):
@@ -141,7 +151,7 @@ class Teacher():
       scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,
         mode='min',       # monitor loss (want to minimize)
         factor=0.1,       # scale lr by this factor (10x smaller)
-        patience=3,       # wait 3 epochs without improvement
+        patience=3,       # wait 3 epochs without improvement, after a 4th change
     )
     else:
       raise ValueError("Invalid scheduler chosen (step, cosine)")
@@ -160,15 +170,14 @@ class Teacher():
     )
     if CRITERION_ID == "cross-entropy":
       assert int(self.labelType[2][-1]) == 1 or (self.labelType[0] == "single"), "CrossEntropyLoss is for top1 tasks"
-      return [nn.CrossEntropyLoss() for _ in range(len(self.headType))]
+      return [nn.CrossEntropyLoss(ignore_index=-1).to(DEVICE) for _ in range(len(self.headType))]
     elif CRITERION_ID == "weighted-cross-entropy":
       assert int(self.labelType[2][-1]) == 1 or (self.labelType[0] == "single"), "CrossEntropyLoss is for top1 tasks"
-      print("Using weighted cross-entropy with class weights:", classWeights)
-      return [nn.CrossEntropyLoss(weight=classWeights[i].to(DEVICE)) for i in range(len(self.headType))]
+      return [nn.CrossEntropyLoss(weight=classWeights[i].to(DEVICE), ignore_index=-1).to(DEVICE) for i in range(len(self.headType))]
     if CRITERION_ID == "binary-cross-entropy-logits":
       # classCounts = 1 / classWeights # inverse frequency
       assert self.labelType[0] == "multi" and int(self.labelType[2][-1]) > 1, "BCEWithLogitsLoss is for multi-label tasks with top-k k>1"
-      a =  [nn.BCEWithLogitsLoss(pos_weight=classWeights[i].to(DEVICE)) for i in range(len(self.headType))]
+      return [nn.BCEWithLogitsLoss(pos_weight=classWeights[i].to(DEVICE)).to(DEVICE) for i in range(len(self.headType))]
     else:
       raise ValueError("Invalid criterion chosen (crossEntropy, )")
 
@@ -199,69 +208,104 @@ def nextBatch(data, labels, model, labelType, batchStats, DEVICE):
     targets = [headTargets.to(DEVICE) for headTargets in data[1]] # list of lists of target tensors
     idxs = data[2].to(DEVICE)  # sample indices in the dataset
 
-    # print("inputs: ", inputs.shape, "\ttargets: ", targets.shape, '\n')
-    # print(targets[:5])  # show a few samples
+    # print("BEFORE inputs: ", inputs.shape, "\ttargets: ", [tgt.shape for tgt in targets], "\t[idxs]: ", idxs.shape, '\n\n')
+    
+    # Add timestamps as input if the case
     if model.domain == "space-time" and ("dTsNet" in model.arch or "pTsNet" in model.arch):
       normTs = torch.tensor(labels.loc[idxs.cpu().numpy(), 'normalizedTimestamp'].values,
           dtype=torch.float32).to(DEVICE)
-      inputs = (inputs, normTs)  # ← tuple of tensors
+      inputs = [inputs, normTs]  # ← tuple of tensors
+    else:
+      inputs = [inputs]
 
-    # mask based on labelType (not inputType)
-    if labelType[0] == "single":
-      targets = [tgt.reshape(-1) for tgt in targets]
-      mask = targets[0] != -1
-    else:  # multi-label
-      targets = [tgt.reshape(-1, tgt.shape[-1]) for tgt in targets]
-      mask = (targets[0] != -1).all(dim=1)  # True for samples where all columns are valid
-    targets = [tgt[mask] for tgt in targets] 
-    idxs = idxs.reshape(-1)[mask]
+    mask = torch.zeros(1) # when no mask is needed, return dummy
+    # Mask and De-clipping (B, T, C -> (B*T, C))
+    if model.inputType[1] == "clip":  # only clipped input needs masking
+      if labelType[0] == "single":
+        targets = [tgt.reshape(-1) for tgt in targets]
+        mask = targets[0] != -1
+      else:  # multi-label
+        targets = [tgt.reshape(-1, tgt.shape[-1]) for tgt in targets]
+        mask = (targets[0] != -1).all(-1)  # True for samples where all columns are valid
+      idxs = idxs.reshape(-1)
+      targets = tuple([tgt[mask] for tgt in targets])
+      idxs = idxs[mask]
+
     
-    # if batchStats[0] % batchStats[1] == 0 or (batchStats[0] + 1) == batchStats[2]:
-    #   print("idx: ", idxs[0].cpu().numpy())
-    #   if isinstance(inputs, tuple) or isinstance(inputs, list):
-    #     print("inputs shape: ", inputs[0].shape, inputs[1].shape)
-    #   else:
-    #     print("inputs shape: ", inputs.shape)
-    #   print([f"target: H{i} {tgt[0]}" for i, tgt in enumerate(targets)])
+    if batchStats[0] % batchStats[1] == 0 or (batchStats[0] + 1) == batchStats[2]:
+      print(f"\n\t{'Example Sample #':<15}", idxs[0].cpu().numpy())
+      print(f"{'inputs shape:':<15}", [f"I{i} {inp.shape}" for i, inp in enumerate(inputs)])
+      print(f"{'targets shape:':<15}", [f"H{i} {tgt.shape}" for i, tgt in enumerate(targets)])
+      for i, tgt in enumerate(targets):
+        print(f"  tgt0 H{i:<9} {tgt[0]}")
+      print(f"{'mask shape:':<15}", mask.shape)
   except Exception as e:
     print(f"Error processing batch {batchStats[0]} data: {e}\n")
     raise
   
   return inputs, targets, idxs, mask
 
-def nextOutputs(model, inputs, mask, batchStats):
+def nextOutputs(model, inputs, mask, labelType, batchStats):
   try:
-    outputs = model(inputs) # forward pass (list of head outputs)
+    if model.domain == "space-time" and ("dTsNet" in model.arch or "pTsNet" in model.arch):
+      outputs = model(inputs) # forward pass (list of head outputs)
+    else:
+      outputs = model(inputs[0])
     # print("outputs: ", outputs.shape, "\ttargets: ", targets.shape, '\n')
-    if not isinstance(outputs, list):
-      outputs = [outputs]  # make it a list for uniform processing
-    
-    outputs = [
-      out.reshape(-1, out.shape[-1])[mask]  # reshape to (B*T, C) for output for every "head"
-      for out in outputs
-    ]
-    # print(outputs[0].shape, outputs[1].shape, len(outputs))
-    # if batchStats[0] % batchStats[1] == 0 or (batchStats[0] + 1) == batchStats[2]:
-    #   print([f"output: H{i} {out[0].detach().cpu().numpy()}" for i, out in enumerate(outputs)])
+    if isinstance(outputs, torch.Tensor):
+      outputs = (outputs,)  # make it a tuple for uniform processing
+
+    # Declip and apply mask
+    if model.inputType[1] == "clip":  # only clipped input needs masking
+      if labelType[0] == "multi" and labelType[2][-1] == '1': # multi label with topk1 (2 heads)
+        outputs = (
+          [o.reshape(-1, o.shape[-1])[mask] for o in outputs[0]],  # head 0, all stages
+          [o.reshape(-1, o.shape[-1])[mask] for o in outputs[1]]   # head 1, all stages
+        )
+        if batchStats[0] % batchStats[1] == 0 or (batchStats[0] + 1) == batchStats[2]:
+          print(f"{'outputs shape:':<15}", [f"H{i} {[outStage.shape for outStage in outHead]}" for i, outHead in enumerate(outputs)])
+          for i, outHead in enumerate(outputs):
+            print([f"  out0 H{i:<9}{outStage[0].detach().cpu().numpy()}" for outStage in outHead])
+      else:
+        outputs = [out.reshape(-1, out.shape[-1])[mask] for out in outputs]
+        if batchStats[0] % batchStats[1] == 0 or (batchStats[0] + 1) == batchStats[2]:
+          print(f"{'outputs shape:':<15}", [f"H{i} {out.shape}" for i, out in enumerate(outputs)])
+          for i, out in enumerate(outputs):
+            print(f"  out0 H{i:<9} {out[0].detach().cpu().numpy()}")
+    else:
+      if batchStats[0] % batchStats[1] == 0 or (batchStats[0] + 1) == batchStats[2]:
+        print(f"{'outputs shape:':<15}", [f"H{i} {out.shape}" for i, out in enumerate(outputs)])
+        for i, out in enumerate(outputs):
+          print(f"  out0 H{i:<9} {out[0].detach().cpu().numpy()}")
+
   except Exception as e:
     print(f"Error during model forward pass for batch {batchStats[0]}: {e}\n")
     raise
-  
 
   return outputs
 
-def nextLoss(criterions, outputs, targets, batchStats):
+def nextLoss(criterions, outputs, targets, labelType, arch, batchStats):
   try:
-    loss = sum(criterion(out, tgt) for criterion, (out, tgt) in zip(criterions, zip(outputs, targets)))
+    if labelType[0] == "single" and len(targets) == 1 and len(outputs) > 1:
+      tgt = targets[0]
+      criterion = criterions[0]
+      loss = sum(criterion(out, tgt) for out in outputs)
+    elif "multiTecno" in arch:  # special case for multi-head multi-label TecnoNet
+      loss  = sum(criterions[0](out, targets[0]) for out in outputs[0])  # all stages, head 0
+      loss += sum(criterions[1](out, targets[1]) for out in outputs[1])  # all stages, head 1
+    else:
+      loss = sum(criterion(out, tgt) for criterion, (out, tgt) in zip(criterions, zip(outputs, targets)))
 
-    # if batchStats[0] % batchStats[1] == 0 or (batchStats[0] + 1) == batchStats[2]:
-    #   print(f"loss: {loss.item():.4f}")
+
+    if batchStats[0] % batchStats[1] == 0 or (batchStats[0] + 1) == batchStats[2]:
+      print(criterions)
+      print(f"{'loss:':<15}{loss.item():.4f}")
   except Exception as e:
     print(f"Error while computing loss for batch {batchStats[0]}: {e}\n")
     raise
   return loss
 
-def nextPreds(outputs, targets, labelType, headType, headSplits, metric, batchStats):
+def nextPreds(outputs, targets, labelType, headType, headSplits, arch, metric, batchStats):
   try:
     try:
       k = int(labelType[2][-1])  
@@ -269,6 +313,11 @@ def nextPreds(outputs, targets, labelType, headType, headSplits, metric, batchSt
         k = 1
     except:
       k = 1
+
+    if "multiTecno" in arch: # multi tecno has outputs per head and then per stage, we only want last stage
+      outputs = (outputs[0][-1], outputs[1][-1])
+    if "tecno" in arch:
+      outputs = (outputs[-1],)
     # always build preds from top-k
     topkPreds = [torch.topk(out, k=k, dim=1).indices for out in outputs]
     preds = [torch.zeros_like(out) for out in outputs]
@@ -330,12 +379,14 @@ def nextPreds(outputs, targets, labelType, headType, headSplits, metric, batchSt
       raise ValueError(f"Invalid labelType {labelType}")
 
     if batchStats[0] % batchStats[1] == 0 or (batchStats[0] + 1) == batchStats[2]:
-      # print([f"pred: H{i} {pred[0].detach().cpu().numpy()}" for i, pred in enumerate(preds)])
-      # if len(preds) > 1:
-      #   print([f"mergedPred: {mergedPreds[0].detach().cpu().numpy()}"])
-      #   print([f"mergedTarget: {mergedTargets[0].detach().cpu().numpy()}"])
+      print(f"{'preds shape:':<15}", [f"H{i} {pred.shape}" for i, pred in enumerate(preds)])
+      for i, pred in enumerate(preds):
+        print(f"  pred0 H{i:<8} {pred[0].detach().cpu().numpy()}")
+      if len(preds) > 1:
+        print([f"{'mergedPred:':<15}{mergedPreds[0].detach().cpu().numpy()}"])
+        print([f"{'mergedTarget:':<15}{mergedTargets[0].detach().cpu().numpy()}"])
       print(f"\t  [B{batchStats[0] + 1}]  scr: {metric.score():.4f}")
-
+      
   except Exception as e:
     print(f"Error while originating batch {batchStats[0]} predictions: {e}\n")
     raise
@@ -370,26 +421,34 @@ class Trainer():
     smartComputeRate = len(trainloader) // self.train_metric.computeRate if len(trainloader) // self.train_metric.computeRate else 1
     batchStats = [0, smartComputeRate, len(trainloader)]
 
-    model.train().to(self.DEVICE)
+    model.train()
     for batch, data in enumerate(trainloader, 0):   # start at batch 0
       batchStats[0] = batch
       inputs, targets, idxs, mask = nextBatch(data, labels, model, self.labelType, batchStats, self.DEVICE)
       
       optimizer.zero_grad() # reset the parameter gradients before backward step
 
-      outputs = nextOutputs(model, inputs, mask, batchStats)  # outputs is a list of size n_heads
+      outputs = nextOutputs(model, inputs, mask, self.labelType, batchStats)  # outputs is a list of size n_heads
 
-      loss = nextLoss(self.criterions, outputs, targets, batchStats)
+      loss = nextLoss(self.criterions, outputs, targets, self.labelType, model.arch, batchStats)
       loss.backward() # backward pass
       optimizer.step()    # a single optimization step
 
-      preds, _ = nextPreds(outputs, targets, self.labelType, self.headType, self.headSplits, self.train_metric, batchStats)  # preds is a list of size n_heads
+      preds, _ = nextPreds(outputs, targets, self.labelType, self.headType, self.headSplits, model.arch, self.train_metric, batchStats)  # preds is a list of size n_heads
 
       runningLoss += loss.item() * targets[0].numel() # all heads should have same number of samples
       totalSamples += targets[0].numel()
 
     return runningLoss / totalSamples, self.train_metric.score()
 
+def check(x, y, C):
+    assert torch.isfinite(x).all(), "NaN/Inf in inputs"
+    ys = y if isinstance(y,(list,tuple)) else [y]
+    for h,t in enumerate(ys):
+        if t.dtype == torch.long:
+            m, M = int(t.min()), int(t.max())
+            assert 0 <= m, f"neg target in head {h}"
+            assert M < C[h], f"target {M} >= C({C[h]}) in head {h}"
 
   
 class Validater():
@@ -411,19 +470,19 @@ class Validater():
     runningLoss, totalSamples = 0.0, 0
     smartComputeRate = len(validloader) // self.valid_metric.computeRate if len(validloader) // self.valid_metric.computeRate else 1
     batchStats = [0, smartComputeRate, len(validloader)]
-    
+
     model.eval()
     with torch.no_grad(): # don't calculate gradients (for learning only)
       for batch, data in enumerate(validloader, 0):   # start at batch 0
         batchStats[0] = batch
         inputs, targets, idxs, mask = nextBatch(data, labels, model, self.labelType, batchStats, self.DEVICE)
 
-        outputs = nextOutputs(model, inputs, mask, batchStats)  # outputs is a list of size n_heads
+        outputs = nextOutputs(model, inputs, mask, self.labelType, batchStats)  # outputs is a list of size n_heads
 
-        loss = nextLoss(self.criterions, outputs, targets, batchStats)
+        loss = nextLoss(self.criterions, outputs, targets, self.labelType, model.arch, batchStats)
         # print(loss.item())
 
-        preds, _ = nextPreds(outputs, targets, self.labelType, self.headType, self.headSplits, self.valid_metric, batchStats)  # preds is a list of size n_heads
+        preds, _ = nextPreds(outputs, targets, self.labelType, self.headType, self.headSplits, model.arch, self.valid_metric, batchStats)  # preds is a list of size n_heads
 
         runningLoss += loss.item() * targets[0].numel()
         totalSamples += targets[0].numel()
@@ -454,23 +513,23 @@ class Tester():
     smartComputeRate = len(testloader) // self.test_metrics.computeRate  if len(testloader) // self.test_metrics.computeRate else 1
     batchStats = [0, smartComputeRate, len(testloader)]
 
-    model.eval().to(self.DEVICE); print("\n\tTesting...")
+    model.eval(); print("\n\tTesting...")
     with torch.no_grad():
       for batch, data in enumerate(testloader, 0):   # start at batch 0
         batchStats[0] = batch
         inputs, targets, idxs, mask = nextBatch(data, labels, model, self.labelType, batchStats, self.DEVICE)
 
-        outputs = nextOutputs(model, inputs, mask, batchStats)  # outputs is a list of size n_heads
+        outputs = nextOutputs(model, inputs, mask, self.labelType, batchStats)  # outputs is a list of size n_heads
 
-        preds, targets = nextPreds(outputs, targets, self.labelType, self.headType, self.headSplits, self.test_metrics, batchStats)
+        preds, targets = nextPreds(outputs, targets, self.labelType, self.headType, self.headSplits, model.arch, self.test_metrics, batchStats)
 
-        predsList.append(preds)
-        targetsList.append(targets)
-        sampleIdsList.append(idxs)
+        predsList.append(preds.cpu())
+        targetsList.append(targets.cpu())
+        sampleIdsList.append(idxs.cpu())
 
-    predsList = torch.cat(predsList).cpu().tolist()  # flattens the list of tensor
-    targetsList = torch.cat(targetsList).cpu().tolist()
-    sampleIdsList = torch.cat(sampleIdsList).cpu().tolist()
+    predsList = torch.cat(predsList).tolist()  # flattens the list of tensor
+    targetsList = torch.cat(targetsList).tolist()
+    sampleIdsList = torch.cat(sampleIdsList).tolist()
 
     # print(f"Preds: {predsList}\n Targets: {targetsList}\n SampleIds: {sampleIdsList}")
     test_bundle = self._get_bundle(predsList, targetsList, sampleIdsList, self.labelType)
@@ -480,7 +539,7 @@ class Tester():
       with open(path_export + ".pt", 'wb') as f:
         pickle.dump(test_bundle, f)
     # print(len(predsList), len(targetsList), len(sampleIdsList))
-    # print(f"SampleIds Type: {type(sampleIdsList[0])}, Content: {sampleIdsList[:5]}")
+    # print(f"SampleIds Type: {type(sampleIdsList[0])}, Content: {sampleIdsList[:5]}"
     return test_bundle, self.test_metrics.score()
 
   def _get_bundle(self, preds, targets, sampleIds, labelType):
@@ -1042,5 +1101,5 @@ def get_path_spaceFeat(path_features, featureName):
       print(f"    Found feature path! ({featureId})")
       return path_features, featureId
   else:
-    print(f"Feature path ({featureName}) not found in {path_features}\n")
+    print(f"    Feature path ({featureName}) not found in {path_features}\n")
     return None, None
