@@ -51,7 +51,7 @@ TRAIN: # to fix because the top ones should not define a classroom
   k_folds: 7 # number of folds for cross-validation
   HYPER:  # traditional hyperparameters
     n_epochs: 25
-    spaceBatchSize: 32
+    spaceBatchSize: 16
     timeBatchSize: 1  # batch size for temporal training
     clipSize: 0  # amount of frames (sec) per clip when temporal training
     learningRate: 0.001  # learning rate

@@ -36,7 +36,7 @@ class Phasinator(nn.Module):
         inputType = ("images", "frame")
         arch = (spaceinator.arch, timeinator.arch, classinator.arch)
         spaceinator.feed_ts = True  # Enable time feature feeding
-        print(f"[DEBUG] Spaceinator will feed time features: {spaceinator.feed_ts}")
+        print(f"[DEBUG] Spaceinator will feed timestamps: {spaceinator.feed_ts}")
       else:
         assert 1 == 0, "Not implemented yet!"
     elif domain == "time":
@@ -145,7 +145,8 @@ class Spaceinator(nn.Module):
         if "layer4" in name or "fc" in name:
           continue
         param.requires_grad = False
-        
+    elif not transferMode:
+      pass
     else:
       raise ValueError("Invalid transfer learning mode!")
     # remove final layer if passing features to another model (not learning them)
@@ -243,8 +244,12 @@ class Timeinator(nn.Module):
       assert sum(self.heads) == n_classes, "Incompatible head configuration"
     self.model = self._get_model(self.arch, MODEL, in_channels, self.heads)  # to implement my own in model.py 
 
-    self.featureSize = self.model.featureSize
-    self.featureNode = fxs.get_graph_node_names(self.model)[0][-1]
+    try:
+      self.featureSize = self.model.featureSize
+      self.featureNode = fxs.get_graph_node_names(self.model)[0][-1]
+    except:
+      self.featureSize = None
+      self.featureNode = None
 
     if self.domain == "class" and MODEL["path_timeModel"]:
       self.exportedFeats = torch.load(MODEL["path_spaceModel"], weights_only=False, map_location="cpu")
@@ -270,6 +275,8 @@ class Timeinator(nn.Module):
       model = MultiLabelTecno(MODEL, in_channels, n_classes)
     elif arch == "dTsNet" or arch == "pTsNet":
       model = TsNet(MODEL, in_channels)
+    elif not arch:
+      model = nn.Identity()
     else:
       raise ValueError("Invalid time architecture choice!")
     return model

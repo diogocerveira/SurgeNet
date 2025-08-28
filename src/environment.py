@@ -11,6 +11,7 @@ import torch
 import pickle
 
 def modeFilter(preds, windowSize):
+  # print(preds[:10])
   def mode(sequence):
     # not handling ties yet
     counter = defaultdict(int)
@@ -24,6 +25,7 @@ def modeFilter(preds, windowSize):
   for i in range(len(preds)):
     window = padded[i:i + windowSize]
     smoothed.append(mode(window)) 
+  # print(smoothed[:10])
   return np.array(smoothed)
 
 def choose_in_path(path):
@@ -287,7 +289,7 @@ class Classroom():
           os.rename(old_path, new_path)
 
 
-def build_globalCM(path_preds, path_to, n_classes, labelType, headType, labelToClassMap, DEVICE="cpu"):
+def build_globalCM(path_preds, path_to, n_classes, labelType, headType, labelToClassMap, DEVICE="cpu", prefix=''):
   overallBundle = {"Pred": [], "Target": []}
 
   # collect predictions and targets
@@ -315,7 +317,7 @@ def build_globalCM(path_preds, path_to, n_classes, labelType, headType, labelToC
   cm = teaching.StillMetric("confusionMatrix", n_classes, DEVICE, labelType, headType, labelToClassMap)
   cm.metric.update(pred_indices, target_indices)
 
-  path_to = os.path.join(path_to, "cm_global")
+  path_to = os.path.join(path_to, f"{prefix}cm_global")
   _ = cm.score(path_to)
  
 def expand_labels(entries, labelToClassMap):

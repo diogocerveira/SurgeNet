@@ -1,0 +1,44 @@
+nohup: ignoring input
+Running 5cfg_SP1-l4FT-RN50-aug.yml...
+
+A. [classroom] LDSS-2508-2 (New)
+   [model] pFT-RN50-1L (New)
+   For ('train', 'process', 'eval')
+
+   Warning: Skipping annotation for 96c7 (./data/LDSS-local/annotations/96c7.json not found)
+   Skipping hidden file _becb
+   Skipping hidden file .DS_Store
+   Skipping hidden file _2e98
+   Skipping hidden file _d699
+   Warning: Skipping annotation for b5bf (./data/LDSS-local/annotations/b5bf.json not found)
+
+   A new labels.csv was created ./data/LDSS-local/labels/single-phase-top1.csv
+
+B. [dataset] LDSS-local (#134498)
+   [label type] single-phase-top1
+   [preprocessing] imagenet-aug
+   [classes] #6 (Unbalanced) ['0Act-0Obj', '0Obj-Rep', 'Dis-Pro', 'Dis-Vau', 'Fix-Pro', 'Fix-Vau']
+   [weights] [tensor([0.3846, 0.6755, 1.0557, 0.2113, 3.4933, 0.1796])]
+   [phases] #6  ['0Act-0Obj', '0Obj-Rep', 'Dis-Pro', 'Dis-Vau', 'Fix-Pro', 'Fix-Vau'] 
+
+C. [training] start on [device] cpu
+   [folds] #7 [epochs] #25 [batch sizes] s16 / t1
+   [criterions] [CrossEntropyLoss()] w/ weights [tensor([0.3846, 0.6755, 1.0557, 0.2113, 3.4933, 0.1796])]
+   [headtype] [6] 
+
+  Fold 1 splits:
+	train ['26d9', '315a', '436c', '5238', 'a909', 'b670', 'b71b', 'e6a9', 'e8d3', 'e8d7']
+	valid ['a334', 'f63b']
+	test ['cf7c']
+
+    No 'path_spaceModel' found. Using pretrained resnet50 in l4-fine-tune mode.
+    Feature size of 2048 at node 'flatten'
+    Feature size of 2049 at node 'cat'
+
+    Feature path (f1) not found in None
+
+
+Teaching model:  pFT-RN50-1L_f1
+-------------- Epoch 1 --------------
+     T
+	  [B1]  scr: 0.0000

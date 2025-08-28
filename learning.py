@@ -134,13 +134,14 @@ def learning(**the):
     # EVALUATE 
     if "eval" in the["actions"]:
       if the["EVAL"]["eval_from"] == "predictions":
-        print(f"E. [Evaluating] from preds {the['EVAL']['path_preds']}")
-        ## path_pred = utils.choose_in_path(Csr.path_preds)
+        print(f"E. [Evaluating] from preds {Csr.path_preds}")
+        predId = teaching.get_pred(Csr.path_preds, fold + 1)
+        path_pred = os.path.join(Csr.path_preds, f"{predId}.pt")
         try:
-          with open(the["EVAL"]["path_preds"], 'rb') as f:  # Load the DataFrame
+          with open(path_pred, 'rb') as f:  # Load the DataFrame
             test_bundle = pickle.load(f)
         except Exception as e:
-          print(f"No predictions (test_bundle) provided for evaluation: {e}\n")
+          print(f"No predictions (test_bundle) provided for evaluation at fold {fold}: {e}\n")
           break
       elif the["EVAL"]["eval_from"] == "model":
         try:
@@ -178,24 +179,24 @@ def learning(**the):
       
       # PROCESS - Filterting
       if the["PROCESS"]["apply_modeFilter"] and "process" in the["actions"]:
-        print(f"F. [Processing] Applying mode filter to preds {Csr.path_preds}")
+        print(f"\nF. [Processing] Applying mode filter to preds {Csr.path_preds}")
         ## path_bundle = utils.choose_in_path(Csr.path_modeFilter)
-        with open(Csr.path_preds, 'rb') as f:
-          test_bundle = pickle.load(f)
-    
+        assert not test_bundle.empty, "No test bundle selected for mode filtering and evaluating"
         try:
-          preds = np.array(test_bundle["Preds"])
-          modePreds = environment.modeFilter(preds, 3)
+          preds = np.array(test_bundle["Pred"])
+          modePreds = environment.modeFilter(preds, 50)
           # torch.save(modePreds, Csr.path_modedPreds)
-          test_bundle["Preds"] = modePreds
+          test_bundle["Pred"] = modePreds
           if the["PROCESS"]["export_modedPreds"]:
-            path_modedPred = os.path.join(Csr.path_modedPreds, f"moded-{Csr.path_preds}")
+            predId = teaching.get_pred(Csr.path_preds, fold + 1)
+            path_modedPred = os.path.join(Csr.path_modedPreds, f"moded-{os.path.splitext(predId)[0]}.pt")
             with open(path_modedPred, 'wb') as f:
               pickle.dump(test_bundle, f)
+            Tch.tester.exportPrefix = "moded-"
         except Exception as e:
           print(f"No predictions (test_bundle) provided for processing: {e}")
           continue
-      Tch.evaluate(test_bundle, the["EVAL"]["eval_tests"], model.id, Csr)
+      Tch.evaluate(test_bundle, the["EVAL"]["eval_tests"], model.id.split("_")[1], Csr)
 
     try: # not defined if only processing
       Tch.writer.close()
@@ -205,7 +206,8 @@ def learning(**the):
     # break # == 1 folc (debug)
   if "process" in the["actions"] and the["PROCESS"]["build_globalCM"]:
     print(f"G. [Processing] Generating all-fold confusion matrix {Csr.path_preds}")
-    environment.build_globalCM(Csr.path_preds, Csr.path_aprfc, dset.n_classes, dset.labelType, dset.headType, dset.labelToClassMap, the["device"])
+    path_preds = Csr.path_modedPreds if the["PROCESS"]["apply_modeFilter"] and "process" in the["actions"] else Csr.path_preds
+    environment.build_globalCM(path_preds, Csr.path_aprfc, dset.n_classes, dset.labelType, dset.headType, dset.labelToClassMap, prefix=Tch.tester.exportPrefix)
 
   print(f"\n\n ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨\n\n")
   # os.system(f"tensorboard --logdir={Csr.path_classroom}")
@@ -213,10 +215,8 @@ def learning(**the):
 
 if __name__ == "__main__":
   # Load default parameters from config.yml
-  # configIds = ["cfg_SP-RN50.yml", "cfg_SP-FX-RN50.yml", "cfg_SP-l4FT-RN50.yml", "cfg_SP-FT-RN50.yml",
-  #             "cfg_SP-FX-RN50-aug.yml", "cfg_SP-l4FT-RN50-aug.yml", 
-  #             "cfg_SP-l4FT-dTsRN50-aug.yml", "cfg_SP-l4FT-pTsRN50-aug.yml"]
-  configIds = ["5cfg_SP-l4FT-RN50-aug.yml"]
+
+  configIds = ["5cfg_SP1-l4FT-RN50-aug.yml"]
 
   for configId in configIds:
     with open(os.path.join("settings", configId), "r") as file:

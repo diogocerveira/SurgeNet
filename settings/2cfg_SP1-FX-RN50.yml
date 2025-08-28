@@ -2,7 +2,7 @@ path_root: . #/batataclan
 path_data: #/workspace/raid-diogo/
 seed: 53  # 5 --> 3 or 3 --> 5  DO NOT CHANGE SEED (it messes up with fold training)
 device:
-id_classroom: LDSS-SP-im # if empty creates new learning environment, else loads it (dataset-YYMM-DDHH)
+id_classroom:  # if empty creates new learning environment, else loads it (dataset-YYMM-DDHH)
 actions:
 # - train        # train (spatial, temporal, full)
 - process       # process (sample-n-label, mode-filter, extractFeatures)
@@ -98,7 +98,7 @@ MODEL:  # for models created/trained in the run
   path_spaceFeats:
 # temporal
   timeTransferMode: # fine-tune | feat-xtract
-  timeArch: dTsNet # tecno | phatima | dTsNet | pTsNet
+  timeArch:  # tecno | phatima | dTsNet | pTsNet
   n_stages: 3
   n_filters: 64  # number of convolution kernels per filter == number of channels
   tf_filter: 3  # size in time (timeframe, # of frames)

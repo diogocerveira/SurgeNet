@@ -74,7 +74,7 @@ PROCESS:  # Process
 
   label: True
 
-  apply_modeFilter: False
+  apply_modeFilter: True
   path_bundle: True
   export_modedPreds: True  # if apply-mode-filter == True
   

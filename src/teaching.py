@@ -68,7 +68,7 @@ class Teacher():
     self.dataset.strength = 0.0
     prev_lr = optimizer.param_groups[0]["lr"]
     for epoch in range(startEpoch, n_epochs):
-      if model.domain != "time" and earlyStopper.counter == self.patience - 2:  # one epoch before decrease the learning rate, increase augmentation strength
+      if model.domain != "time" and earlyStopper.counter == 2:  # one epoch after decrease the learning rate, increase augmentation strength
         self.dataset.strength = min(1.0, round(self.dataset.strength + 0.2, 2))  # increase strength every 5 epochs to max at 1.0
         print(f"\n* Dataset augmentation strength increased to {self.dataset.strength} *\n")
 
@@ -120,7 +120,7 @@ class Teacher():
   def evaluate(self, test_bundle, eval_tests, modelId, Csr):
 
     if eval_tests["aprfc"]:
-      self.tester._aprfc(self.writer, modelId, Csr.path_aprfc)
+      self.tester._aprfc(test_bundle, self.writer, modelId, Csr.path_aprfc)
       # clear GPU memory
       torch.cuda.empty_cache()
       gc.collect()
@@ -232,13 +232,13 @@ def nextBatch(data, labels, model, labelType, batchStats, DEVICE):
       idxs = idxs[mask]
 
     
-    if batchStats[0] % batchStats[1] == 0 or (batchStats[0] + 1) == batchStats[2]:
-      print(f"\n\t{'Example Sample #':<15}", idxs[0].cpu().numpy())
-      print(f"{'inputs shape:':<15}", [f"I{i} {inp.shape}" for i, inp in enumerate(inputs)])
-      print(f"{'targets shape:':<15}", [f"H{i} {tgt.shape}" for i, tgt in enumerate(targets)])
-      for i, tgt in enumerate(targets):
-        print(f"  tgt0 H{i:<9} {tgt[0]}")
-      print(f"{'mask shape:':<15}", mask.shape)
+    # if batchStats[0] % batchStats[1] == 0 or (batchStats[0] + 1) == batchStats[2]:
+    #   print(f"\n\t{'Example Sample #':<15}", idxs[0].cpu().numpy())
+      # print(f"{'inputs shape:':<15}", [f"I{i} {inp.shape}" for i, inp in enumerate(inputs)])
+      # print(f"{'targets shape:':<15}", [f"H{i} {tgt.shape}" for i, tgt in enumerate(targets)])
+    #   for i, tgt in enumerate(targets):
+    #     print(f"  tgt0 H{i:<9} {tgt[0]}")
+    #   print(f"{'mask shape:':<15}", mask.shape)
   except Exception as e:
     print(f"Error processing batch {batchStats[0]} data: {e}\n")
     raise
@@ -262,21 +262,22 @@ def nextOutputs(model, inputs, mask, labelType, batchStats):
           [o.reshape(-1, o.shape[-1])[mask] for o in outputs[0]],  # head 0, all stages
           [o.reshape(-1, o.shape[-1])[mask] for o in outputs[1]]   # head 1, all stages
         )
-        if batchStats[0] % batchStats[1] == 0 or (batchStats[0] + 1) == batchStats[2]:
-          print(f"{'outputs shape:':<15}", [f"H{i} {[outStage.shape for outStage in outHead]}" for i, outHead in enumerate(outputs)])
-          for i, outHead in enumerate(outputs):
-            print([f"  out0 H{i:<9}{outStage[0].detach().cpu().numpy()}" for outStage in outHead])
+        # if batchStats[0] % batchStats[1] == 0 or (batchStats[0] + 1) == batchStats[2]:
+        #   print(f"{'outputs shape:':<15}", [f"H{i} {[outStage.shape for outStage in outHead]}" for i, outHead in enumerate(outputs)])
+          # for i, outHead in enumerate(outputs):
+          #   print([f"  out0 H{i:<9}{outStage[0].detach().cpu().numpy()}" for outStage in outHead])
       else:
         outputs = [out.reshape(-1, out.shape[-1])[mask] for out in outputs]
-        if batchStats[0] % batchStats[1] == 0 or (batchStats[0] + 1) == batchStats[2]:
-          print(f"{'outputs shape:':<15}", [f"H{i} {out.shape}" for i, out in enumerate(outputs)])
-          for i, out in enumerate(outputs):
-            print(f"  out0 H{i:<9} {out[0].detach().cpu().numpy()}")
+        # if batchStats[0] % batchStats[1] == 0 or (batchStats[0] + 1) == batchStats[2]:
+        #   print(f"{'outputs shape:':<15}", [f"H{i} {out.shape}" for i, out in enumerate(outputs)])
+          # for i, out in enumerate(outputs):
+          #   print(f"  out0 H{i:<9} {out[0].detach().cpu().numpy()}")
     else:
-      if batchStats[0] % batchStats[1] == 0 or (batchStats[0] + 1) == batchStats[2]:
-        print(f"{'outputs shape:':<15}", [f"H{i} {out.shape}" for i, out in enumerate(outputs)])
-        for i, out in enumerate(outputs):
-          print(f"  out0 H{i:<9} {out[0].detach().cpu().numpy()}")
+      # if batchStats[0] % batchStats[1] == 0 or (batchStats[0] + 1) == batchStats[2]:
+      #   print(f"{'outputs shape:':<15}", [f"H{i} {out.shape}" for i, out in enumerate(outputs)])
+        # for i, out in enumerate(outputs):
+        #   print(f"  out0 H{i:<9} {out[0].detach().cpu().numpy()}")
+        pass
 
   except Exception as e:
     print(f"Error during model forward pass for batch {batchStats[0]}: {e}\n")
@@ -297,9 +298,9 @@ def nextLoss(criterions, outputs, targets, labelType, arch, batchStats):
       loss = sum(criterion(out, tgt) for criterion, (out, tgt) in zip(criterions, zip(outputs, targets)))
 
 
-    if batchStats[0] % batchStats[1] == 0 or (batchStats[0] + 1) == batchStats[2]:
-      print(criterions)
-      print(f"{'loss:':<15}{loss.item():.4f}")
+    # if batchStats[0] % batchStats[1] == 0 or (batchStats[0] + 1) == batchStats[2]:
+      # print(criterions)
+      # print(f"{'loss:':<15}{loss.item():.4f}")
   except Exception as e:
     print(f"Error while computing loss for batch {batchStats[0]}: {e}\n")
     raise
@@ -353,7 +354,7 @@ def nextPreds(outputs, targets, labelType, headType, headSplits, arch, metric, b
       mergedTargets = targets[0].to(torch.int64)  # multi-hot [B, n_classes]
       metric.update(mergedPreds, mergedTargets) # multi-label metrics
 
-    # (4) SINGLE LABEL + MULTI TASK
+    # (4) MULTI LABEL but SINGLE LABEL in head each + MULTI TASK
     elif labelType[0] == "multi" and len(preds) > 1:
       total_classes = sum(len(split) for split in headSplits) # assuming non-overlapping splits
       B = preds[0].shape[0] # batch size
@@ -379,12 +380,12 @@ def nextPreds(outputs, targets, labelType, headType, headSplits, arch, metric, b
       raise ValueError(f"Invalid labelType {labelType}")
 
     if batchStats[0] % batchStats[1] == 0 or (batchStats[0] + 1) == batchStats[2]:
-      print(f"{'preds shape:':<15}", [f"H{i} {pred.shape}" for i, pred in enumerate(preds)])
-      for i, pred in enumerate(preds):
-        print(f"  pred0 H{i:<8} {pred[0].detach().cpu().numpy()}")
-      if len(preds) > 1:
-        print([f"{'mergedPred:':<15}{mergedPreds[0].detach().cpu().numpy()}"])
-        print([f"{'mergedTarget:':<15}{mergedTargets[0].detach().cpu().numpy()}"])
+      # print(f"{'preds shape:':<15}", [f"H{i} {pred.shape}" for i, pred in enumerate(preds)])
+      # for i, pred in enumerate(preds):
+      #   print(f"  pred0 H{i:<8} {pred[0].detach().cpu().numpy()}")
+      # if len(preds) > 1:
+      #   print([f"{'mergedPred:':<15}{mergedPreds[0].detach().cpu().numpy()}"])
+      #   print([f"{'mergedTarget:':<15}{mergedTargets[0].detach().cpu().numpy()}"])
       print(f"\t  [B{batchStats[0] + 1}]  scr: {metric.score():.4f}")
       
   except Exception as e:
@@ -502,6 +503,7 @@ class Tester():
     self.headType = headType
     self.headSplits = headSplits
     self.colormap = self.build_colormap_from_phases(PHASES)
+    self.exportPrefix = ''
 
   def test(self, model, testloader, labels, export_bundle, path_export=None):
     ''' Test the model - return Preds, labels and sampleIds
@@ -586,9 +588,11 @@ class Tester():
     # print(f"Labels: {labels}")  # Debugging line to check labels
     return sep.join(labels)
 
-  def _aprfc(self, writer, modelId, path_aprfc):
+  def _aprfc(self, test_bundle, writer, modelId, path_aprfc):
     # self.test_metrics.display()
-    fold = int(modelId.split('_')[1][1]) # get fold number from modelId
+    fold = int(modelId[1]) # get fold number from modelId
+    self.test_metrics.to("cpu")
+    self.test_metrics.update_from_bundle(test_bundle, self.labelToClassMap, self.labelType)
     if self.test_metrics.accuracy:
       writer.add_scalar(f"accuracy/test", self.test_metrics.get_accuracy(), fold)
     if self.test_metrics.precision:
@@ -598,7 +602,7 @@ class Tester():
     if self.test_metrics.f1score:
       writer.add_scalar(f"f1score/test", self.test_metrics.get_f1score(), fold)
     if self.test_metrics.confusionMatrix:
-      path_to = os.path.join(path_aprfc, f"cm_{modelId}.png")
+      path_to = os.path.join(path_aprfc, f"{self.exportPrefix}cm_{modelId}.png")
       cm = self.test_metrics.get_confusionMatrix(path_to)
       if cm is not None:
         image_cf = plt.imread(cm)
@@ -650,7 +654,7 @@ class Tester():
         )
       outText.append(ot)
       print(ot, '\n')
-      self._export_textImg(ot, path_phaseTiming, f"timings_{modelId}_{video[:4]}")
+      self._export_textImg(ot, path_phaseTiming, f"{self.exportPrefix}timings_{modelId}_{video[:4]}")
     # Average Overall Results
     phases_preds_avg = phases_preds_sum / len(videos) / (samplerate)
     phases_gt_avg = phases_gt_sum / len(videos) / (samplerate)
@@ -673,7 +677,7 @@ class Tester():
         "Avg_Targets": phases_gt_avg,
         "Avg_Absolute_Error": phases_diff_avg
     })
-    results_path = os.path.join(path_phaseTiming, f"timingsSummary.csv")
+    results_path = os.path.join(path_phaseTiming, f"{self.exportPrefix}timings_Summary.csv")
 
     # aggregate with existing results if any (csv)
     # Step 1: load existing
@@ -784,13 +788,13 @@ class Tester():
           bbox_transform=fig.transFigure,
           borderaxespad=0.5,
           fontsize=9,
-          title='Classes',
+          title='Phases',
           frameon=True
       )
 
       plt.tight_layout()  # can keep to adjust spacing nicely
       # print(modelId)
-      plt.savefig(os.path.join(path_phaseCharts, f"ribbons_{modelId}_{video[:4]}.png"), bbox_inches='tight')
+      plt.savefig(os.path.join(path_phaseCharts, f"{self.exportPrefix}ribbons_{modelId}_{video[:4]}.png"), bbox_inches='tight')
       plt.close(fig)
 
     t2 = time.time()
@@ -942,14 +946,14 @@ class StillMetric:
       # original labels
       labels = list(self.labelToClass.keys())
 
-      # move index 1 to the end
-      order = list(range(cm.shape[0]))  # assuming square matrix
-      col = order.pop(1)
-      order.append(col)
+      # # move index 1 to the end
+      # order = list(range(cm.shape[0]))  # assuming square matrix
+      # col = order.pop(1)
+      # order.append(col)
 
-      # reorder rows and columns
-      cm_reordered = cm[np.ix_(order, order)]
-      labels_reordered = [labels[i] for i in order]
+      # # reorder rows and columns
+      # cm_reordered = cm[np.ix_(order, order)]
+      # labels_reordered = [labels[i] for i in order]
 
       fig, ax = plt.subplots(figsize=(10, 7))
       sns.heatmap(
@@ -1002,6 +1006,7 @@ class MetricBunch:
     self.labelToClass = labelToClass
     self.agg = agg
     self.computeRate = computeRate
+    self.DEVICE = DEVICE
 
     if labelType[0] == "single" or (labelType[0] == "multi" and int(labelType[2][-1]) == 1):  # single-label single-head or multi-label multi-head
       self.accuracy = RunningMetric("accuracy", n_classes, DEVICE, "micro", computeRate, labelType, headType, labelToClass) if self.metricSwitches["accuracy"] else None
@@ -1014,7 +1019,7 @@ class MetricBunch:
       self.precision = None
       self.recall = None
       self.f1score = None
-      self.confusionMatrix = RunningMetric("confusionMatrix", n_classes, DEVICE, agg, computeRate, labelType, headType, labelToClass) if self.metricSwitches["confusionMatrix"] else None
+      self.confusionMatrix = None
     else:
       raise ValueError("Invalid labelType")
   def score(self):
@@ -1034,6 +1039,100 @@ class MetricBunch:
     if self.f1score: self.f1score.update(outputs, targets)
     if self.confusionMatrix: self.confusionMatrix.update(outputs, targets)
 
+  def update_from_bundle(self, df, labelToClassMap, labelType):
+    # Drop padding rows if they exist
+    if "SampleId" in df.columns:
+        df = df[df["SampleId"] >= 0].copy()
+    assert len(df["Pred"]) == len(df["Target"]), "Pred and Target length mismatch in bundle DataFrame"
+
+    if labelType[0] == "single":  
+        # Pred/Target are strings like "Dis-Vau"
+        y_pred = torch.tensor(
+            [labelToClassMap[s] for s in df["Pred"].tolist()],
+            dtype=torch.long,
+            device=self.DEVICE
+        )
+        y_true = torch.tensor(
+            [labelToClassMap[s] for s in df["Target"].tolist()],
+            dtype=torch.long,
+            device=self.DEVICE
+        )
+        self.reset()
+        self.update(y_pred, y_true)
+
+    elif labelType[0] == "multi" and labelType[2][-1] == '1':
+       # topk=1 -> two heads, one class per head (order may vary)
+      actions = {"0Act", "Dis", "Fix", "Rep"}
+      objects = {"0Obj", "Vau", "Pro"}
+
+      def split_pair(s):
+        if not isinstance(s, str) or not s:
+          return None, None
+        parts = [p.strip() for p in s.replace("-", ",").split(",") if p.strip()]
+        if len(parts) != 2:
+          raise ValueError(f"Expected 2 tokens (action+object), got {s}")
+        act, obj = None, None
+        for p in parts:
+          if p in actions:
+            act = p
+          elif p in objects:
+            obj = p
+          else:
+            raise ValueError(f"Unknown class {p} in {s}")
+        return act, obj
+
+      preds_a, preds_o = zip(*[split_pair(s) for s in df["Pred"]])
+      trues_a, trues_o = zip(*[split_pair(s) for s in df["Target"]])
+
+      y_pred_a = torch.tensor([labelToClassMap[a] for a in preds_a],
+                              dtype=torch.long, device=self.DEVICE)
+      y_true_a = torch.tensor([labelToClassMap[a] for a in trues_a],
+                              dtype=torch.long, device=self.DEVICE)
+
+      y_pred_o = torch.tensor([labelToClassMap[o] for o in preds_o],
+                              dtype=torch.long, device=self.DEVICE)
+      y_true_o = torch.tensor([labelToClassMap[o] for o in trues_o],
+                              dtype=torch.long, device=self.DEVICE)
+
+      self.reset()
+      self.update(y_pred_a, y_true_a)   # action head
+      self.update(y_pred_o, y_true_o)   # object head
+
+    elif labelType[0] == "multi" and int(labelType[2][-1]) > 1:
+        # multi-label. Pred/Target are strings like "Class1,Class2"
+        def to_ids(s):
+            if not isinstance(s, str) or not s:
+                return []
+            return [labelToClassMap[c.strip()] for c in s.split(",") if c.strip()]
+
+        pred_ids = [to_ids(s) for s in df["Pred"]]
+        true_ids = [to_ids(s) for s in df["Target"]]
+
+        C = len(labelToClassMap)
+        Yhat = torch.zeros(len(pred_ids), C, dtype=torch.float32, device=self.DEVICE)
+        Y    = torch.zeros(len(true_ids), C, dtype=torch.float32, device=self.DEVICE)
+
+        for i, ids in enumerate(pred_ids):
+            if ids: Yhat[i, ids] = 1.0
+        for i, ids in enumerate(true_ids):
+            if ids: Y[i, ids] = 1.0
+
+        self.reset()
+        self.update(Yhat, Y)
+    else:
+        raise ValueError("Invalid labelType")
+
+  def to(self, device):
+    # Move every underlying metric to device
+    if self.accuracy: self.accuracy.metric.to(device)
+    if self.precision: self.precision.metric.to(device)
+    if self.recall: self.recall.metric.to(device)
+    if self.f1score: self.f1score.metric.to(device)
+    if self.confusionMatrix: self.confusionMatrix.metric.to(device)
+    # Also update the DEVICE field so new tensors match
+    self.DEVICE = device
+    return self
+
   def display(self, metricSwitches={"accuracy": 1, "precision": 1, "recall": 1, "f1score": 1, "confusionMatrix": 1}):
     if metricSwitches["accuracy"]:
       print(f"Accuracy: {self.get_accuracy():.4f}")
@@ -1050,25 +1149,25 @@ class MetricBunch:
     try:
       return self.accuracy.score()
     except:
-      print("! Dataset group lacks representation of all classes !")
+      print("! Accuracy: Dataset group lacks representation of all classes !")
       return -1
   def get_precision(self):
     try:
       return self.precision.score()
     except:
-      print("! Dataset group lacks representation of all classes !")
+      print("! Precision: Dataset group lacks representation of all classes !")
       return -1
   def get_recall(self):
     try:
       return self.recall.score()
     except:
-      print("! Dataset group lacks representation of all classes !")
+      print("! Recall: Dataset group lacks representation of all classes !")
       return -1
   def get_f1score(self):
     try:
       return self.f1score.score()
     except:
-      print("! Dataset group lacks representation of all classes !")
+      print("! F1Score: Dataset group lacks representation of all classes !")
       return -1
   def get_confusionMatrix(self, path_to):
     try:
@@ -1103,3 +1202,14 @@ def get_path_spaceFeat(path_features, featureName):
   else:
     print(f"    Feature path ({featureName}) not found in {path_features}\n")
     return None, None
+
+def get_pred(path_preds, fold):
+  for predId in os.listdir(path_preds):
+    # print(predId)
+    if str(fold) in predId and os.path.splitext(predId)[1] == '.pt':
+      path_pred = os.path.join(path_preds, predId)
+      print(f"    Found prediction path! ({predId})")
+      return os.path.splitext(predId)[0]
+  else:
+    print(f"    Prediction path (fold{fold}) not found in {path_preds}\n")
+    return None

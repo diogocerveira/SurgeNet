@@ -2,11 +2,11 @@ path_root: . #/batataclan
 path_data: #/workspace/raid-diogo/
 seed: 53  # 5 --> 3 or 3 --> 5  DO NOT CHANGE SEED (it messes up with fold training)
 device:
-id_classroom: LDSS-SP-ld # if empty creates new learning environment, else loads it (dataset-YYMM-DDHH)
+id_classroom:  # if empty creates new learning environment, else loads it (dataset-YYMM-DDHH)
 actions:
 # - train        # train (spatial, temporal, full)
 - process       # process (sample-n-label, mode-filter, extractFeatures)
-# - eval         # eval (aprfc, phaseTiming, phaseChart)
+- eval         # eval (aprfc, phaseTiming, phaseChart)
 
 # DATA and TRAIN properties define an unique classroom
 DATA:
@@ -72,9 +72,9 @@ PROCESS:  # Process
   resize: False
   crop: False
 
-  label: True
+  label: False
 
-  apply_modeFilter: False
+  apply_modeFilter: True
   path_bundle: True
   export_modedPreds: True  # if apply-mode-filter == True
 
@@ -98,7 +98,7 @@ MODEL:  # for models created/trained in the run
   path_spaceFeats:
 # temporal
   timeTransferMode: # fine-tune | feat-xtract
-  timeArch: dTsNet # tecno | phatima | dTsNet | pTsNet
+  timeArch:  # tecno | phatima | dTsNet | pTsNet
   n_stages: 3
   n_filters: 64  # number of convolution kernels per filter == number of channels
   tf_filter: 3  # size in time (timeframe, # of frames)
@@ -110,7 +110,7 @@ MODEL:  # for models created/trained in the run
   n_classes:   # normally gets from dataset itself 
 
 EVAL:  # Eval
-  eval_from: model  # model | predictions
+  eval_from: predictions  # model | predictions
   path_model:  # if eval-from == model and no training done
   path_preds:
   eval_tests:
