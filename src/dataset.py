@@ -580,7 +580,7 @@ class Cataloguer():
             except Exception as e:
               print(f"Error processing {path_from_frame}: {e}")
 
-    print("D. Resizing finished!\n")
+    print("D. Cropping finished!\n")
   
   def label(self, path_from, path_to, labelType):
     ''' folders of sampled videos -> labels.csv
@@ -934,16 +934,29 @@ class Cataloguer():
           splitIdxs.append(vidIdxs)            # list of [T]
           # print(splitFeats[-1].shape, len(splitTargets[-1]), splitIdxs[-1].shape)
         else:
-          assert 1 == 0, "clip_size > 0 not implemented yet in _batch_clipFeats"
+          # assert 1 == 0, "clip_size > 0 not implemented yet in _batch_clipFeats"
           num_clips = vidFeats.shape[0] // clip_size
           F = vidFeats.shape[1]
-          C = vidTargets.shape[1] if len(vidTargets.shape) > 1 else None
-          splitFeats.extend(vidFeats.view(num_clips, clip_size, F))
-          if C: # multi-label case
-            splitTargets.extend(vidTargets.view(num_clips, clip_size, C))
-          else:
-            splitTargets.extend(vidTargets.view(num_clips, clip_size))
-          splitIdxs.extend(vidIdxs.view(num_clips, clip_size))
+
+          # [T,F] -> [Nclips, clip_size, F]
+          vidFeats = vidFeats.view(num_clips, clip_size, F)
+          # targets are a LIST (one tensor per head); keep per-head shapes:
+          #  - [T]   -> [Nclips, clip_size]
+          #  - [T,C] -> [Nclips, clip_size, C]
+          reshapedTargets = []
+          for tgt in vidTargets:
+            if tgt.dim() == 1:
+              reshapedTargets.append(tgt.view(num_clips, clip_size))
+            else:
+              C = tgt.shape[1]
+              reshapedTargets.append(tgt.view(num_clips, clip_size, C))
+          # idxs: [T] -> [Nclips, clip_size]
+          vidIdxs = vidIdxs.view(num_clips, clip_size)
+
+          # IMPORTANT: append ONE item per VIDEO (so batch unit stays "video")
+          splitFeats.append(vidFeats)          # [Nclips, clip_size, F]
+          splitTargets.append(reshapedTargets) # list of [Nclips, clip_size,(C)]
+          splitIdxs.append(vidIdxs)            # [Nclips, clip_size]
 
       featset = MultiHeadDataset(splitFeats, splitTargets, splitIdxs)
       if split == 0:

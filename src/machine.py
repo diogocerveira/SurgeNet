@@ -375,8 +375,17 @@ class Tecno(nn.Module):
     self.featureSize = n_classes # (batchSize, n_classes)
 
   def forward(self, x):
-    # x: [B, T, C]
-    x = x.transpose(1, 2)             # [B, C, T] for conv layers
+    # x: [B, T, Cfeat]  OR  [B, Cclips, Tclip, Cfeat]
+    if x.dim() == 4:                      # clip mode
+      B, N, T, C = x.shape
+      x = x.reshape(B, N*T, C)    # [B, T_total, Cfeat]
+      x = x.permute(0, 2, 1).contiguous()     # [B, Cfeat, T_total]
+    elif x.dim() == 3:                    # full-video mode
+      x = x.permute(0, 2, 1).contiguous()     # [B, Cfeat, T_total]
+    else:
+      raise ValueError(f"bad input shape {x.shape}")
+
+    # x = x.transpose(1, 2)             # [B, C, T] for conv layers
     # prediction head
     headOut = self.predStage(x)           # [B, C, T]
     outputs = [headOut.permute(0, 2, 1)]  # [B, T, C]
@@ -476,7 +485,7 @@ class _IdentityResBlock(nn.Module):
     out = F.relu(out)
     # out = self.dropout(out)
     out = self.conv1x1(out)
-    out = self.dropout(out)
+    # out = self.dropout(out)
     return out + x
 
 class _ProjectionResBlock(nn.Module):

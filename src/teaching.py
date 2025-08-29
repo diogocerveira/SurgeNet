@@ -56,7 +56,8 @@ class Teacher():
     print("\nTeaching model: ", model.id)
     optimizer = self._get_optimizer(model, self.trainer.optimizerId, self.trainer.learningRate, self.trainer.momentum)
     scheduler = self._get_scheduler(optimizer, self.trainer.schedulerId, self.trainer.stepSize, self.trainer.gamma)
-
+    print(f"   [optim]: {self.trainer.optimizerId}")
+    print(f"   [sched]: {self.trainer.schedulerId}")
     earlyStopper = EarlyStopper(self.patience, self.minDelta)
 
     betterState, valid_minLoss = {}, np.inf
@@ -637,17 +638,18 @@ class Tester():
       # Count only valid classes (ignore -1)
       phases_preds_video = df_filtered[df_filtered["Pred"] != -1]["Pred"].value_counts().reindex(range(N_PHASES), fill_value=0)
       phases_gt_video = df_filtered["Target"].value_counts().reindex(range(N_PHASES), fill_value=0)
+      phases_diff = np.abs(phases_preds_video.values - phases_gt_video.values)
 
       phases_preds_sum += phases_preds_video.values
       phases_gt_sum += phases_gt_video.values
-      phases_diff_sum += np.abs(phases_preds_video.values - phases_gt_video.values)
+      phases_diff_sum += phases_diff
       # print(phases_diff_sum)
       
       # Optionally print counts for each video
       print("phases_preds counts:", phases_preds_video.values, '\t', sum(phases_preds_video))
       print("phases_gt counts:", phases_gt_video.values, '\t', sum(phases_gt_video))
       print(phaseIntToLabelMap)
-      mix = list(zip(phases_preds_video / (samplerate), phases_gt_video / (samplerate), phases_diff_sum))
+      mix = list(zip(phases_preds_video / (samplerate), phases_gt_video / (samplerate), phases_diff))
       ot = f"\nVideo {video[:4]} Phase Report\n" + f"{'':<10} | {'T Preds':^10} | {'T Targets':^10} || {'Error':^10}\n" + '\n'.join(
             f"{phaseIntToLabelMap[i]:<10} | {self.get_hourMinSec_from_seconds(mix[i][0]):^10} | {self.get_hourMinSec_from_seconds(mix[i][1]):^10} || {self.get_hourMinSec_from_seconds(mix[i][2]):^10}"
             for i in range(N_PHASES)
@@ -660,6 +662,13 @@ class Tester():
     phases_gt_avg = phases_gt_sum / len(videos) / (samplerate)
     phases_diff_avg = phases_diff_sum / len(videos) / (samplerate)
     mix = list(zip(phases_preds_avg, phases_gt_avg, phases_diff_avg))
+
+    # teste
+    bad = df[~df["Pred"].isin(self.PHASES)]
+    print("invalid preds: ", len(bad), " / ", len(df))
+    print(bad["Pred"].value_counts().head(10))
+
+
 
     otavg = f"\n\nOverall Average Phase Report\n{'':12}\t|{'  T Avg Preds':<12}|{'  T Avg Targets':<12}||{'  Total AE':<12}\n" + '\n'.join(
             f"{phaseIntToLabelMap[i]:<12}|{int(mix[i][0]):12}|{int(mix[i][1]):12}||{int(mix[i][2]):12}"
