@@ -369,8 +369,11 @@ class Tecno(nn.Module):
     N_BLOCKS = MODEL["n_blocks"] 
     self.N_FILTERS = MODEL["n_filters"]
     TF_FILTER = MODEL["tf_filter"]
-    self.n_classes = n_classes
-    self.predStage = _TecnoStage(in_channels, n_classes, N_BLOCKS, self.N_FILTERS, TF_FILTER)  # stage for prediction
+    self.n_classes = n_classes # actually they're phases
+    self.bneck_channels = MODEL["n_visuals"]
+    # self.predStage = _TecnoStage(in_channels, n_classes, N_BLOCKS, self.N_FILTERS, TF_FILTER)  # stage for prediction
+    # self.predStage = _TecnoStageV2(in_channels, self.bneck_channels, n_classes, N_BLOCKS, self.N_FILTERS, TF_FILTER)  # stage for prediction
+    self.predStage = _TecnoStageTest(in_channels, n_classes, N_BLOCKS, self.N_FILTERS, TF_FILTER)  # stage for prediction
     self.refStages = nn.ModuleList([copy.deepcopy(_TecnoStage(n_classes, n_classes, N_BLOCKS, self.N_FILTERS, TF_FILTER)) for s in range(N_STAGES - 1)])
     self.featureSize = n_classes # (batchSize, n_classes)
 
@@ -414,8 +417,17 @@ class MultiLabelTecno(nn.Module):
     self.featureSize = n_classes # (batchSize, n_classes)
 
   def forward(self, x):
+    # x: [B, T, Cfeat]  OR  [B, Cclips, Tclip, Cfeat]
+    if x.dim() == 4:                      # clip mode
+      B, N, T, C = x.shape
+      x = x.reshape(B, N*T, C)    # [B, T_total, Cfeat]
+      x = x.permute(0, 2, 1).contiguous()     # [B, Cfeat, T_total]
+    elif x.dim() == 3:                    # full-video mode
+      x = x.permute(0, 2, 1).contiguous()     # [B, Cfeat, T_total]
+    else:
+      raise ValueError(f"bad input shape {x.shape}")
     # x: [B, T, C] -> convs need [B, C, T]
-    x = x.transpose(1, 2)
+    # x = x.transpose(1, 2)
 
     # stage 0 (prediction)
     predHeadOuts = self.predStage(x)                     # ( [B,C1,T], [B,C2,T] )
@@ -433,12 +445,51 @@ class MultiLabelTecno(nn.Module):
     return (tuple(leftHead), tuple(rightHead))           # len==2 (heads); each is tuple over stages
 
 
+class _TecnoStageV2(nn.Module):
+  def __init__(self, in_channels, bneck_channels, out_channels, n_blocks, n_filters, tf_filter, dilation=1):
+    super().__init__()
+    self.conv1x1_in = nn.Conv1d(in_channels, bneck_channels, kernel_size=1) # adapts fv channel dimension
+    self.bneckBlock = _ProjectionResBlock(bneck_channels, n_filters, tf_filter, 1)
+    self.blocks = nn.ModuleList([copy.deepcopy(_IdentityResBlock(n_filters, n_filters, tf_filter, 2**b)) for b in range(1, n_blocks)])
+    self.conv1x1_out = nn.Conv1d(n_filters, out_channels, kernel_size=1)
+  def forward(self, x):
+    # print("Before conv1x1_in Shape: ", x.shape)
+    x = self.conv1x1_in(x)
+    # print("After conv1x1_in Shape: ", x.shape)
+    x = self.bneckBlock(x)
+    # print("After bneckBlock Shape: ", x.shape)
+    for block in self.blocks:
+      x = block(x)
+    # print("After blocks Shape: ", x.shape)
+    x = self.conv1x1_out(x)
+    # print("After conv1x1_out Shape: ", x.shape)
+    return x
+  
+class _TecnoStageTest(nn.Module):
+  def __init__(self, in_channels, out_channels, n_blocks, n_filters, tf_filter, dilation=1):
+    super().__init__()
+    self.conv1x1_in = nn.Conv1d(in_channels, 12, kernel_size=1) # adapts fv channel dimension
+    self.block1 = _ProjectionResBlock(12, n_filters, tf_filter, 1)
+    self.block2 = _IdentityResBlock(n_filters, n_filters, tf_filter, 2)
+    self.conv1x1_out = nn.Conv1d(n_filters, out_channels, kernel_size=1)
+  def forward(self, x):
+    # print("Before conv1x1_in Shape: ", x.shape)
+    x = self.conv1x1_in(x)
+    # print("After conv1x1_in Shape: ", x.shape)
+    x = self.block1(x)
+    x = self.block2(x)
+    # print("After blocks Shape: ", x.shape)
+    x = self.conv1x1_out(x)
+    # print("After conv1x1_out Shape: ", x.shape)
+    return x
+
 class _TecnoStage(nn.Module):
   def __init__(self, in_channels, out_channels, n_blocks, n_filters, tf_filter, dilation=1):
     super().__init__()
     self.conv1x1_in = nn.Conv1d(in_channels, n_filters, kernel_size=1) # adapts fv channel dimension
     self.blocks = nn.ModuleList([copy.deepcopy(_IdentityResBlock(n_filters, n_filters, tf_filter, 2**b)) for b in range(n_blocks)])
     self.conv1x1_out = nn.Conv1d(n_filters, out_channels, kernel_size=1)
+
   def forward(self, x):
     # print("Before conv1x1_in Shape: ", x.shape)
     x = self.conv1x1_in(x)
@@ -474,7 +525,8 @@ class _IdentityResBlock(nn.Module):
   # Dilated Residual Block of Layers
   def __init__(self, in_channels, out_channels, kernelSize, dilation):
     super().__init__()
-    self.convDilated = nn.Conv1d(in_channels, out_channels, kernel_size=kernelSize, padding=dilation, dilation=dilation)
+    padding = (kernelSize - 1) * dilation // 2
+    self.convDilated = nn.Conv1d(in_channels, out_channels, kernel_size=kernelSize, padding=padding, dilation=dilation)
     self.conv1x1 = nn.Conv1d(out_channels, out_channels, kernel_size=1) # filter with time frame 1: mix learned features
     self.dropout = nn.Dropout()
     # self.batchNorm = nn.BatchNorm1d(out_channels)  # Batch Normalization for stability
@@ -485,15 +537,16 @@ class _IdentityResBlock(nn.Module):
     out = F.relu(out)
     # out = self.dropout(out)
     out = self.conv1x1(out)
-    # out = self.dropout(out)
+    out = self.dropout(out)
     return out + x
 
 class _ProjectionResBlock(nn.Module):
   # Dilated Residual Block of Layers
   def __init__(self, in_channels, out_channels, kernelSize, dilation):
     super().__init__()
+    padding = (kernelSize - 1) * dilation // 2
     self.conv1x1_proj = nn.Conv1d(in_channels, out_channels, kernel_size=1) # filter with time frame 1: mix learned features
-    self.convDilated = nn.Conv1d(in_channels, out_channels, kernel_size=kernelSize, padding=dilation, dilation=dilation)
+    self.convDilated = nn.Conv1d(in_channels, out_channels, kernel_size=kernelSize, padding=padding, dilation=dilation)
     self.conv1x1 = nn.Conv1d(out_channels, out_channels, kernel_size=1) # filter with time frame 1: mix learned features
     self.dropout = nn.Dropout()
     # self.batchNorm = nn.BatchNorm1d(out_channels)  # Batch Normalization for stability
@@ -502,7 +555,6 @@ class _ProjectionResBlock(nn.Module):
     out = self.convDilated(x)
     # out = self.batchNorm(out)
     out = F.relu(out)
-    out = self.conv1x1_proj(out)
     out = self.dropout(out)
     x = self.conv1x1_proj(x)  # project input to output channels
     return out + x

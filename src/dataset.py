@@ -810,8 +810,11 @@ class Cataloguer():
     ''' helper for loading data, features or stopping when fx_mode == 'export'
     '''
     # print(inputType)
-    torch.cuda.empty_cache()
-    gc.collect()
+    try:
+      torch.cuda.empty_cache()
+      gc.collect()
+    except:
+      pass
     if inputType[0] == "images": # regular resnet training on images
       return self._batch_dataset(dset, HYPER["spaceBatchSize"], train_idxs, valid_idxs, test_idxs)
     elif inputType[0] == "fmaps":

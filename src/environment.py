@@ -91,7 +91,7 @@ class Classroom():
       studentStatus = "New"
       num = 1
       while True:
-        id_student = self.get_modelId(MODEL)
+        id_student = f"{self.get_modelId(MODEL)}v{num}"
         if id_student not in os.listdir(self.path_classroom):
           break
         num += 1

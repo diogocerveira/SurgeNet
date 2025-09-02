@@ -53,13 +53,13 @@ class Teacher():
         In: Untrained model, data, etc
         Out: Trained model (state_dict)
     '''
-    print("\nTeaching model: ", model.id)
     optimizer = self._get_optimizer(model, self.trainer.optimizerId, self.trainer.learningRate, self.trainer.momentum)
     scheduler = self._get_scheduler(optimizer, self.trainer.schedulerId, self.trainer.stepSize, self.trainer.gamma)
     print(f"   [optim]: {self.trainer.optimizerId}")
     print(f"   [sched]: {self.trainer.schedulerId}")
     earlyStopper = EarlyStopper(self.patience, self.minDelta)
 
+    print("\nTeaching model: ", model.id)
     betterState, valid_minLoss = {}, np.inf
     earlyStopper.reset()
     if path_resume: # Loading checkpoint before resuming training
@@ -74,20 +74,24 @@ class Teacher():
         print(f"\n* Dataset augmentation strength increased to {self.dataset.strength} *\n")
 
       print(f"-------------- Epoch {epoch + 1} --------------")
-      print("     T"), torch.cuda.empty_cache(), gc.collect()
+      print("     T")
       trainloader.dataset.set_preprocessing(("train", self.dataset.preprocessingType), self.dataset.strength)
       train_loss, train_score = self.trainer.train(model, trainloader, labels, optimizer)
-      print("     V"), torch.cuda.empty_cache(), gc.collect()
+      print("     V")
       validloader.dataset.set_preprocessing(("valid", self.dataset.preprocessingType), self.dataset.strength)
       valid_loss, valid_score = self.validater.validate(model, validloader, labels)
-      torch.cuda.empty_cache(), gc.collect()
+      try:torch.cuda.empty_cache(), gc.collect()
+      except:pass
       self.writer.add_scalar("Loss/train", train_loss, epoch + 1)
       self.writer.add_scalar("Loss/valid", valid_loss, epoch + 1)
       self.writer.add_scalar("Acc/train", train_score, epoch + 1)
       self.writer.add_scalar("Acc/valid", valid_score, epoch + 1)
       print(f"Train Loss: {train_loss:4f}\tValid Loss: {valid_loss:4f}")
 
-      scheduler.step(valid_loss) # Adjust learning rate based on validation loss stagnation
+      if self.trainer.schedulerId != "plateau":
+        scheduler.step()  # Adjust learning rate each epoch
+      else:
+        scheduler.step(valid_loss) # Adjust learning rate based on validation loss stagnation
       
       if (valid_minLoss - valid_loss) > earlyStopper.minDelta:  # if valid loss decreased by more than minDelta == good
         print(f"\n* New best model (valid loss): {valid_minLoss:.4f} --> {valid_loss:.4f} *\n")
@@ -111,10 +115,6 @@ class Teacher():
           self.save_checkpoint(model, optimizer, epoch, valid_loss, path_checkpoint)
       model.valid_lastScore = valid_score
 
-      # clear GPU memory
-      torch.cuda.synchronize()               # wait for kernels to finish
-      torch.cuda.empty_cache()               # release cached blocks to the driver
-      gc.collect()                           # reclaim Python refs
 
     return model, valid_maxScore, betterState
 
@@ -122,19 +122,13 @@ class Teacher():
 
     if eval_tests["aprfc"]:
       self.tester._aprfc(test_bundle, self.writer, modelId, Csr.path_aprfc)
-      # clear GPU memory
-      torch.cuda.empty_cache()
-      gc.collect()
+
     if eval_tests["phaseTiming"]:
       outText  = self.tester._phase_timing(test_bundle, Csr.path_timings, modelId)
-      # clear GPU memory
-      torch.cuda.empty_cache()
-      gc.collect()
+ 
       if eval_tests["phaseChart"]:
         self.tester._phase_graph(test_bundle, Csr.path_ribbons, modelId, outText)
-        # clear GPU memory
-        torch.cuda.empty_cache()
-        gc.collect()
+
 
   def _get_optimizer(self, model, optimizerId, lr, momentum):
     if optimizerId == "adam":
@@ -151,8 +145,8 @@ class Teacher():
     elif schedulerId == "plateau":
       scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer,
         mode='min',       # monitor loss (want to minimize)
-        factor=0.1,       # scale lr by this factor (10x smaller)
-        patience=3,       # wait 3 epochs without improvement, after a 4th change
+        factor=gamma,       # scale lr by this factor (10x smaller)
+        patience=2,       # wait 2 epochs without improvement, after a 3rd change
     )
     else:
       raise ValueError("Invalid scheduler chosen (step, cosine)")

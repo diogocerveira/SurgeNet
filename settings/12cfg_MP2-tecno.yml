@@ -53,7 +53,7 @@ TRAIN: # to fix because the top ones should not define a classroom
     n_epochs: 25
     spaceBatchSize: 32
     timeBatchSize: 1  # batch size for temporal training
-    clipSize: 0  # amount of frames (sec) per clip when temporal training
+    clipSize: 16  # amount of frames (sec) per clip when temporal training
     learningRate: 0.001  # learning rate
     stepSize: 25  # optimizer scheduler (to change mid train)
     momentum: 0.9

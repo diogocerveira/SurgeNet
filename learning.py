@@ -94,8 +94,6 @@ def learning(**the):
       if Csr.TRAIN["save_lastState"]:
         model.id = f"{model.id}-{model.valid_lastScore:.2f}"
         torch.save(model.state_dict(), os.path.join(Csr.path_state, f"state_{model.id.split('_')[1]}.pt"))
-    
-    torch.cuda.ipc_collect()  # collect from CUDA IPC
 
     # PROCESS - Feature extraction
     if the["PROCESS"]["fx_spatial"] and "process" in the["actions"]:
@@ -112,8 +110,7 @@ def learning(**the):
       t2 = time.time()
       print(f"Exporting features took {(t2 - t1) // 3600} hours and {(((t2 - t1) % 3600) / 60):.1f} minutes!")
       # clear GPU memory
-      torch.cuda.empty_cache()
-      gc.collect()
+      
     if the["PROCESS"]["fx_temporal"] and "process" in the["actions"]:
       print(f"D. [Processing] Extract Temporal Features")
       t1 = time.time()
@@ -128,8 +125,7 @@ def learning(**the):
       t2 = time.time()
       print(f"Exporting features took {(t2 - t1) // 3600} hours and {(((t2 - t1) % 3600) / 60):.1f} minutes!")
       # clear GPU memory
-      torch.cuda.empty_cache()
-      gc.collect()
+      
 
     # EVALUATE 
     if "eval" in the["actions"]:
@@ -181,18 +177,20 @@ def learning(**the):
       if the["PROCESS"]["apply_modeFilter"] and "process" in the["actions"]:
         print(f"\nF. [Processing] Applying mode filter to preds {Csr.path_preds}")
         ## path_bundle = utils.choose_in_path(Csr.path_modeFilter)
+        assert the["EVAL"]["eval_from"] == "predictions", "Mode filtering only works when evaluating from predictions"
         assert not test_bundle.empty, "No test bundle selected for mode filtering and evaluating"
         try:
           preds = np.array(test_bundle["Pred"])
-          modePreds = environment.modeFilter(preds, 50)
+          mode = 200
+          modePreds = environment.modeFilter(preds, mode)
           # torch.save(modePreds, Csr.path_modedPreds)
           test_bundle["Pred"] = modePreds
           if the["PROCESS"]["export_modedPreds"]:
             predId = teaching.get_pred(Csr.path_preds, fold + 1)
-            path_modedPred = os.path.join(Csr.path_modedPreds, f"moded-{os.path.splitext(predId)[0]}.pt")
+            path_modedPred = os.path.join(Csr.path_modedPreds, f"moded{mode}-{os.path.splitext(predId)[0]}.pt")
             with open(path_modedPred, 'wb') as f:
               pickle.dump(test_bundle, f)
-            Tch.tester.exportPrefix = "moded-"
+            Tch.tester.exportPrefix = f"moded{mode}-"
         except Exception as e:
           print(f"No predictions (test_bundle) provided for processing: {e}")
           continue
