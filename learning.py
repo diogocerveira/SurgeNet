@@ -214,7 +214,7 @@ def learning(**the):
 if __name__ == "__main__":
   # Load default parameters from config.yml
 
-  configIds = ["cfg_SP1-tecno-teste.yml"]
+  configIds = ["cfg_default.yml"]
 
   for configId in configIds:
     with open(os.path.join("settings", configId), "r") as file:

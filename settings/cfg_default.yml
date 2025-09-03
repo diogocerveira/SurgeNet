@@ -4,8 +4,8 @@ seed: 53  # 5 --> 3 or 3 --> 5  DO NOT CHANGE SEED (it messes up with fold train
 device:
 id_classroom:  # if empty creates new learning environment, else loads it (dataset-YYMM-DDHH)
 actions:
-# - train        # train (spatial, temporal, full)
-- process       # process (sample-n-label, mode-filter, extractFeatures)
+- train        # train (spatial, temporal, full)
+# - process       # process (sample-n-label, mode-filter, extractFeatures)
 # - eval         # eval (aprfc, phaseTiming, phaseChart)
 
 # DATA and TRAIN properties define an unique classroom

@@ -10,7 +10,7 @@ from torchvision import datasets
 import numpy as np
 from sklearn.model_selection import KFold, GroupKFold, train_test_split, LeaveOneGroupOut
 from torchvision import datasets
-from torch.utils.data import DataLoader, TensorDataset
+from torch.utils.data import DataLoader, TensorDataset, Subset
 import time
 from torchvision.transforms import v2 as transforms
 import shutil
@@ -445,6 +445,97 @@ class SampledVideosDataset(Dataset):
       print("Sorted phases: ", sortedPhases)
       return sortedPhases
     return normalize_and_sort_phases(phases)
+  
+class HelperSubset(Subset):
+  def __init__(self, dataset, indices, preprocessingType):
+    super().__init__(dataset, indices)
+    self.preprocessingType = preprocessingType
+
+
+  def set_preprocessing(self, key, strength=0.0):
+    mode, preproc = key  # e.g., ("train", "imagenet-dynaug")
+    self.preprocessingType = preproc
+
+    if mode == "train":
+      table = {
+      "ldss": self.get_transform("ldss"),
+      "imagenet": self.get_transform("imagenet"),
+      "imagenet-aug": self.get_transform("imagenet-aug"),
+      "imagenet-dynaug": self.get_transform("imagenet-dynaug", strength=strength),
+      }
+    else:  # eval/test → no aug
+      table = {
+      "ldss": self.get_transform("ldss"),
+      "imagenet": self.get_transform("imagenet"),
+      "imagenet-aug": self.get_transform("imagenet"),      # map aug → plain
+      "imagenet-dynaug": self.get_transform("imagenet"),   # map dynaug → plain
+      }
+
+    if preproc not in table:
+      raise ValueError(f"Unknown preprocessingType: {preproc}")
+    self.transform = table[preproc]
+    # print(f"    [preprocessing] {self.transform}")
+
+
+  def get_transform(self, preprocessingType, normValues=None, strength=1.0):
+    ''' Get torch group of tranforms directly applied to torch Dataset object'''
+    normValues = ((0.416, 0.270, 0.271), (0.196, 0.157, 0.156))
+    # print(f"Preprocessing type: {preprocessingType}, strength: {strength}")
+    if preprocessingType == "ldss":
+      transform = transforms.Compose([
+        transforms.ToImage(), # only for v2
+        transforms.Resize((244, 244), antialias=True),   # keeps aspect ratio
+        # transforms.CenterCrop(224),
+        transforms.ToDtype(torch.float32, scale=True),
+        transforms.Normalize(normValues[0], normValues[1])
+      ])
+    elif preprocessingType == "imagenet":
+      transform = transforms.Compose([
+        transforms.ToImage(),
+        transforms.Resize((244, 244), antialias=True),   # keeps aspect ratio
+        # transforms.CenterCrop(224),               # randomness without warping
+        transforms.ToDtype(torch.float32, scale=True),                          # [0, 255] → [0.0, 1.0]
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], # ImageNet channel stats
+                            std=[0.229, 0.224, 0.225])
+      ])
+    elif preprocessingType == "imagenet-aug":
+      transform = transforms.Compose([
+        # from 0-255 Image/numpy.ndarray to 0.0-1.0 torch.FloatTensor
+        transforms.ToImage(), # only for v2
+        transforms.Pad(16, padding_mode='reflect'),         
+        transforms.RandomRotation((-15, 15), interpolation=transforms.InterpolationMode.BILINEAR, fill=0),
+        transforms.Resize((256, 256), antialias=True),
+        transforms.RandomCrop(224),               # randomness without warping
+        # transforms.RandomHorizontalFlip(p=0.5 * self.strength),  # 50% chance to flip horizontally
+        # transforms.RandomVerticalFlip(p=0.5 * self.strength),    # 50% chance to flip vertically
+        transforms.ToDtype(torch.float32, scale=True),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], # ImageNet channel stats
+                            std=[0.229, 0.224, 0.225])
+      ])
+    elif preprocessingType == "imagenet-dynaug":
+      transform = transforms.Compose([
+        # from 0-255 Image/numpy.ndarray to 0.0-1.0 torch.FloatTensor
+        transforms.ToImage(), # only for v2
+        transforms.Pad(16, padding_mode='reflect'), 
+        transforms.RandomRotation((-15.0 * strength , 15.0 * strength)),
+        transforms.Resize((256, 256), antialias=True),
+        transforms.RandomCrop(224),               # randomness without warping
+        # transforms.RandomHorizontalFlip(p=0.5 * strength),  # 50% chance to flip horizontally
+        # transforms.RandomVerticalFlip(p=0.5 * strength),    # 50% chance to flip vertically
+        transforms.ToDtype(torch.float32, scale=True),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], # ImageNet channel stats
+                            std=[0.229, 0.224, 0.225])
+      ])
+    elif not self.preprocessingType:
+      # make identity transform
+      transform = transforms.Compose([
+        transforms.ToImage(), # only for v2
+        transforms.ToDtype(torch.float32, scale=True),
+      ])
+    else:
+      raise ValueError("Invalid preprocessingType key")
+    return transform
+
 class Cataloguer():
   ''' Each Cataloguer organises/handles 1 dataset (local - LDSS - or external - CIFAR10)
       In - digital rawdata from pc paths
@@ -836,9 +927,11 @@ class Cataloguer():
         if np.any(train_idxs):
           loaders["trainloader"] = DataLoader(dataset=dset, batch_size=size_batch, num_workers=4, sampler=torch.utils.data.SubsetRandomSampler(train_idxs), collate_fn=self.frame_collate, persistent_workers=False)
         if np.any(valid_idxs):
-          loaders["validloader"] = DataLoader(dataset=dset, batch_size=size_batch, num_workers=0, sampler=torch.utils.data.SubsetRandomSampler(valid_idxs), collate_fn=self.frame_collate)
+          vset = HelperSubset(dset, valid_idxs, dset.preprocessingType)
+          loaders["validloader"] = DataLoader(dataset=vset, batch_size=size_batch, num_workers=0, shuffle=False, collate_fn=self.frame_collate)
         if np.any(test_idxs):
-          loaders["testloader"] = DataLoader(dataset=dset, batch_size=size_batch, num_workers=0, sampler=torch.utils.data.SubsetRandomSampler(test_idxs), collate_fn=self.frame_collate)
+          tset = HelperSubset(dset, test_idxs, dset.preprocessingType)
+          loaders["testloader"] = DataLoader(dataset=tset, batch_size=size_batch, num_workers=0, shuffle=False, collate_fn=self.frame_collate)
     except:
       print("Error in batch() for local dataset, assuming external dataset batch instead")
       # test_idxs actually carries the test part of the dataset when using CIFAR-10
