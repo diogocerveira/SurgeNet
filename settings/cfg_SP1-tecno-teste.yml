@@ -102,7 +102,7 @@ MODEL:  # for models created/trained in the run
   n_stages: 2
   n_filters: 64 # number of convolution kernels per filter == number of channels
   tf_filter: 3  # size in time (timeframe, # of frames)
-  n_blocks: 2 # inside the stage
+  n_blocks: 13 # inside the stage
   n_visuals: 12 # from space feature size to n_visuals channels
   proj_channels: 5 # ts-net projection channels
 # classification

@@ -69,7 +69,7 @@ class Teacher():
     self.dataset.strength = 0.0
     prev_lr = optimizer.param_groups[0]["lr"]
     for epoch in range(startEpoch, n_epochs):
-      if model.domain != "time" and earlyStopper.counter == 2:  # one epoch after decrease the learning rate, increase augmentation strength
+      if model.domain != "time" and earlyStopper.counter == 2:
         self.dataset.strength = min(1.0, round(self.dataset.strength + 0.2, 2))  # increase strength every 5 epochs to max at 1.0
         print(f"\n* Dataset augmentation strength increased to {self.dataset.strength} *\n")
 

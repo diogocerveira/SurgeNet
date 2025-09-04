@@ -214,8 +214,13 @@ def learning(**the):
 if __name__ == "__main__":
   # Load default parameters from config.yml
 
-  configIds = ["cfg_default.yml"]
-
+  # configIds = ["1cfg_SP1-RN50.yml", "2cfg_SP1-FX-RN50.yml", "3cfg_SP1-l4FT-RN50.yml",
+  #              "4cfg_SP1-FT-RN50.yml", "5cfg_SP1-l4FT-RN50-aug.yml",
+  #              "6cfg_SP1-l4FT-RN50-dynaug.yml", "7cfg_SP1-l4FT-dTsRN50-dynaug.yml",
+  #              "8cfg_SP1-l4FT-pTsRN50-dynaug.yml", "9cfg_MP2-l4FT-RN50-PTS-1L-dynaug.yml",
+  #              "10cfg_MP1-l4FT-RN50-PTS-2L-dynaug.yml", "11cfg_SP1-tecno.yml",
+  #              "12cfg_MP2-tecno.yml", "13cfg_MP1-mTecno.yml"]
+  configIds = ["1cfg_SP1-RN50.yml"]
   for configId in configIds:
     with open(os.path.join("settings", configId), "r") as file:
       config = yaml.safe_load(file)

@@ -45,12 +45,12 @@ TRAIN: # to fix because the top ones should not define a classroom
 
   criterionId: binary-cross-entropy-logits  # cross-entropy | weighted-cross-entropy | binary-cross-entropy-logits
   optimizerId: adam # adam | sgd
-  schedulerId: plateau # step | cosine | plateau
+  schedulerId: step # step | cosine | plateau
   train_metric: accuracy
   valid_metric: accuracy  # guiding and evaluating training
   k_folds: 7 # number of folds for cross-validation
   HYPER:  # traditional hyperparameters
-    n_epochs: 25
+    n_epochs: 100
     spaceBatchSize: 32
     timeBatchSize: 1  # batch size for temporal training
     clipSize: 16  # amount of frames (sec) per clip when temporal training
@@ -72,7 +72,7 @@ PROCESS:  # Process
   resize: False
   crop: False
 
-  label: True
+  label: False
 
   apply_modeFilter: False
   path_bundle: True
@@ -95,14 +95,15 @@ MODEL:  # for models created/trained in the run
   spaceArch: resnet50
   spacePreweights: image-net # image-net
   path_spaceModel: #C:/Users/DC/Documents/Programming/python/ucl/ML_SurgeNet/logs/LDSS/run_20241104-00/checkpoints/LDSS-20241104-00-fold6-0.837800.pth # if empty, uses new untrained one
-  path_spaceFeats: logs/LDSS-SP-imaug-BROKEN/l4FT-pTsRN50/process/feats
+  path_spaceFeats: logs/LDSS-SP1-imaug-BROKEN/l4FT-pTsRN50/process/feats
 # temporal
   timeTransferMode: # fine-tune | feat-xtract
-  timeArch: tecno # tecno | multiTecno | phatima | dTsNet | pTsNet
+  timeArch: tecnoOG # tecno | multiTecno | phatima | dTsNet | pTsNet
   n_stages: 2
   n_filters: 64  # number of convolution kernels per filter == number of channels
   tf_filter: 3  # size in time (timeframe, # of frames)
   n_blocks: 2 # inside the stage
+  n_visuals: 12 # from space feature size to n_visuals channels
   proj_channels: 5 # ts-net projection channels
 # classification
   classifierArch: # one-liner | two-linear

@@ -268,8 +268,10 @@ class Timeinator(nn.Module):
     # Choose model architecture - backbones
     if arch == "phatima":
       model = Phatima(MODEL, in_channels, n_classes[0])
-    elif arch == "tecno":
-      model = Tecno(MODEL, in_channels, n_classes[0])
+    elif arch == "tecnoOG":
+      model = TecnoOG(MODEL, in_channels, n_classes[0])
+    elif arch == "tecno2":
+      model = Tecno2(MODEL, in_channels, n_classes[0])
     elif arch == "multiTecno":
       assert len(n_classes) > 1, "Multi-label architecture requires multiple classes values"
       model = MultiLabelTecno(MODEL, in_channels, n_classes)
@@ -358,7 +360,7 @@ class _PhatimaStage(nn.Module):
     return x    
 
 
-class Tecno(nn.Module):
+class Tecno2(nn.Module):
   ''' Receives [batch_size, in_channels == feature size, in_length == length of clip of vid] feature tensors
       Outputs [batch_size, N_CLASSES, in_length] further guesses
   '''
@@ -371,9 +373,45 @@ class Tecno(nn.Module):
     TF_FILTER = MODEL["tf_filter"]
     self.n_classes = n_classes # actually they're phases
     self.bneck_channels = MODEL["n_visuals"]
-    # self.predStage = _TecnoStage(in_channels, n_classes, N_BLOCKS, self.N_FILTERS, TF_FILTER)  # stage for prediction
-    # self.predStage = _TecnoStageV2(in_channels, self.bneck_channels, n_classes, N_BLOCKS, self.N_FILTERS, TF_FILTER)  # stage for prediction
-    self.predStage = _TecnoStageTest(in_channels, n_classes, N_BLOCKS, self.N_FILTERS, TF_FILTER)  # stage for prediction
+    self.predStage = _TecnoStageV2(in_channels, self.bneck_channels, n_classes, N_BLOCKS, self.N_FILTERS, TF_FILTER)  # stage for prediction
+    self.refStages = nn.ModuleList([copy.deepcopy(_TecnoStage(n_classes, n_classes, N_BLOCKS, self.N_FILTERS, TF_FILTER)) for s in range(N_STAGES - 1)])
+    self.featureSize = n_classes # (batchSize, n_classes)
+
+  def forward(self, x):
+    # x: [B, T, Cfeat]  OR  [B, Cclips, Tclip, Cfeat]
+    if x.dim() == 4:                      # clip mode
+      B, N, T, C = x.shape
+      x = x.reshape(B, N*T, C)    # [B, T_total, Cfeat]
+      x = x.permute(0, 2, 1).contiguous()     # [B, Cfeat, T_total]
+    elif x.dim() == 3:                    # full-video mode
+      x = x.permute(0, 2, 1).contiguous()     # [B, Cfeat, T_total]
+    else:
+      raise ValueError(f"bad input shape {x.shape}")
+
+    # x = x.transpose(1, 2)             # [B, C, T] for conv layers
+    # prediction head
+    headOut = self.predStage(x)           # [B, C, T]
+    outputs = [headOut.permute(0, 2, 1)]  # [B, T, C]
+    # refinement heads
+    for stage in self.refStages:
+      headOut = stage(F.softmax(headOut, dim=1))   # still [B, C, T]
+      outputs.append(headOut.permute(0, 2, 1)) # convert to [B, T, C]
+    return tuple(outputs)   # (head0, head1, ...)
+
+class TecnoOG(nn.Module):
+  ''' Receives [batch_size, in_channels == feature size, in_length == length of clip of vid] feature tensors
+      Outputs [batch_size, N_CLASSES, in_length] further guesses
+  '''
+  def __init__(self, MODEL, in_channels, n_classes):
+    super().__init__()
+
+    N_STAGES = MODEL["n_stages"]
+    N_BLOCKS = MODEL["n_blocks"] 
+    self.N_FILTERS = MODEL["n_filters"]
+    TF_FILTER = MODEL["tf_filter"]
+    self.n_classes = n_classes # actually they're phases
+    self.bneck_channels = MODEL["n_visuals"]
+    self.predStage = _TecnoStage(in_channels, n_classes, N_BLOCKS, self.N_FILTERS, TF_FILTER)  # stage for prediction
     self.refStages = nn.ModuleList([copy.deepcopy(_TecnoStage(n_classes, n_classes, N_BLOCKS, self.N_FILTERS, TF_FILTER)) for s in range(N_STAGES - 1)])
     self.featureSize = n_classes # (batchSize, n_classes)
 
@@ -460,24 +498,6 @@ class _TecnoStageV2(nn.Module):
     # print("After bneckBlock Shape: ", x.shape)
     for block in self.blocks:
       x = block(x)
-    # print("After blocks Shape: ", x.shape)
-    x = self.conv1x1_out(x)
-    # print("After conv1x1_out Shape: ", x.shape)
-    return x
-  
-class _TecnoStageTest(nn.Module):
-  def __init__(self, in_channels, out_channels, n_blocks, n_filters, tf_filter, dilation=1):
-    super().__init__()
-    self.conv1x1_in = nn.Conv1d(in_channels, 12, kernel_size=1) # adapts fv channel dimension
-    self.block1 = _ProjectionResBlock(12, n_filters, tf_filter, 1)
-    self.block2 = _IdentityResBlock(n_filters, n_filters, tf_filter, 2)
-    self.conv1x1_out = nn.Conv1d(n_filters, out_channels, kernel_size=1)
-  def forward(self, x):
-    # print("Before conv1x1_in Shape: ", x.shape)
-    x = self.conv1x1_in(x)
-    # print("After conv1x1_in Shape: ", x.shape)
-    x = self.block1(x)
-    x = self.block2(x)
     # print("After blocks Shape: ", x.shape)
     x = self.conv1x1_out(x)
     # print("After conv1x1_out Shape: ", x.shape)

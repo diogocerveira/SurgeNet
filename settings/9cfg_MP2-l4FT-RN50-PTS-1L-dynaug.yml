@@ -44,17 +44,17 @@ TRAIN: # to fix because the top ones should not define a classroom
   skipFolds: [] # 0 for fold 1... after a break (e.g. crash) allows to skip folds and restart from a checkpoint
 
   criterionId: binary-cross-entropy-logits # cross-entropy | weighted-cross-entropy | binary-cross-entropy-logits
-  optimizerId: adam # adam | sgd
+  optimizerId: step # adam | sgd
   schedulerId: plateau # step | cosine | plateau
   train_metric: accuracy
   valid_metric: accuracy  # guiding and evaluating training
   k_folds: 7 # number of folds for cross-validation
   HYPER:  # traditional hyperparameters
-    n_epochs: 25
+    n_epochs: 50
     spaceBatchSize: 32
     timeBatchSize: 1  # batch size for temporal training
-    clipSize: 0  # amount of frames (sec) per clip when temporal training
-    learningRate: 0.001  # learning rate
+    clipSize: 16  # amount of frames (sec) per clip when temporal training
+    learningRate: 0.0001  # learning rate
     stepSize: 25  # optimizer scheduler (to change mid train)
     momentum: 0.9
     gamma: 0.1 # factor to scale learning rate by
@@ -72,9 +72,9 @@ PROCESS:  # Process
   resize: False
   crop: False
 
-  label: True
+  label: False
 
-  apply_modeFilter: True
+  apply_modeFilter: False
   path_bundle: True
   export_modedPreds: True  # if apply-mode-filter == True
   

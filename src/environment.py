@@ -122,10 +122,10 @@ class Classroom():
 
   def get_modelId(self, MODEL):
     # learnMode = {"space": "SP", "time": "TP", "spatio-temporal": "ST"}
-    spaceTransferMode = {None: None, "feat-xtract": "FX", "fine-tune": "FT", "l4-fine-tune": "pFT"}
+    spaceTransferMode = {None: None, "feat-xtract": "FX", "fine-tune": "FT", "l4-fine-tune": "l4FT"}
     spaceArch = {"resnet50": "RN50"}
     timeTransferMode = {None: None, "feat-xtract": "FX", "fine-tune": "FT"}
-    timeArch = {"tecno": "TECNO", "multiTecno": "mTECNO", "phatima": "PHA", "dTsNet": "DTS", "pTsNet": "PTS"}
+    timeArch = {"tecnoOG": "TECNO", "tecno2": "TECN2", "multiTecno": "mTECNO", "phatima": "PHA", "dTsNet": "DTS", "pTsNet": "PTS"}
     classifierArch = {None: None, "one-linear": "1L", "two-linear": "2L"}
     domain = MODEL["domain"].split('-')  # e.g. ['space', 'time'] or ['space', time']
     modelId = []
