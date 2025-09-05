@@ -44,7 +44,7 @@ class Phasinator(nn.Module):
         backbone = [timeinator]
         head = [classinator]
         assert 1 == 0, "Not implemented yet!"
-      elif timeinator.arch == "tecno" or timeinator.arch == "multiTecno":
+      elif timeinator.arch == "tecnoOG" or timeinator.arch == "multiTecno" or timeinator.arch == "tecno2":
         backbone = []
         head = [timeinator]
       

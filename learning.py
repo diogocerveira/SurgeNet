@@ -104,8 +104,9 @@ def learning(**the):
         fx_stateId = model.id
       elif the["PROCESS"]["fx_load_models"]:
         fx_stateDict, fx_stateId = teaching.get_testState(Csr.path_state, model.id)
+        print(f"    Loading state from model {fx_stateId}")
         spaceinator.load_state_dict(fx_stateDict, strict=False)
-      path_export = os.path.join(Csr.path_feats, f"feats_{fx_stateId.split('_')[1]}.pt")
+      path_export = os.path.join(Csr.path_feats, f"feats_{fx_stateId}.pt")
       spaceinator.export_features(DataLoader(dset, batch_size=Csr.TRAIN["HYPER"]["spaceBatchSize"]), path_export, the["PROCESS"]["featureLayer"], the["device"])
       t2 = time.time()
       print(f"Exporting features took {(t2 - t1) // 3600} hours and {(((t2 - t1) % 3600) / 60):.1f} minutes!")
@@ -120,7 +121,7 @@ def learning(**the):
       elif the["PROCESS"]["fx_load_models"]:
         fx_stateDict, fx_stateId = teaching.get_testState(Csr.path_state, model.id)
         timeinator.load_state_dict(fx_stateDict, strict=False)
-      path_export = os.path.join(Csr.path_feats, f"feats_{fx_stateId.split('_')[1]}.pt")
+      path_export = os.path.join(Csr.path_feats, f"feats_{fx_stateId[1]}.pt")
       timeinator.export_features(DataLoader(dset, batch_size=Csr.TRAIN["HYPER"]["timeBatchSize"]), path_export, the["PROCESS"]["featureLayer"], the["device"])
       t2 = time.time()
       print(f"Exporting features took {(t2 - t1) // 3600} hours and {(((t2 - t1) % 3600) / 60):.1f} minutes!")
@@ -220,7 +221,10 @@ if __name__ == "__main__":
   #              "8cfg_SP1-l4FT-pTsRN50-dynaug.yml", "9cfg_MP2-l4FT-RN50-PTS-1L-dynaug.yml",
   #              "10cfg_MP1-l4FT-RN50-PTS-2L-dynaug.yml", "11cfg_SP1-tecno.yml",
   #              "12cfg_MP2-tecno.yml", "13cfg_MP1-mTecno.yml"]
-  configIds = ["1cfg_SP1-RN50.yml"]
+
+  configIds = ["11cfg_SP1-tecno.yml", "12cfg_MP2-tecno.yml", "13cfg_MP1-mTecno.yml",
+          "14cfg_SP1-tecno2_A.yml", "15cfg_SP1-tecno2_B.yml", "16cfg_SP1-tecno2_C.yml", "17cfg_MP1-mTecno_C.yml"]
+  # configIds = ["10cfg_MP1-l4FT-RN50-PTS-2L-dynaug.yml"]
   for configId in configIds:
     with open(os.path.join("settings", configId), "r") as file:
       config = yaml.safe_load(file)

@@ -312,7 +312,7 @@ def nextPreds(outputs, targets, labelType, headType, headSplits, arch, metric, b
 
     if "multiTecno" in arch: # multi tecno has outputs per head and then per stage, we only want last stage
       outputs = (outputs[0][-1], outputs[1][-1])
-    if "tecno" in arch:
+    if "tecnoOG" in arch or "tecno2" in arch:
       outputs = (outputs[-1],)
     # always build preds from top-k
     topkPreds = [torch.topk(out, k=k, dim=1).indices for out in outputs]
@@ -1185,10 +1185,10 @@ def get_testState(path_states, modelId):
   # problem if 2 models with same id (e.g. last and best state)
   fold = modelId.split("_")[-1][1]  # get fold number from modelId
   for stateId in os.listdir(path_states):
-    if fold in stateId:
+    if fold in stateId.split('-')[0]:
       path_state = os.path.join(path_states, stateId)
       print(f"    Loading state from model {stateId}")
-      stateDict = torch.load(path_state, weights_only=False)
+      stateDict = torch.load(path_state, weights_only=False, map_location='cpu')
       stateId = os.path.splitext(stateId)[0].split('_')[1]  # remove .pt and state_
       return stateDict, stateId
   else:

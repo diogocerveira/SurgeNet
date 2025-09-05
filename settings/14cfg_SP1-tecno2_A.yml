@@ -54,10 +54,10 @@ TRAIN: # to fix because the top ones should not define a classroom
     spaceBatchSize: 32
     timeBatchSize: 1  # batch size for temporal training
     clipSize: 16  # amount of frames (sec) per clip when temporal training
-    learningRate: 0.001  # learning rate
-    stepSize: 25  # optimizer scheduler (to change mid train)
+    learningRate: 0.0001  # learning rate
+    stepSize: 50  # optimizer scheduler (to change mid train)
     momentum: 0.9
-    gamma: 0.1 # factor to scale learning rate by
+    gamma: 0.5 # factor to scale learning rate by
     minDelta: 0.001  # minimum delta to save a better state
     patience: 5  # number of epochs to wait for a better state before stopping training
 
@@ -95,7 +95,7 @@ MODEL:  # for models created/trained in the run
   spaceArch: resnet50
   spacePreweights: image-net # image-net
   path_spaceModel: #C:/Users/DC/Documents/Programming/python/ucl/ML_SurgeNet/logs/LDSS/run_20241104-00/checkpoints/LDSS-20241104-00-fold6-0.837800.pth # if empty, uses new untrained one
-  path_spaceFeats: logs/LDSS-SP1-imaug-BROKEN/l4FT-pTsRN50/process/feats
+  path_spaceFeats: logs/LDSS-MP1-imdynaug/l4FT-RN50-PTS-2Lv1/process/feats
 # temporal
   timeTransferMode: # fine-tune | feat-xtract
   timeArch: tecno2 # tecnoOG | tecno2 | multiTecno | phatima | dTsNet | pTsNet

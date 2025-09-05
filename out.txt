@@ -1,0 +1,7206 @@
+nohup: ignoring input
+Running 13cfg_MP1-mTecno.yml...
+
+A. [classroom] LDSS-MP1-imdynaug100 (Matched)
+   [model] mTECNOv1 (Matched)
+   For ('train', 'process', 'eval')
+
+B. [dataset] LDSS-local (#134498)
+   [label type] multi-phase-top1
+   [preprocessing] imagenet-dynaug
+   [classes] #7 (Unbalanced) ['0Act', '0Obj', 'Dis', 'Fix', 'Pro', 'Rep', 'Vau']
+   [weights] [tensor([1.0517, 0.4815, 0.4672, 1.8471]), tensor([0.6701, 2.2169, 0.2655])]
+   [phases] #6  ['0Act,0Obj', '0Obj,Rep', 'Dis,Pro', 'Dis,Vau', 'Fix,Pro', 'Fix,Vau'] 
+
+C. [training] start on [device] cpu
+   [folds] #7 [epochs] #100 [batch sizes] s32 / t1
+   [criterions] [CrossEntropyLoss(), CrossEntropyLoss()] w/ weights [tensor([1.0517, 0.4815, 0.4672, 1.8471]), tensor([0.6701, 2.2169, 0.2655])]
+   [headtype] ['4', '3'] 
+
+  Fold 1 splits:
+	train ['26d9', '315a', '436c', '5238', 'a909', 'b670', 'b71b', 'e6a9', 'e8d3', 'e8d7']
+	valid ['a334', 'f63b']
+	test ['cf7c']
+
+    No 'path_spaceModel' found. Using pretrained resnet50 in l4-fine-tune mode.
+    Feature size of 2048 at node 'flatten'
+    Feature size of None at node 'None'
+
+    Found feature path! (feats_f1-0.80.pt)
+  Available feature layers: ['flatten'] / Using last layer: flatten
+
+	Batch example shapes:
+	[space feature] torch.Size([581, 16, 2048])
+	[labels] [torch.Size([581, 16, 4])]
+	[idx] torch.Size([581, 16])
+    Batch contains 1 clip(s), each with 16 frames
+
+   [optim]: adam
+   [sched]: step
+
+Teaching model:  mTECNOv1_f1
+-------------- Epoch 1 --------------
+     T
+	  [B1]  scr: 0.2645
+	  [B4]  scr: 0.4554
+	  [B7]  scr: 0.4825
+	  [B10]  scr: 0.4167
+     V
+	  [B1]  scr: 0.0902
+	  [B2]  scr: 0.1862
+Train Loss: 3.004945	Valid Loss: 3.082151
+
+* New best model (valid loss): inf --> 3.0822 *
+
+-------------- Epoch 2 --------------
+     T
+	  [B1]  scr: 0.3301
+	  [B4]  scr: 0.2996
+	  [B7]  scr: 0.3472
+	  [B10]  scr: 0.3555
+     V
+	  [B1]  scr: 0.5728
+	  [B2]  scr: 0.5541
+Train Loss: 2.721835	Valid Loss: 2.734297
+
+* New best model (valid loss): 3.0822 --> 2.7343 *
+
+-------------- Epoch 3 --------------
+     T
+	  [B1]  scr: 0.4271
+	  [B4]  scr: 0.5221
+	  [B7]  scr: 0.5553
+	  [B10]  scr: 0.6027
+     V
+	  [B1]  scr: 0.7038
+	  [B2]  scr: 0.7001
+Train Loss: 2.453130	Valid Loss: 2.427352
+
+* New best model (valid loss): 2.7343 --> 2.4274 *
+
+-------------- Epoch 4 --------------
+     T
+	  [B1]  scr: 0.7185
+	  [B4]  scr: 0.7274
+	  [B7]  scr: 0.7405
+	  [B10]  scr: 0.7273
+     V
+	  [B1]  scr: 0.6924
+	  [B2]  scr: 0.6961
+Train Loss: 2.084057	Valid Loss: 2.272992
+
+* New best model (valid loss): 2.4274 --> 2.2730 *
+
+-------------- Epoch 5 --------------
+     T
+	  [B1]  scr: 0.7018
+	  [B4]  scr: 0.7375
+	  [B7]  scr: 0.7363
+	  [B10]  scr: 0.7462
+     V
+	  [B1]  scr: 0.6586
+	  [B2]  scr: 0.5865
+Train Loss: 1.772586	Valid Loss: 2.203939
+
+* New best model (valid loss): 2.2730 --> 2.2039 *
+
+-------------- Epoch 6 --------------
+     T
+	  [B1]  scr: 0.5874
+	  [B4]  scr: 0.6350
+	  [B7]  scr: 0.6970
+	  [B10]  scr: 0.6891
+     V
+	  [B1]  scr: 0.6219
+	  [B2]  scr: 0.6416
+Train Loss: 1.935773	Valid Loss: 1.884072
+
+* New best model (valid loss): 2.2039 --> 1.8841 *
+
+-------------- Epoch 7 --------------
+     T
+	  [B1]  scr: 0.7883
+	  [B4]  scr: 0.7577
+	  [B7]  scr: 0.7684
+	  [B10]  scr: 0.7796
+     V
+	  [B1]  scr: 0.7488
+	  [B2]  scr: 0.7421
+Train Loss: 1.546317	Valid Loss: 1.683679
+
+* New best model (valid loss): 1.8841 --> 1.6837 *
+
+-------------- Epoch 8 --------------
+     T
+	  [B1]  scr: 0.8294
+	  [B4]  scr: 0.7449
+	  [B7]  scr: 0.7121
+	  [B10]  scr: 0.7426
+     V
+	  [B1]  scr: 0.7299
+	  [B2]  scr: 0.7404
+Train Loss: 1.564695	Valid Loss: 1.959377
+-------------- Epoch 9 --------------
+     T
+	  [B1]  scr: 0.7878
+	  [B4]  scr: 0.7832
+	  [B7]  scr: 0.7916
+	  [B10]  scr: 0.7811
+     V
+	  [B1]  scr: 0.7969
+	  [B2]  scr: 0.7421
+Train Loss: 1.401715	Valid Loss: 2.024622
+-------------- Epoch 10 --------------
+     T
+	  [B1]  scr: 0.7975
+	  [B4]  scr: 0.8254
+	  [B7]  scr: 0.8259
+	  [B10]  scr: 0.8155
+     V
+	  [B1]  scr: 0.7133
+	  [B2]  scr: 0.6862
+Train Loss: 1.343417	Valid Loss: 1.714662
+-------------- Epoch 11 --------------
+     T
+	  [B1]  scr: 0.6937
+	  [B4]  scr: 0.7153
+	  [B7]  scr: 0.7733
+	  [B10]  scr: 0.7930
+     V
+	  [B1]  scr: 0.6789
+	  [B2]  scr: 0.7062
+Train Loss: 1.404914	Valid Loss: 1.828737
+-------------- Epoch 12 --------------
+     T
+	  [B1]  scr: 0.8155
+	  [B4]  scr: 0.7589
+	  [B7]  scr: 0.7602
+	  [B10]  scr: 0.7885
+     V
+	  [B1]  scr: 0.8000
+	  [B2]  scr: 0.7609
+Train Loss: 1.289696	Valid Loss: 1.945924
+
+* Stopped early *
+
+E. [Evaluating] from trained model mTECNOv1_f1-0.74
+
+	Testing...
+	  [B1]  scr: 0.6826
+
+Test Score: 0.6826 (took 0.81s)
+
+./logs/LDSS-MP1-imdynaug100/mTECNOv1/eval/aprfc/cm_f1-0.74.png
+{'0Act,0Obj': 0, '0Obj,Rep': 1, 'Dis,Pro': 2, 'Dis,Vau': 3, 'Fix,Pro': 4, 'Fix,Vau': 5}
+
+phases_preds counts: [2328 1629 1458 6055  151 5128] 	 16749
+phases_gt counts: [5930 1281 1128 3955  157 5325] 	 17776
+{0: '0Act,0Obj', 1: '0Obj,Rep', 2: 'Dis,Pro', 3: 'Dis,Vau', 4: 'Fix,Pro', 5: 'Fix,Vau'}
+
+Video cf7c Phase Report
+           |  T Preds   | T Targets  ||   Error   
+0Act,0Obj  |  38m 48s   | 1h 38m 50s ||   1h 2s   
+0Obj,Rep   |   27m 9s   |  21m 21s   ||   5m 48s  
+Dis,Pro    |  24m 18s   |  18m 48s   ||   5m 30s  
+Dis,Vau    | 1h 40m 55s | 1h 5m 55s  ||    35m    
+Fix,Pro    |   2m 31s   |   2m 37s   ||     6s    
+Fix,Vau    | 1h 25m 28s | 1h 28m 45s ||   3m 17s   
+
+invalid preds:  1027  /  17776
+Pred
+0Obj,Dis    647
+0Act,Vau    222
+Rep,Vau      91
+0Obj,Fix     40
+Pro,Rep      22
+0Act,Pro      5
+Name: count, dtype: int64
+Saving aggregated phase timing results to ./logs/LDSS-MP1-imdynaug100/mTECNOv1/eval/timings/timings_Summary.csv
+
+
+Number of videos: 1
+Video graphing took 1.03 seconds
+
+Saved phase metric graphs to ./logs/LDSS-MP1-imdynaug100/mTECNOv1/eval/ribbons
+
+	 = = = = = 	 = = = = =
+		 Fold 1 done!
+	 = = = = = 	 = = = = =
+
+  Fold 2 splits:
+	train ['26d9', '315a', '436c', '5238', 'a909', 'b670', 'b71b', 'e6a9', 'e8d3', 'e8d7']
+	valid ['cf7c']
+	test ['a334', 'f63b']
+
+    No 'path_spaceModel' found. Using pretrained resnet50 in l4-fine-tune mode.
+    Feature size of 2048 at node 'flatten'
+    Feature size of None at node 'None'
+
+    Found feature path! (feats_f2-0.72.pt)
+  Available feature layers: ['flatten'] / Using last layer: flatten
+
+	Batch example shapes:
+	[space feature] torch.Size([577, 16, 2048])
+	[labels] [torch.Size([577, 16, 4])]
+	[idx] torch.Size([577, 16])
+    Batch contains 1 clip(s), each with 16 frames
+
+   [optim]: adam
+   [sched]: step
+
+Teaching model:  mTECNOv1_f2
+-------------- Epoch 1 --------------
+     T
+	  [B1]  scr: 0.1817
+	  [B4]  scr: 0.2528
+	  [B7]  scr: 0.3548
+	  [B10]  scr: 0.3962
+     V
+	  [B1]  scr: 0.4441
+Train Loss: 3.010739	Valid Loss: 3.227859
+
+* New best model (valid loss): inf --> 3.2279 *
+
+-------------- Epoch 2 --------------
+     T
+	  [B1]  scr: 0.5118
+	  [B4]  scr: 0.3959
+	  [B7]  scr: 0.3731
+	  [B10]  scr: 0.3900
+     V
+	  [B1]  scr: 0.3499
+Train Loss: 2.722454	Valid Loss: 3.022007
+
+* New best model (valid loss): 3.2279 --> 3.0220 *
+
+-------------- Epoch 3 --------------
+     T
+	  [B1]  scr: 0.4831
+	  [B4]  scr: 0.5098
+	  [B7]  scr: 0.5587
+	  [B10]  scr: 0.6068
+     V
+	  [B1]  scr: 0.5572
+Train Loss: 2.415545	Valid Loss: 2.725112
+
+* New best model (valid loss): 3.0220 --> 2.7251 *
+
+-------------- Epoch 4 --------------
+     T
+	  [B1]  scr: 0.6912
+	  [B4]  scr: 0.6905
+	  [B7]  scr: 0.6856
+	  [B10]  scr: 0.7104
+     V
+	  [B1]  scr: 0.6168
+Train Loss: 2.103497	Valid Loss: 2.625853
+
+* New best model (valid loss): 2.7251 --> 2.6259 *
+
+-------------- Epoch 5 --------------
+     T
+	  [B1]  scr: 0.8227
+	  [B4]  scr: 0.7877
+	  [B7]  scr: 0.7137
+	  [B10]  scr: 0.7018
+     V
+	  [B1]  scr: 0.6261
+Train Loss: 2.081499	Valid Loss: 2.442487
+
+* New best model (valid loss): 2.6259 --> 2.4425 *
+
+-------------- Epoch 6 --------------
+     T
+	  [B1]  scr: 0.7650
+	  [B4]  scr: 0.6898
+	  [B7]  scr: 0.7402
+	  [B10]  scr: 0.7341
+     V
+	  [B1]  scr: 0.5123
+Train Loss: 1.835044	Valid Loss: 2.829168
+-------------- Epoch 7 --------------
+     T
+	  [B1]  scr: 0.6992
+	  [B4]  scr: 0.7412
+	  [B7]  scr: 0.7535
+	  [B10]  scr: 0.7525
+     V
+	  [B1]  scr: 0.6689
+Train Loss: 1.651314	Valid Loss: 2.410225
+
+* New best model (valid loss): 2.4425 --> 2.4102 *
+
+-------------- Epoch 8 --------------
+     T
+	  [B1]  scr: 0.7327
+	  [B4]  scr: 0.7815
+	  [B7]  scr: 0.7835
+	  [B10]  scr: 0.7945
+     V
+	  [B1]  scr: 0.6635
+Train Loss: 1.429518	Valid Loss: 2.816962
+-------------- Epoch 9 --------------
+     T
+	  [B1]  scr: 0.8860
+	  [B4]  scr: 0.8365
+	  [B7]  scr: 0.7934
+	  [B10]  scr: 0.7955
+     V
+	  [B1]  scr: 0.6712
+Train Loss: 1.369660	Valid Loss: 2.804855
+-------------- Epoch 10 --------------
+     T
+	  [B1]  scr: 0.9116
+	  [B4]  scr: 0.8723
+	  [B7]  scr: 0.8301
+	  [B10]  scr: 0.8182
+     V
+	  [B1]  scr: 0.6666
+Train Loss: 1.324187	Valid Loss: 2.618387
+-------------- Epoch 11 --------------
+     T
+	  [B1]  scr: 0.7931
+	  [B4]  scr: 0.8112
+	  [B7]  scr: 0.8341
+	  [B10]  scr: 0.8177
+     V
+	  [B1]  scr: 0.6552
+Train Loss: 1.313533	Valid Loss: 2.333873
+
+* New best model (valid loss): 2.4102 --> 2.3339 *
+
+-------------- Epoch 12 --------------
+     T
+	  [B1]  scr: 0.6457
+	  [B4]  scr: 0.7810
+	  [B7]  scr: 0.8179
+	  [B10]  scr: 0.8181
+     V
+	  [B1]  scr: 0.6869
+Train Loss: 1.254089	Valid Loss: 2.439508
+-------------- Epoch 13 --------------
+     T
+	  [B1]  scr: 0.8813
+	  [B4]  scr: 0.8555
+	  [B7]  scr: 0.8325
+	  [B10]  scr: 0.8367
+     V
+	  [B1]  scr: 0.6725
+Train Loss: 1.089933	Valid Loss: 2.836999
+-------------- Epoch 14 --------------
+     T
+	  [B1]  scr: 0.8480
+	  [B4]  scr: 0.8777
+	  [B7]  scr: 0.8463
+	  [B10]  scr: 0.8519
+     V
+	  [B1]  scr: 0.7103
+Train Loss: 1.045816	Valid Loss: 2.562961
+-------------- Epoch 15 --------------
+     T
+	  [B1]  scr: 0.8205
+	  [B4]  scr: 0.8594
+	  [B7]  scr: 0.8543
+	  [B10]  scr: 0.8657
+     V
+	  [B1]  scr: 0.7123
+Train Loss: 0.963026	Valid Loss: 2.435312
+-------------- Epoch 16 --------------
+     T
+	  [B1]  scr: 0.8748
+	  [B4]  scr: 0.8690
+	  [B7]  scr: 0.8639
+	  [B10]  scr: 0.8690
+     V
+	  [B1]  scr: 0.6924
+Train Loss: 0.921572	Valid Loss: 2.693059
+
+* Stopped early *
+
+E. [Evaluating] from trained model mTECNOv1_f2-0.66
+
+	Testing...
+	  [B1]  scr: 0.7758
+	  [B2]  scr: 0.7640
+
+Test Score: 0.7640 (took 0.93s)
+
+./logs/LDSS-MP1-imdynaug100/mTECNOv1/eval/aprfc/cm_f2-0.66.png
+{'0Act,0Obj': 0, '0Obj,Rep': 1, 'Dis,Pro': 2, 'Dis,Vau': 3, 'Fix,Pro': 4, 'Fix,Vau': 5}
+
+phases_preds counts: [ 341  793  199 1121  140 3556] 	 6150
+phases_gt counts: [ 579 1423   53  916  100 3339] 	 6410
+{0: '0Act,0Obj', 1: '0Obj,Rep', 2: 'Dis,Pro', 3: 'Dis,Vau', 4: 'Fix,Pro', 5: 'Fix,Vau'}
+
+Video a334 Phase Report
+           |  T Preds   | T Targets  ||   Error   
+0Act,0Obj  |   5m 41s   |   9m 39s   ||   3m 58s  
+0Obj,Rep   |  13m 13s   |  23m 43s   ||  10m 30s  
+Dis,Pro    |   3m 19s   |    53s     ||   2m 26s  
+Dis,Vau    |  18m 41s   |  15m 16s   ||   3m 25s  
+Fix,Pro    |   2m 20s   |   1m 40s   ||    40s    
+Fix,Vau    |  59m 16s   |  55m 39s   ||   3m 37s   
+
+
+phases_preds counts: [ 890 1348 1873 3632   89 4581] 	 12413
+phases_gt counts: [2841  718 1344 3002  155 4896] 	 12956
+{0: '0Act,0Obj', 1: '0Obj,Rep', 2: 'Dis,Pro', 3: 'Dis,Vau', 4: 'Fix,Pro', 5: 'Fix,Vau'}
+
+Video f63b Phase Report
+           |  T Preds   | T Targets  ||   Error   
+0Act,0Obj  |  14m 50s   |  47m 21s   ||  32m 31s  
+0Obj,Rep   |  22m 28s   |  11m 58s   ||  10m 30s  
+Dis,Pro    |  31m 13s   |  22m 24s   ||   8m 49s  
+Dis,Vau    |   1h 32s   |   50m 2s   ||  10m 30s  
+Fix,Pro    |   1m 29s   |   2m 35s   ||   1m 6s   
+Fix,Vau    | 1h 16m 21s | 1h 21m 36s ||   5m 15s   
+
+invalid preds:  803  /  19366
+Pred
+Rep,Vau     288
+0Obj,Dis    255
+0Act,Vau    119
+0Act,Pro    116
+0Obj,Fix     14
+Pro,Rep      11
+Name: count, dtype: int64
+Saving aggregated phase timing results to ./logs/LDSS-MP1-imdynaug100/mTECNOv1/eval/timings/timings_Summary.csv
+
+
+Number of videos: 2
+Video graphing took 1.36 seconds
+
+Saved phase metric graphs to ./logs/LDSS-MP1-imdynaug100/mTECNOv1/eval/ribbons
+
+	 = = = = = 	 = = = = =
+		 Fold 2 done!
+	 = = = = = 	 = = = = =
+
+  Fold 3 splits:
+	train ['26d9', '315a', '436c', '5238', 'a334', 'a909', 'b670', 'b71b', 'e8d3', 'f63b']
+	valid ['cf7c']
+	test ['e6a9', 'e8d7']
+
+    No 'path_spaceModel' found. Using pretrained resnet50 in l4-fine-tune mode.
+    Feature size of 2048 at node 'flatten'
+    Feature size of None at node 'None'
+
+    Found feature path! (feats_f3-0.76.pt)
+  Available feature layers: ['flatten'] / Using last layer: flatten
+
+	Batch example shapes:
+	[space feature] torch.Size([699, 16, 2048])
+	[labels] [torch.Size([699, 16, 4])]
+	[idx] torch.Size([699, 16])
+    Batch contains 1 clip(s), each with 16 frames
+
+   [optim]: adam
+   [sched]: step
+
+Teaching model:  mTECNOv1_f3
+-------------- Epoch 1 --------------
+     T
+	  [B1]  scr: 0.2519
+	  [B4]  scr: 0.3206
+	  [B7]  scr: 0.3464
+	  [B10]  scr: 0.3384
+     V
+	  [B1]  scr: 0.2363
+Train Loss: 3.045870	Valid Loss: 3.262922
+
+* New best model (valid loss): inf --> 3.2629 *
+
+-------------- Epoch 2 --------------
+     T
+	  [B1]  scr: 0.3726
+	  [B4]  scr: 0.3847
+	  [B7]  scr: 0.4311
+	  [B10]  scr: 0.4632
+     V
+	  [B1]  scr: 0.5589
+Train Loss: 2.743866	Valid Loss: 3.036587
+
+* New best model (valid loss): 3.2629 --> 3.0366 *
+
+-------------- Epoch 3 --------------
+     T
+	  [B1]  scr: 0.7456
+	  [B4]  scr: 0.6483
+	  [B7]  scr: 0.6190
+	  [B10]  scr: 0.6347
+     V
+	  [B1]  scr: 0.5489
+Train Loss: 2.476429	Valid Loss: 2.915884
+
+* New best model (valid loss): 3.0366 --> 2.9159 *
+
+-------------- Epoch 4 --------------
+     T
+	  [B1]  scr: 0.6562
+	  [B4]  scr: 0.6487
+	  [B7]  scr: 0.6573
+	  [B10]  scr: 0.6788
+     V
+	  [B1]  scr: 0.6026
+Train Loss: 2.180376	Valid Loss: 2.713348
+
+* New best model (valid loss): 2.9159 --> 2.7133 *
+
+-------------- Epoch 5 --------------
+     T
+	  [B1]  scr: 0.7189
+	  [B4]  scr: 0.7523
+	  [B7]  scr: 0.7542
+	  [B10]  scr: 0.7312
+     V
+	  [B1]  scr: 0.5606
+Train Loss: 1.953517	Valid Loss: 2.827998
+-------------- Epoch 6 --------------
+     T
+	  [B1]  scr: 0.6266
+	  [B4]  scr: 0.6195
+	  [B7]  scr: 0.6614
+	  [B10]  scr: 0.7043
+     V
+	  [B1]  scr: 0.6649
+Train Loss: 1.880930	Valid Loss: 2.531525
+
+* New best model (valid loss): 2.7133 --> 2.5315 *
+
+-------------- Epoch 7 --------------
+     T
+	  [B1]  scr: 0.7902
+	  [B4]  scr: 0.7646
+	  [B7]  scr: 0.7925
+	  [B10]  scr: 0.7916
+     V
+	  [B1]  scr: 0.6870
+Train Loss: 1.475150	Valid Loss: 2.580979
+-------------- Epoch 8 --------------
+     T
+	  [B1]  scr: 0.7896
+	  [B4]  scr: 0.8041
+	  [B7]  scr: 0.8018
+	  [B10]  scr: 0.8209
+     V
+	  [B1]  scr: 0.6880
+Train Loss: 1.295705	Valid Loss: 2.685619
+-------------- Epoch 9 --------------
+     T
+	  [B1]  scr: 0.7980
+	  [B4]  scr: 0.8262
+	  [B7]  scr: 0.8263
+	  [B10]  scr: 0.8241
+     V
+	  [B1]  scr: 0.7037
+Train Loss: 1.187844	Valid Loss: 2.548406
+-------------- Epoch 10 --------------
+     T
+	  [B1]  scr: 0.8561
+	  [B4]  scr: 0.8515
+	  [B7]  scr: 0.8401
+	  [B10]  scr: 0.8364
+     V
+	  [B1]  scr: 0.6849
+Train Loss: 1.160581	Valid Loss: 2.436460
+
+* New best model (valid loss): 2.5315 --> 2.4365 *
+
+-------------- Epoch 11 --------------
+     T
+	  [B1]  scr: 0.8349
+	  [B4]  scr: 0.8403
+	  [B7]  scr: 0.8262
+	  [B10]  scr: 0.8342
+     V
+	  [B1]  scr: 0.6483
+Train Loss: 1.200188	Valid Loss: 2.516184
+-------------- Epoch 12 --------------
+     T
+	  [B1]  scr: 0.8407
+	  [B4]  scr: 0.8156
+	  [B7]  scr: 0.8417
+	  [B10]  scr: 0.8520
+     V
+	  [B1]  scr: 0.6703
+Train Loss: 1.074818	Valid Loss: 2.565286
+-------------- Epoch 13 --------------
+     T
+	  [B1]  scr: 0.8337
+	  [B4]  scr: 0.8157
+	  [B7]  scr: 0.8111
+	  [B10]  scr: 0.8260
+     V
+	  [B1]  scr: 0.7053
+Train Loss: 1.167514	Valid Loss: 2.420815
+
+* New best model (valid loss): 2.4365 --> 2.4208 *
+
+-------------- Epoch 14 --------------
+     T
+	  [B1]  scr: 0.7871
+	  [B4]  scr: 0.8168
+	  [B7]  scr: 0.8242
+	  [B10]  scr: 0.8273
+     V
+	  [B1]  scr: 0.7192
+Train Loss: 1.159007	Valid Loss: 2.346740
+
+* New best model (valid loss): 2.4208 --> 2.3467 *
+
+-------------- Epoch 15 --------------
+     T
+	  [B1]  scr: 0.7838
+	  [B4]  scr: 0.8665
+	  [B7]  scr: 0.8587
+	  [B10]  scr: 0.8534
+     V
+	  [B1]  scr: 0.6603
+Train Loss: 1.078706	Valid Loss: 2.864213
+-------------- Epoch 16 --------------
+     T
+	  [B1]  scr: 0.8911
+	  [B4]  scr: 0.8667
+	  [B7]  scr: 0.8646
+	  [B10]  scr: 0.8661
+     V
+	  [B1]  scr: 0.6569
+Train Loss: 0.991394	Valid Loss: 2.783549
+-------------- Epoch 17 --------------
+     T
+	  [B1]  scr: 0.8652
+	  [B4]  scr: 0.8341
+	  [B7]  scr: 0.8581
+	  [B10]  scr: 0.8659
+     V
+	  [B1]  scr: 0.7218
+Train Loss: 0.941208	Valid Loss: 2.349145
+-------------- Epoch 18 --------------
+     T
+	  [B1]  scr: 0.8869
+	  [B4]  scr: 0.8714
+	  [B7]  scr: 0.8612
+	  [B10]  scr: 0.8801
+     V
+	  [B1]  scr: 0.7009
+Train Loss: 0.852423	Valid Loss: 2.488022
+-------------- Epoch 19 --------------
+     T
+	  [B1]  scr: 0.9050
+	  [B4]  scr: 0.8840
+	  [B7]  scr: 0.8842
+	  [B10]  scr: 0.8634
+     V
+	  [B1]  scr: 0.7328
+Train Loss: 0.956351	Valid Loss: 2.263038
+
+* New best model (valid loss): 2.3467 --> 2.2630 *
+
+-------------- Epoch 20 --------------
+     T
+	  [B1]  scr: 0.9053
+	  [B4]  scr: 0.9068
+	  [B7]  scr: 0.8938
+	  [B10]  scr: 0.8769
+     V
+	  [B1]  scr: 0.7363
+Train Loss: 0.851108	Valid Loss: 2.444253
+-------------- Epoch 21 --------------
+     T
+	  [B1]  scr: 0.8737
+	  [B4]  scr: 0.9046
+	  [B7]  scr: 0.9056
+	  [B10]  scr: 0.8924
+     V
+	  [B1]  scr: 0.6392
+Train Loss: 0.822126	Valid Loss: 2.516713
+-------------- Epoch 22 --------------
+     T
+	  [B1]  scr: 0.8477
+	  [B4]  scr: 0.8665
+	  [B7]  scr: 0.8755
+	  [B10]  scr: 0.8796
+     V
+	  [B1]  scr: 0.6726
+Train Loss: 0.825153	Valid Loss: 2.437665
+-------------- Epoch 23 --------------
+     T
+	  [B1]  scr: 0.8598
+	  [B4]  scr: 0.8850
+	  [B7]  scr: 0.8921
+	  [B10]  scr: 0.8825
+     V
+	  [B1]  scr: 0.6801
+Train Loss: 0.812690	Valid Loss: 2.481251
+-------------- Epoch 24 --------------
+     T
+	  [B1]  scr: 0.8942
+	  [B4]  scr: 0.8874
+	  [B7]  scr: 0.8903
+	  [B10]  scr: 0.8947
+     V
+	  [B1]  scr: 0.7079
+Train Loss: 0.777869	Valid Loss: 2.476000
+
+* Stopped early *
+
+E. [Evaluating] from trained model mTECNOv1_f3-0.73
+
+	Testing...
+	  [B1]  scr: 0.6682
+	  [B2]  scr: 0.7115
+
+Test Score: 0.7115 (took 0.83s)
+
+./logs/LDSS-MP1-imdynaug100/mTECNOv1/eval/aprfc/cm_f3-0.73.png
+{'0Act,0Obj': 0, '0Obj,Rep': 1, 'Dis,Pro': 2, 'Dis,Vau': 3, 'Fix,Pro': 4, 'Fix,Vau': 5}
+
+phases_preds counts: [2807  437  743 2309 1058 4611] 	 11965
+phases_gt counts: [2072 1604  445 4324  280 4039] 	 12764
+{0: '0Act,0Obj', 1: '0Obj,Rep', 2: 'Dis,Pro', 3: 'Dis,Vau', 4: 'Fix,Pro', 5: 'Fix,Vau'}
+
+Video e6a9 Phase Report
+           |  T Preds   | T Targets  ||   Error   
+0Act,0Obj  |  46m 47s   |  34m 32s   ||  12m 15s  
+0Obj,Rep   |   7m 17s   |  26m 44s   ||  19m 27s  
+Dis,Pro    |  12m 23s   |   7m 25s   ||   4m 58s  
+Dis,Vau    |  38m 29s   | 1h 12m 4s  ||  33m 35s  
+Fix,Pro    |  17m 38s   |   4m 40s   ||  12m 58s  
+Fix,Vau    | 1h 16m 51s | 1h 7m 19s  ||   9m 32s   
+
+
+phases_preds counts: [1185  864  498 1746  261 1703] 	 6257
+phases_gt counts: [ 964  890  836 1709  211 1968] 	 6578
+{0: '0Act,0Obj', 1: '0Obj,Rep', 2: 'Dis,Pro', 3: 'Dis,Vau', 4: 'Fix,Pro', 5: 'Fix,Vau'}
+
+Video e8d7 Phase Report
+           |  T Preds   | T Targets  ||   Error   
+0Act,0Obj  |  19m 45s   |   16m 4s   ||   3m 41s  
+0Obj,Rep   |  14m 24s   |  14m 50s   ||    26s    
+Dis,Pro    |   8m 18s   |  13m 56s   ||   5m 38s  
+Dis,Vau    |   29m 6s   |  28m 29s   ||    37s    
+Fix,Pro    |   4m 21s   |   3m 31s   ||    50s    
+Fix,Vau    |  28m 23s   |  32m 48s   ||   4m 25s   
+
+invalid preds:  1120  /  19342
+Pred
+0Obj,Dis    385
+0Act,Pro    343
+0Act,Vau    270
+0Obj,Fix     55
+Rep,Vau      54
+Pro,Rep      13
+Name: count, dtype: int64
+Saving aggregated phase timing results to ./logs/LDSS-MP1-imdynaug100/mTECNOv1/eval/timings/timings_Summary.csv
+
+
+Number of videos: 2
+Video graphing took 1.45 seconds
+
+Saved phase metric graphs to ./logs/LDSS-MP1-imdynaug100/mTECNOv1/eval/ribbons
+
+	 = = = = = 	 = = = = =
+		 Fold 3 done!
+	 = = = = = 	 = = = = =
+
+  Fold 4 splits:
+	train ['26d9', '315a', '436c', 'a334', 'a909', 'b670', 'b71b', 'e6a9', 'e8d7', 'f63b']
+	valid ['cf7c']
+	test ['5238', 'e8d3']
+
+    No 'path_spaceModel' found. Using pretrained resnet50 in l4-fine-tune mode.
+    Feature size of 2048 at node 'flatten'
+    Feature size of None at node 'None'
+
+    Found feature path! (feats_f4-0.72.pt)
+  Available feature layers: ['flatten'] / Using last layer: flatten
+
+	Batch example shapes:
+	[space feature] torch.Size([517, 16, 2048])
+	[labels] [torch.Size([517, 16, 4])]
+	[idx] torch.Size([517, 16])
+    Batch contains 1 clip(s), each with 16 frames
+
+   [optim]: adam
+   [sched]: step
+
+Teaching model:  mTECNOv1_f4
+-------------- Epoch 1 --------------
+     T
+	  [B1]  scr: 0.1253
+	  [B4]  scr: 0.2074
+	  [B7]  scr: 0.1752
+	  [B10]  scr: 0.1898
+     V
+	  [B1]  scr: 0.3023
+Train Loss: 3.074865	Valid Loss: 3.215931
+
+* New best model (valid loss): inf --> 3.2159 *
+
+-------------- Epoch 2 --------------
+     T
+	  [B1]  scr: 0.3662
+	  [B4]  scr: 0.3560
+	  [B7]  scr: 0.3521
+	  [B10]  scr: 0.3694
+     V
+	  [B1]  scr: 0.3854
+Train Loss: 2.755414	Valid Loss: 3.054128
+
+* New best model (valid loss): 3.2159 --> 3.0541 *
+
+-------------- Epoch 3 --------------
+     T
+	  [B1]  scr: 0.5168
+	  [B4]  scr: 0.5749
+	  [B7]  scr: 0.6008
+	  [B10]  scr: 0.5886
+     V
+	  [B1]  scr: 0.5847
+Train Loss: 2.484285	Valid Loss: 2.630582
+
+* New best model (valid loss): 3.0541 --> 2.6306 *
+
+-------------- Epoch 4 --------------
+     T
+	  [B1]  scr: 0.5724
+	  [B4]  scr: 0.6292
+	  [B7]  scr: 0.6678
+	  [B10]  scr: 0.6812
+     V
+	  [B1]  scr: 0.6071
+Train Loss: 2.198409	Valid Loss: 2.736202
+-------------- Epoch 5 --------------
+     T
+	  [B1]  scr: 0.7659
+	  [B4]  scr: 0.7252
+	  [B7]  scr: 0.7111
+	  [B10]  scr: 0.6977
+     V
+	  [B1]  scr: 0.6690
+Train Loss: 1.895784	Valid Loss: 2.432887
+
+* New best model (valid loss): 2.6306 --> 2.4329 *
+
+-------------- Epoch 6 --------------
+     T
+	  [B1]  scr: 0.7393
+	  [B4]  scr: 0.7806
+	  [B7]  scr: 0.7395
+	  [B10]  scr: 0.7368
+     V
+	  [B1]  scr: 0.6872
+Train Loss: 1.715420	Valid Loss: 2.428631
+
+* New best model (valid loss): 2.4329 --> 2.4286 *
+
+-------------- Epoch 7 --------------
+     T
+	  [B1]  scr: 0.7783
+	  [B4]  scr: 0.8189
+	  [B7]  scr: 0.7868
+	  [B10]  scr: 0.7654
+     V
+	  [B1]  scr: 0.6325
+Train Loss: 1.624582	Valid Loss: 2.479536
+-------------- Epoch 8 --------------
+     T
+	  [B1]  scr: 0.7948
+	  [B4]  scr: 0.7685
+	  [B7]  scr: 0.7795
+	  [B10]  scr: 0.7826
+     V
+	  [B1]  scr: 0.6311
+Train Loss: 1.468928	Valid Loss: 2.398289
+
+* New best model (valid loss): 2.4286 --> 2.3983 *
+
+-------------- Epoch 9 --------------
+     T
+	  [B1]  scr: 0.6909
+	  [B4]  scr: 0.7614
+	  [B7]  scr: 0.7893
+	  [B10]  scr: 0.7909
+     V
+	  [B1]  scr: 0.7019
+Train Loss: 1.346568	Valid Loss: 2.279501
+
+* New best model (valid loss): 2.3983 --> 2.2795 *
+
+-------------- Epoch 10 --------------
+     T
+	  [B1]  scr: 0.7540
+	  [B4]  scr: 0.7859
+	  [B7]  scr: 0.8279
+	  [B10]  scr: 0.8249
+     V
+	  [B1]  scr: 0.6393
+Train Loss: 1.236563	Valid Loss: 2.405528
+-------------- Epoch 11 --------------
+     T
+	  [B1]  scr: 0.8257
+	  [B4]  scr: 0.8118
+	  [B7]  scr: 0.8225
+	  [B10]  scr: 0.8234
+     V
+	  [B1]  scr: 0.6029
+Train Loss: 1.215177	Valid Loss: 2.983136
+-------------- Epoch 12 --------------
+     T
+	  [B1]  scr: 0.8289
+	  [B4]  scr: 0.8389
+	  [B7]  scr: 0.8367
+	  [B10]  scr: 0.8361
+     V
+	  [B1]  scr: 0.7080
+Train Loss: 1.160013	Valid Loss: 2.342305
+-------------- Epoch 13 --------------
+     T
+	  [B1]  scr: 0.8469
+	  [B4]  scr: 0.8346
+	  [B7]  scr: 0.8553
+	  [B10]  scr: 0.8493
+     V
+	  [B1]  scr: 0.6891
+Train Loss: 1.054975	Valid Loss: 2.824743
+-------------- Epoch 14 --------------
+     T
+	  [B1]  scr: 0.8967
+	  [B4]  scr: 0.8730
+	  [B7]  scr: 0.8542
+	  [B10]  scr: 0.8568
+     V
+	  [B1]  scr: 0.7044
+Train Loss: 1.024572	Valid Loss: 2.233097
+
+* New best model (valid loss): 2.2795 --> 2.2331 *
+
+-------------- Epoch 15 --------------
+     T
+	  [B1]  scr: 0.8769
+	  [B4]  scr: 0.8413
+	  [B7]  scr: 0.8608
+	  [B10]  scr: 0.8509
+     V
+	  [B1]  scr: 0.7109
+Train Loss: 0.993550	Valid Loss: 2.206953
+
+* New best model (valid loss): 2.2331 --> 2.2070 *
+
+-------------- Epoch 16 --------------
+     T
+	  [B1]  scr: 0.7882
+	  [B4]  scr: 0.8587
+	  [B7]  scr: 0.8626
+	  [B10]  scr: 0.8562
+     V
+	  [B1]  scr: 0.7389
+Train Loss: 1.008406	Valid Loss: 2.377662
+-------------- Epoch 17 --------------
+     T
+	  [B1]  scr: 0.8754
+	  [B4]  scr: 0.8562
+	  [B7]  scr: 0.8378
+	  [B10]  scr: 0.8358
+     V
+	  [B1]  scr: 0.7537
+Train Loss: 1.165050	Valid Loss: 2.300519
+-------------- Epoch 18 --------------
+     T
+	  [B1]  scr: 0.8903
+	  [B4]  scr: 0.8993
+	  [B7]  scr: 0.8636
+	  [B10]  scr: 0.8695
+     V
+	  [B1]  scr: 0.7078
+Train Loss: 0.967690	Valid Loss: 2.643159
+-------------- Epoch 19 --------------
+     T
+	  [B1]  scr: 0.9131
+	  [B4]  scr: 0.8896
+	  [B7]  scr: 0.8878
+	  [B10]  scr: 0.8855
+     V
+	  [B1]  scr: 0.7092
+Train Loss: 0.851104	Valid Loss: 2.710488
+-------------- Epoch 20 --------------
+     T
+	  [B1]  scr: 0.9175
+	  [B4]  scr: 0.8991
+	  [B7]  scr: 0.8697
+	  [B10]  scr: 0.8793
+     V
+	  [B1]  scr: 0.7565
+Train Loss: 0.894899	Valid Loss: 2.051256
+
+* New best model (valid loss): 2.2070 --> 2.0513 *
+
+-------------- Epoch 21 --------------
+     T
+	  [B1]  scr: 0.8972
+	  [B4]  scr: 0.8286
+	  [B7]  scr: 0.8671
+	  [B10]  scr: 0.8724
+     V
+	  [B1]  scr: 0.7609
+Train Loss: 0.869595	Valid Loss: 2.115032
+-------------- Epoch 22 --------------
+     T
+	  [B1]  scr: 0.8608
+	  [B4]  scr: 0.8563
+	  [B7]  scr: 0.8711
+	  [B10]  scr: 0.8741
+     V
+	  [B1]  scr: 0.7485
+Train Loss: 0.871985	Valid Loss: 2.189348
+-------------- Epoch 23 --------------
+     T
+	  [B1]  scr: 0.8905
+	  [B4]  scr: 0.9090
+	  [B7]  scr: 0.9067
+	  [B10]  scr: 0.8955
+     V
+	  [B1]  scr: 0.6910
+Train Loss: 0.766771	Valid Loss: 2.810712
+-------------- Epoch 24 --------------
+     T
+	  [B1]  scr: 0.9330
+	  [B4]  scr: 0.8978
+	  [B7]  scr: 0.9074
+	  [B10]  scr: 0.8971
+     V
+	  [B1]  scr: 0.7327
+Train Loss: 0.731152	Valid Loss: 2.382729
+-------------- Epoch 25 --------------
+     T
+	  [B1]  scr: 0.8515
+	  [B4]  scr: 0.9053
+	  [B7]  scr: 0.8981
+	  [B10]  scr: 0.8817
+     V
+	  [B1]  scr: 0.7485
+Train Loss: 0.766458	Valid Loss: 2.539319
+
+* Stopped early *
+
+E. [Evaluating] from trained model mTECNOv1_f4-0.76
+
+	Testing...
+	  [B1]  scr: 0.7937
+	  [B2]  scr: 0.7756
+
+Test Score: 0.7756 (took 0.83s)
+
+./logs/LDSS-MP1-imdynaug100/mTECNOv1/eval/aprfc/cm_f4-0.76.png
+{'0Act,0Obj': 0, '0Obj,Rep': 1, 'Dis,Pro': 2, 'Dis,Vau': 3, 'Fix,Pro': 4, 'Fix,Vau': 5}
+
+phases_preds counts: [3099  597  913 3199  131 2936] 	 10875
+phases_gt counts: [2439 1014  359 4849  135 2530] 	 11326
+{0: '0Act,0Obj', 1: '0Obj,Rep', 2: 'Dis,Pro', 3: 'Dis,Vau', 4: 'Fix,Pro', 5: 'Fix,Vau'}
+
+Video 5238 Phase Report
+           |  T Preds   | T Targets  ||   Error   
+0Act,0Obj  |  51m 39s   |  40m 39s   ||    11m    
+0Obj,Rep   |   9m 57s   |  16m 54s   ||   6m 57s  
+Dis,Pro    |  15m 13s   |   5m 59s   ||   9m 14s  
+Dis,Vau    |  53m 19s   | 1h 20m 49s ||  27m 30s  
+Fix,Pro    |   2m 11s   |   2m 15s   ||     4s    
+Fix,Vau    |  48m 56s   |  42m 10s   ||   6m 46s   
+
+
+phases_preds counts: [1259    0  645 2086  112 3163] 	 7265
+phases_gt counts: [ 632    0  451 3121   57 3150] 	 7411
+{0: '0Act,0Obj', 1: '0Obj,Rep', 2: 'Dis,Pro', 3: 'Dis,Vau', 4: 'Fix,Pro', 5: 'Fix,Vau'}
+
+Video e8d3 Phase Report
+           |  T Preds   | T Targets  ||   Error   
+0Act,0Obj  |  20m 59s   |  10m 32s   ||  10m 27s  
+0Obj,Rep   |     0s     |     0s     ||     0s    
+Dis,Pro    |  10m 45s   |   7m 31s   ||   3m 14s  
+Dis,Vau    |  34m 46s   |   52m 1s   ||  17m 15s  
+Fix,Pro    |   1m 52s   |    57s     ||    55s    
+Fix,Vau    |  52m 43s   |  52m 30s   ||    13s     
+
+invalid preds:  597  /  18737
+Pred
+0Obj,Dis    255
+0Act,Pro    227
+0Act,Vau     87
+Rep,Vau      25
+0Obj,Fix      3
+Name: count, dtype: int64
+Saving aggregated phase timing results to ./logs/LDSS-MP1-imdynaug100/mTECNOv1/eval/timings/timings_Summary.csv
+
+
+Number of videos: 2
+Video graphing took 1.44 seconds
+
+Saved phase metric graphs to ./logs/LDSS-MP1-imdynaug100/mTECNOv1/eval/ribbons
+
+	 = = = = = 	 = = = = =
+		 Fold 4 done!
+	 = = = = = 	 = = = = =
+
+  Fold 5 splits:
+	train ['26d9', '315a', '436c', '5238', 'a334', 'b670', 'e6a9', 'e8d3', 'e8d7', 'f63b']
+	valid ['cf7c']
+	test ['a909', 'b71b']
+
+    No 'path_spaceModel' found. Using pretrained resnet50 in l4-fine-tune mode.
+    Feature size of 2048 at node 'flatten'
+    Feature size of None at node 'None'
+
+    Found feature path! (feats_f5-0.72.pt)
+  Available feature layers: ['flatten'] / Using last layer: flatten
+
+	Batch example shapes:
+	[space feature] torch.Size([412, 16, 2048])
+	[labels] [torch.Size([412, 16, 4])]
+	[idx] torch.Size([412, 16])
+    Batch contains 1 clip(s), each with 16 frames
+
+   [optim]: adam
+   [sched]: step
+
+Teaching model:  mTECNOv1_f5
+-------------- Epoch 1 --------------
+     T
+	  [B1]  scr: 0.2723
+	  [B4]  scr: 0.2340
+	  [B7]  scr: 0.2174
+	  [B10]  scr: 0.2081
+     V
+	  [B1]  scr: 0.1566
+Train Loss: 3.092067	Valid Loss: 3.169689
+
+* New best model (valid loss): inf --> 3.1697 *
+
+-------------- Epoch 2 --------------
+     T
+	  [B1]  scr: 0.2326
+	  [B4]  scr: 0.1976
+	  [B7]  scr: 0.2025
+	  [B10]  scr: 0.2131
+     V
+	  [B1]  scr: 0.3127
+Train Loss: 2.784215	Valid Loss: 2.989989
+
+* New best model (valid loss): 3.1697 --> 2.9900 *
+
+-------------- Epoch 3 --------------
+     T
+	  [B1]  scr: 0.3054
+	  [B4]  scr: 0.3878
+	  [B7]  scr: 0.4718
+	  [B10]  scr: 0.5311
+     V
+	  [B1]  scr: 0.6379
+Train Loss: 2.492812	Valid Loss: 2.701012
+
+* New best model (valid loss): 2.9900 --> 2.7010 *
+
+-------------- Epoch 4 --------------
+     T
+	  [B1]  scr: 0.7041
+	  [B4]  scr: 0.6675
+	  [B7]  scr: 0.6552
+	  [B10]  scr: 0.6450
+     V
+	  [B1]  scr: 0.6635
+Train Loss: 2.237863	Valid Loss: 2.405189
+
+* New best model (valid loss): 2.7010 --> 2.4052 *
+
+-------------- Epoch 5 --------------
+     T
+	  [B1]  scr: 0.7130
+	  [B4]  scr: 0.7310
+	  [B7]  scr: 0.7366
+	  [B10]  scr: 0.7423
+     V
+	  [B1]  scr: 0.6814
+Train Loss: 1.837472	Valid Loss: 2.829017
+-------------- Epoch 6 --------------
+     T
+	  [B1]  scr: 0.7980
+	  [B4]  scr: 0.8145
+	  [B7]  scr: 0.7685
+	  [B10]  scr: 0.7651
+     V
+	  [B1]  scr: 0.6865
+Train Loss: 1.582262	Valid Loss: 2.297074
+
+* New best model (valid loss): 2.4052 --> 2.2971 *
+
+-------------- Epoch 7 --------------
+     T
+	  [B1]  scr: 0.6977
+	  [B4]  scr: 0.7764
+	  [B7]  scr: 0.8015
+	  [B10]  scr: 0.7671
+     V
+	  [B1]  scr: 0.6696
+Train Loss: 1.488638	Valid Loss: 2.304682
+-------------- Epoch 8 --------------
+     T
+	  [B1]  scr: 0.6386
+	  [B4]  scr: 0.7807
+	  [B7]  scr: 0.7827
+	  [B10]  scr: 0.7938
+     V
+	  [B1]  scr: 0.7125
+Train Loss: 1.468438	Valid Loss: 2.343345
+-------------- Epoch 9 --------------
+     T
+	  [B1]  scr: 0.8165
+	  [B4]  scr: 0.7960
+	  [B7]  scr: 0.8162
+	  [B10]  scr: 0.8205
+     V
+	  [B1]  scr: 0.7101
+Train Loss: 1.225763	Valid Loss: 2.504389
+-------------- Epoch 10 --------------
+     T
+	  [B1]  scr: 0.8153
+	  [B4]  scr: 0.8490
+	  [B7]  scr: 0.8394
+	  [B10]  scr: 0.8384
+     V
+	  [B1]  scr: 0.6908
+Train Loss: 1.127440	Valid Loss: 2.663856
+-------------- Epoch 11 --------------
+     T
+	  [B1]  scr: 0.8639
+	  [B4]  scr: 0.8264
+	  [B7]  scr: 0.8430
+	  [B10]  scr: 0.8405
+     V
+	  [B1]  scr: 0.7114
+Train Loss: 1.106154	Valid Loss: 2.707023
+
+* Stopped early *
+
+E. [Evaluating] from trained model mTECNOv1_f5-0.69
+
+	Testing...
+	  [B1]  scr: 0.7873
+	  [B2]  scr: 0.8158
+
+Test Score: 0.8158 (took 0.81s)
+
+./logs/LDSS-MP1-imdynaug100/mTECNOv1/eval/aprfc/cm_f5-0.69.png
+{'0Act,0Obj': 0, '0Obj,Rep': 1, 'Dis,Pro': 2, 'Dis,Vau': 3, 'Fix,Pro': 4, 'Fix,Vau': 5}
+
+phases_preds counts: [1258 1218  429 2125   33 2795] 	 7858
+phases_gt counts: [1737  802  274 2228   48 3168] 	 8257
+{0: '0Act,0Obj', 1: '0Obj,Rep', 2: 'Dis,Pro', 3: 'Dis,Vau', 4: 'Fix,Pro', 5: 'Fix,Vau'}
+
+Video a909 Phase Report
+           |  T Preds   | T Targets  ||   Error   
+0Act,0Obj  |  20m 58s   |  28m 57s   ||   7m 59s  
+0Obj,Rep   |  20m 18s   |  13m 22s   ||   6m 56s  
+Dis,Pro    |   7m 9s    |   4m 34s   ||   2m 35s  
+Dis,Vau    |  35m 25s   |   37m 8s   ||   1m 43s  
+Fix,Pro    |    33s     |    48s     ||    15s    
+Fix,Vau    |  46m 35s   |  52m 48s   ||   6m 13s   
+
+
+phases_preds counts: [ 785  941  892 5069  199 2762] 	 10648
+phases_gt counts: [ 748  733  316 5640  151 3583] 	 11171
+{0: '0Act,0Obj', 1: '0Obj,Rep', 2: 'Dis,Pro', 3: 'Dis,Vau', 4: 'Fix,Pro', 5: 'Fix,Vau'}
+
+Video b71b Phase Report
+           |  T Preds   | T Targets  ||   Error   
+0Act,0Obj  |   13m 5s   |  12m 28s   ||    37s    
+0Obj,Rep   |  15m 41s   |  12m 13s   ||   3m 28s  
+Dis,Pro    |  14m 52s   |   5m 16s   ||   9m 36s  
+Dis,Vau    | 1h 24m 29s |   1h 34m   ||   9m 31s  
+Fix,Pro    |   3m 19s   |   2m 31s   ||    48s    
+Fix,Vau    |   46m 2s   |  59m 43s   ||  13m 41s   
+
+invalid preds:  922  /  19428
+Pred
+0Obj,Dis    386
+0Act,Vau    262
+0Obj,Fix    152
+Rep,Vau      52
+0Act,Pro     40
+Pro,Rep      30
+Name: count, dtype: int64
+Saving aggregated phase timing results to ./logs/LDSS-MP1-imdynaug100/mTECNOv1/eval/timings/timings_Summary.csv
+
+
+Number of videos: 2
+Video graphing took 1.52 seconds
+
+Saved phase metric graphs to ./logs/LDSS-MP1-imdynaug100/mTECNOv1/eval/ribbons
+
+	 = = = = = 	 = = = = =
+		 Fold 5 done!
+	 = = = = = 	 = = = = =
+
+  Fold 6 splits:
+	train ['26d9', '315a', '5238', 'a334', 'a909', 'b71b', 'e6a9', 'e8d3', 'e8d7', 'f63b']
+	valid ['cf7c']
+	test ['436c', 'b670']
+
+    No 'path_spaceModel' found. Using pretrained resnet50 in l4-fine-tune mode.
+    Feature size of 2048 at node 'flatten'
+    Feature size of None at node 'None'
+
+    Found feature path! (feats_f6-0.72.pt)
+  Available feature layers: ['flatten'] / Using last layer: flatten
+
+	Batch example shapes:
+	[space feature] torch.Size([798, 16, 2048])
+	[labels] [torch.Size([798, 16, 4])]
+	[idx] torch.Size([798, 16])
+    Batch contains 1 clip(s), each with 16 frames
+
+   [optim]: adam
+   [sched]: step
+
+Teaching model:  mTECNOv1_f6
+-------------- Epoch 1 --------------
+     T
+	  [B1]  scr: 0.2214
+	  [B4]  scr: 0.1338
+	  [B7]  scr: 0.1957
+	  [B10]  scr: 0.2785
+     V
+	  [B1]  scr: 0.4810
+Train Loss: 2.970657	Valid Loss: 3.149487
+
+* New best model (valid loss): inf --> 3.1495 *
+
+-------------- Epoch 2 --------------
+     T
+	  [B1]  scr: 0.5416
+	  [B4]  scr: 0.4964
+	  [B7]  scr: 0.5004
+	  [B10]  scr: 0.4976
+     V
+	  [B1]  scr: 0.4171
+Train Loss: 2.670201	Valid Loss: 2.839712
+
+* New best model (valid loss): 3.1495 --> 2.8397 *
+
+-------------- Epoch 3 --------------
+     T
+	  [B1]  scr: 0.4894
+	  [B4]  scr: 0.5228
+	  [B7]  scr: 0.5917
+	  [B10]  scr: 0.6406
+     V
+	  [B1]  scr: 0.6707
+Train Loss: 2.309973	Valid Loss: 2.562477
+
+* New best model (valid loss): 2.8397 --> 2.5625 *
+
+-------------- Epoch 4 --------------
+     T
+	  [B1]  scr: 0.6982
+	  [B4]  scr: 0.7299
+	  [B7]  scr: 0.7403
+	  [B10]  scr: 0.7411
+     V
+	  [B1]  scr: 0.5713
+Train Loss: 1.978835	Valid Loss: 2.731647
+-------------- Epoch 5 --------------
+     T
+	  [B1]  scr: 0.6970
+	  [B4]  scr: 0.7247
+	  [B7]  scr: 0.7365
+	  [B10]  scr: 0.7288
+     V
+	  [B1]  scr: 0.5487
+Train Loss: 1.741225	Valid Loss: 2.485100
+
+* New best model (valid loss): 2.5625 --> 2.4851 *
+
+-------------- Epoch 6 --------------
+     T
+	  [B1]  scr: 0.5372
+	  [B4]  scr: 0.6513
+	  [B7]  scr: 0.7047
+	  [B10]  scr: 0.6875
+     V
+	  [B1]  scr: 0.6980
+Train Loss: 1.776443	Valid Loss: 2.293772
+
+* New best model (valid loss): 2.4851 --> 2.2938 *
+
+-------------- Epoch 7 --------------
+     T
+	  [B1]  scr: 0.8051
+	  [B4]  scr: 0.7990
+	  [B7]  scr: 0.7965
+	  [B10]  scr: 0.7840
+     V
+	  [B1]  scr: 0.6849
+Train Loss: 1.476408	Valid Loss: 2.288060
+
+* New best model (valid loss): 2.2938 --> 2.2881 *
+
+-------------- Epoch 8 --------------
+     T
+	  [B1]  scr: 0.7674
+	  [B4]  scr: 0.7642
+	  [B7]  scr: 0.7682
+	  [B10]  scr: 0.7827
+     V
+	  [B1]  scr: 0.7055
+Train Loss: 1.352940	Valid Loss: 2.428068
+-------------- Epoch 9 --------------
+     T
+	  [B1]  scr: 0.8269
+	  [B4]  scr: 0.8451
+	  [B7]  scr: 0.8400
+	  [B10]  scr: 0.8230
+     V
+	  [B1]  scr: 0.7171
+Train Loss: 1.202625	Valid Loss: 2.284084
+
+* New best model (valid loss): 2.2881 --> 2.2841 *
+
+-------------- Epoch 10 --------------
+     T
+	  [B1]  scr: 0.8452
+	  [B4]  scr: 0.8127
+	  [B7]  scr: 0.8168
+	  [B10]  scr: 0.8178
+     V
+	  [B1]  scr: 0.7524
+Train Loss: 1.144828	Valid Loss: 2.197858
+
+* New best model (valid loss): 2.2841 --> 2.1979 *
+
+-------------- Epoch 11 --------------
+     T
+	  [B1]  scr: 0.7749
+	  [B4]  scr: 0.8279
+	  [B7]  scr: 0.8428
+	  [B10]  scr: 0.8422
+     V
+	  [B1]  scr: 0.7333
+Train Loss: 1.083544	Valid Loss: 2.301613
+-------------- Epoch 12 --------------
+     T
+	  [B1]  scr: 0.8917
+	  [B4]  scr: 0.8616
+	  [B7]  scr: 0.8479
+	  [B10]  scr: 0.8442
+     V
+	  [B1]  scr: 0.6877
+Train Loss: 1.015670	Valid Loss: 2.408543
+-------------- Epoch 13 --------------
+     T
+	  [B1]  scr: 0.8137
+	  [B4]  scr: 0.8289
+	  [B7]  scr: 0.8381
+	  [B10]  scr: 0.8563
+     V
+	  [B1]  scr: 0.7155
+Train Loss: 0.994637	Valid Loss: 2.271636
+-------------- Epoch 14 --------------
+     T
+	  [B1]  scr: 0.8660
+	  [B4]  scr: 0.8155
+	  [B7]  scr: 0.8460
+	  [B10]  scr: 0.8460
+     V
+	  [B1]  scr: 0.7114
+Train Loss: 1.021877	Valid Loss: 2.583286
+-------------- Epoch 15 --------------
+     T
+	  [B1]  scr: 0.8800
+	  [B4]  scr: 0.8909
+	  [B7]  scr: 0.8670
+	  [B10]  scr: 0.8589
+     V
+	  [B1]  scr: 0.7198
+Train Loss: 0.939420	Valid Loss: 2.538011
+
+* Stopped early *
+
+E. [Evaluating] from trained model mTECNOv1_f6-0.75
+
+	Testing...
+	  [B1]  scr: 0.7111
+	  [B2]  scr: 0.7433
+
+Test Score: 0.7433 (took 1.03s)
+
+./logs/LDSS-MP1-imdynaug100/mTECNOv1/eval/aprfc/cm_f6-0.75.png
+{'0Act,0Obj': 0, '0Obj,Rep': 1, 'Dis,Pro': 2, 'Dis,Vau': 3, 'Fix,Pro': 4, 'Fix,Vau': 5}
+
+phases_preds counts: [ 157 1683 1380 3096  294 1791] 	 8401
+phases_gt counts: [ 882  881 1022 2323  340 3777] 	 9225
+{0: '0Act,0Obj', 1: '0Obj,Rep', 2: 'Dis,Pro', 3: 'Dis,Vau', 4: 'Fix,Pro', 5: 'Fix,Vau'}
+
+Video 436c Phase Report
+           |  T Preds   | T Targets  ||   Error   
+0Act,0Obj  |   2m 37s   |  14m 42s   ||   12m 5s  
+0Obj,Rep   |   28m 3s   |  14m 41s   ||  13m 22s  
+Dis,Pro    |    23m     |   17m 2s   ||   5m 58s  
+Dis,Vau    |  51m 36s   |  38m 43s   ||  12m 53s  
+Fix,Pro    |   4m 54s   |   5m 40s   ||    46s    
+Fix,Vau    |  29m 51s   | 1h 2m 57s  ||   33m 6s   
+
+
+phases_preds counts: [ 343 1883  934 5273   53 1893] 	 10379
+phases_gt counts: [ 731  790  911 4940  618 3143] 	 11133
+{0: '0Act,0Obj', 1: '0Obj,Rep', 2: 'Dis,Pro', 3: 'Dis,Vau', 4: 'Fix,Pro', 5: 'Fix,Vau'}
+
+Video b670 Phase Report
+           |  T Preds   | T Targets  ||   Error   
+0Act,0Obj  |   5m 43s   |  12m 11s   ||   6m 28s  
+0Obj,Rep   |  31m 23s   |  13m 10s   ||  18m 13s  
+Dis,Pro    |  15m 34s   |  15m 11s   ||    23s    
+Dis,Vau    | 1h 27m 53s | 1h 22m 20s ||   5m 33s  
+Fix,Pro    |    53s     |  10m 18s   ||   9m 25s  
+Fix,Vau    |  31m 33s   |  52m 23s   ||  20m 50s   
+
+invalid preds:  1578  /  20358
+Pred
+Rep,Vau     835
+0Obj,Dis    302
+0Act,Pro    192
+Pro,Rep     157
+0Act,Vau     72
+0Obj,Fix     20
+Name: count, dtype: int64
+Saving aggregated phase timing results to ./logs/LDSS-MP1-imdynaug100/mTECNOv1/eval/timings/timings_Summary.csv
+
+
+Number of videos: 2
+Video graphing took 1.63 seconds
+
+Saved phase metric graphs to ./logs/LDSS-MP1-imdynaug100/mTECNOv1/eval/ribbons
+
+	 = = = = = 	 = = = = =
+		 Fold 6 done!
+	 = = = = = 	 = = = = =
+
+  Fold 7 splits:
+	train ['436c', '5238', 'a334', 'a909', 'b670', 'b71b', 'e6a9', 'e8d3', 'e8d7', 'f63b']
+	valid ['cf7c']
+	test ['26d9', '315a']
+
+    No 'path_spaceModel' found. Using pretrained resnet50 in l4-fine-tune mode.
+    Feature size of 2048 at node 'flatten'
+    Feature size of None at node 'None'
+
+    Found feature path! (feats_f7-0.71.pt)
+  Available feature layers: ['flatten'] / Using last layer: flatten
+
+	Batch example shapes:
+	[space feature] torch.Size([810, 16, 2048])
+	[labels] [torch.Size([810, 16, 4])]
+	[idx] torch.Size([810, 16])
+    Batch contains 1 clip(s), each with 16 frames
+
+   [optim]: adam
+   [sched]: step
+
+Teaching model:  mTECNOv1_f7
+-------------- Epoch 1 --------------
+     T
+	  [B1]  scr: 0.4999
+	  [B4]  scr: 0.4567
+	  [B7]  scr: 0.3771
+	  [B10]  scr: 0.3749
+     V
+	  [B1]  scr: 0.1933
+Train Loss: 3.037578	Valid Loss: 3.334415
+
+* New best model (valid loss): inf --> 3.3344 *
+
+-------------- Epoch 2 --------------
+     T
+	  [B1]  scr: 0.3435
+	  [B4]  scr: 0.3154
+	  [B7]  scr: 0.3145
+	  [B10]  scr: 0.3454
+     V
+	  [B1]  scr: 0.4813
+Train Loss: 2.750288	Valid Loss: 3.111866
+
+* New best model (valid loss): 3.3344 --> 3.1119 *
+
+-------------- Epoch 3 --------------
+     T
+	  [B1]  scr: 0.5628
+	  [B4]  scr: 0.6337
+	  [B7]  scr: 0.6217
+	  [B10]  scr: 0.6412
+     V
+	  [B1]  scr: 0.5203
+Train Loss: 2.482423	Valid Loss: 2.751151
+
+* New best model (valid loss): 3.1119 --> 2.7512 *
+
+-------------- Epoch 4 --------------
+     T
+	  [B1]  scr: 0.7878
+	  [B4]  scr: 0.7198
+	  [B7]  scr: 0.7164
+	  [B10]  scr: 0.6966
+     V
+	  [B1]  scr: 0.5319
+Train Loss: 2.157873	Valid Loss: 2.729293
+
+* New best model (valid loss): 2.7512 --> 2.7293 *
+
+-------------- Epoch 5 --------------
+     T
+	  [B1]  scr: 0.6318
+	  [B4]  scr: 0.6414
+	  [B7]  scr: 0.6567
+	  [B10]  scr: 0.6826
+     V
+	  [B1]  scr: 0.6537
+Train Loss: 1.989878	Valid Loss: 2.858662
+-------------- Epoch 6 --------------
+     T
+	  [B1]  scr: 0.7442
+	  [B4]  scr: 0.7604
+	  [B7]  scr: 0.7262
+	  [B10]  scr: 0.7163
+     V
+	  [B1]  scr: 0.6544
+Train Loss: 1.765288	Valid Loss: 2.427258
+
+* New best model (valid loss): 2.7293 --> 2.4273 *
+
+-------------- Epoch 7 --------------
+     T
+	  [B1]  scr: 0.8079
+	  [B4]  scr: 0.7828
+	  [B7]  scr: 0.7892
+	  [B10]  scr: 0.7868
+     V
+	  [B1]  scr: 0.6884
+Train Loss: 1.482838	Valid Loss: 2.534084
+-------------- Epoch 8 --------------
+     T
+	  [B1]  scr: 0.7679
+	  [B4]  scr: 0.8011
+	  [B7]  scr: 0.8012
+	  [B10]  scr: 0.7875
+     V
+	  [B1]  scr: 0.6950
+Train Loss: 1.444553	Valid Loss: 2.487591
+-------------- Epoch 9 --------------
+     T
+	  [B1]  scr: 0.7775
+	  [B4]  scr: 0.7722
+	  [B7]  scr: 0.7924
+	  [B10]  scr: 0.7888
+     V
+	  [B1]  scr: 0.7072
+Train Loss: 1.385307	Valid Loss: 2.507205
+-------------- Epoch 10 --------------
+     T
+	  [B1]  scr: 0.7976
+	  [B4]  scr: 0.8148
+	  [B7]  scr: 0.8091
+	  [B10]  scr: 0.8148
+     V
+	  [B1]  scr: 0.6998
+Train Loss: 1.266262	Valid Loss: 2.760835
+-------------- Epoch 11 --------------
+     T
+	  [B1]  scr: 0.8462
+	  [B4]  scr: 0.8550
+	  [B7]  scr: 0.8463
+	  [B10]  scr: 0.8397
+     V
+	  [B1]  scr: 0.7137
+Train Loss: 1.150935	Valid Loss: 2.432244
+
+* Stopped early *
+
+E. [Evaluating] from trained model mTECNOv1_f7-0.65
+
+	Testing...
+	  [B1]  scr: 0.8349
+	  [B2]  scr: 0.7736
+
+Test Score: 0.7736 (took 0.87s)
+
+./logs/LDSS-MP1-imdynaug100/mTECNOv1/eval/aprfc/cm_f7-0.65.png
+{'0Act,0Obj': 0, '0Obj,Rep': 1, 'Dis,Pro': 2, 'Dis,Vau': 3, 'Fix,Pro': 4, 'Fix,Vau': 5}
+
+phases_preds counts: [1426 1133  427 2010  103 3738] 	 8837
+phases_gt counts: [1031 1386  463 2223   42 4139] 	 9284
+{0: '0Act,0Obj', 1: '0Obj,Rep', 2: 'Dis,Pro', 3: 'Dis,Vau', 4: 'Fix,Pro', 5: 'Fix,Vau'}
+
+Video 26d9 Phase Report
+           |  T Preds   | T Targets  ||   Error   
+0Act,0Obj  |  23m 46s   |  17m 11s   ||   6m 35s  
+0Obj,Rep   |  18m 53s   |   23m 6s   ||   4m 13s  
+Dis,Pro    |   7m 7s    |   7m 43s   ||    36s    
+Dis,Vau    |  33m 30s   |   37m 3s   ||   3m 33s  
+Fix,Pro    |   1m 43s   |    42s     ||   1m 1s   
+Fix,Vau    | 1h 2m 18s  | 1h 8m 59s  ||   6m 41s   
+
+
+phases_preds counts: [2339 1869  352  691  185 3712] 	 9148
+phases_gt counts: [1812 1231  558 1536  172 4898] 	 10207
+{0: '0Act,0Obj', 1: '0Obj,Rep', 2: 'Dis,Pro', 3: 'Dis,Vau', 4: 'Fix,Pro', 5: 'Fix,Vau'}
+
+Video 315a Phase Report
+           |  T Preds   | T Targets  ||   Error   
+0Act,0Obj  |  38m 59s   |  30m 12s   ||   8m 47s  
+0Obj,Rep   |   31m 9s   |  20m 31s   ||  10m 38s  
+Dis,Pro    |   5m 52s   |   9m 18s   ||   3m 26s  
+Dis,Vau    |  11m 31s   |  25m 36s   ||   14m 5s  
+Fix,Pro    |   3m 5s    |   2m 52s   ||    13s    
+Fix,Vau    | 1h 1m 52s  | 1h 21m 38s ||  19m 46s   
+
+invalid preds:  1506  /  19491
+Pred
+0Obj,Fix    824
+0Obj,Dis    287
+0Act,Pro    208
+0Act,Vau    183
+Rep,Vau       2
+Pro,Rep       2
+Name: count, dtype: int64
+Saving aggregated phase timing results to ./logs/LDSS-MP1-imdynaug100/mTECNOv1/eval/timings/timings_Summary.csv
+
+
+Number of videos: 2
+Video graphing took 1.53 seconds
+
+Saved phase metric graphs to ./logs/LDSS-MP1-imdynaug100/mTECNOv1/eval/ribbons
+
+	 = = = = = 	 = = = = =
+		 Fold 7 done!
+	 = = = = = 	 = = = = =
+
+G. [Processing] Generating all-fold confusion matrix ./logs/LDSS-MP1-imdynaug100/mTECNOv1/eval/preds
+Collected 134498 predictions and 134498 targets
+Pred tensor shape: torch.Size([268996]), Target tensor shape: torch.Size([268996])
+./logs/LDSS-MP1-imdynaug100/mTECNOv1/eval/aprfc/cm_global
+
+
+ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨
+
+
+Running 14cfg_SP1-tecno2_A.yml...
+
+A. [classroom] LDSS-SP1-imdynaug100 (Matched)
+   [model] TECN2v1 (New)
+   For ('train', 'process', 'eval')
+
+B. [dataset] LDSS-local (#134498)
+   [label type] single-phase-top1
+   [preprocessing] imagenet-dynaug
+   [classes] #6 (Unbalanced) ['0Act-0Obj', '0Obj-Rep', 'Dis-Pro', 'Dis-Vau', 'Fix-Pro', 'Fix-Vau']
+   [weights] [tensor([0.3846, 0.6755, 1.0557, 0.2113, 3.4933, 0.1796])]
+   [phases] #6  ['0Act-0Obj', '0Obj-Rep', 'Dis-Pro', 'Dis-Vau', 'Fix-Pro', 'Fix-Vau'] 
+
+C. [training] start on [device] cpu
+   [folds] #7 [epochs] #100 [batch sizes] s32 / t1
+   [criterions] [CrossEntropyLoss()] w/ weights [tensor([0.3846, 0.6755, 1.0557, 0.2113, 3.4933, 0.1796])]
+   [headtype] [6] 
+
+  Fold 1 splits:
+	train ['26d9', '315a', '436c', '5238', 'a909', 'b670', 'b71b', 'e6a9', 'e8d3', 'e8d7']
+	valid ['a334', 'f63b']
+	test ['cf7c']
+
+    No 'path_spaceModel' found. Using pretrained resnet50 in l4-fine-tune mode.
+    Feature size of 2048 at node 'flatten'
+    Feature size of None at node 'None'
+
+    Found feature path! (feats_f1-0.80.pt)
+  Available feature layers: ['flatten'] / Using last layer: flatten
+
+	Batch example shapes:
+	[space feature] torch.Size([577, 16, 2048])
+	[labels] [torch.Size([577, 16])]
+	[idx] torch.Size([577, 16])
+    Batch contains 1 clip(s), each with 16 frames
+
+   [optim]: adam
+   [sched]: step
+
+Teaching model:  TECN2v1_f1
+-------------- Epoch 1 --------------
+     T
+	  [B1]  scr: 0.3313
+	  [B4]  scr: 0.1330
+	  [B7]  scr: 0.0950
+	  [B10]  scr: 0.0816
+     V
+	  [B1]  scr: 0.0321
+	  [B2]  scr: 0.0209
+Train Loss: 3.581474	Valid Loss: 3.526315
+
+* New best model (valid loss): inf --> 3.5263 *
+
+-------------- Epoch 2 --------------
+     T
+	  [B1]  scr: 0.1691
+	  [B4]  scr: 0.2358
+	  [B7]  scr: 0.2771
+	  [B10]  scr: 0.2895
+     V
+	  [B1]  scr: 0.2799
+	  [B2]  scr: 0.3768
+Train Loss: 3.394380	Valid Loss: 3.286016
+
+* New best model (valid loss): 3.5263 --> 3.2860 *
+
+-------------- Epoch 3 --------------
+     T
+	  [B1]  scr: 0.2984
+	  [B4]  scr: 0.3852
+	  [B7]  scr: 0.3845
+	  [B10]  scr: 0.3803
+     V
+	  [B1]  scr: 0.5496
+	  [B2]  scr: 0.4832
+Train Loss: 3.134252	Valid Loss: 2.985503
+
+* New best model (valid loss): 3.2860 --> 2.9855 *
+
+-------------- Epoch 4 --------------
+     T
+	  [B1]  scr: 0.3120
+	  [B4]  scr: 0.3493
+	  [B7]  scr: 0.3196
+	  [B10]  scr: 0.3309
+     V
+	  [B1]  scr: 0.6850
+	  [B2]  scr: 0.5610
+Train Loss: 2.852253	Valid Loss: 2.595248
+
+* New best model (valid loss): 2.9855 --> 2.5952 *
+
+-------------- Epoch 5 --------------
+     T
+	  [B1]  scr: 0.3692
+	  [B4]  scr: 0.4017
+	  [B7]  scr: 0.3964
+	  [B10]  scr: 0.4426
+     V
+	  [B1]  scr: 0.6479
+	  [B2]  scr: 0.5942
+Train Loss: 2.485595	Valid Loss: 2.349342
+
+* New best model (valid loss): 2.5952 --> 2.3493 *
+
+-------------- Epoch 6 --------------
+     T
+	  [B1]  scr: 0.6145
+	  [B4]  scr: 0.5634
+	  [B7]  scr: 0.4787
+	  [B10]  scr: 0.4844
+     V
+	  [B1]  scr: 0.6381
+	  [B2]  scr: 0.5953
+Train Loss: 2.196974	Valid Loss: 2.057828
+
+* New best model (valid loss): 2.3493 --> 2.0578 *
+
+-------------- Epoch 7 --------------
+     T
+	  [B1]  scr: 0.5756
+	  [B4]  scr: 0.6865
+	  [B7]  scr: 0.6745
+	  [B10]  scr: 0.6744
+     V
+	  [B1]  scr: 0.6234
+	  [B2]  scr: 0.5767
+Train Loss: 1.800456	Valid Loss: 1.792974
+
+* New best model (valid loss): 2.0578 --> 1.7930 *
+
+-------------- Epoch 8 --------------
+     T
+	  [B1]  scr: 0.7081
+	  [B4]  scr: 0.6862
+	  [B7]  scr: 0.7034
+	  [B10]  scr: 0.6834
+     V
+	  [B1]  scr: 0.6014
+	  [B2]  scr: 0.5771
+Train Loss: 1.677785	Valid Loss: 1.750954
+
+* New best model (valid loss): 1.7930 --> 1.7510 *
+
+-------------- Epoch 9 --------------
+     T
+	  [B1]  scr: 0.6972
+	  [B4]  scr: 0.5917
+	  [B7]  scr: 0.5963
+	  [B10]  scr: 0.6266
+     V
+	  [B1]  scr: 0.6906
+	  [B2]  scr: 0.6426
+Train Loss: 1.545625	Valid Loss: 1.972340
+-------------- Epoch 10 --------------
+     T
+	  [B1]  scr: 0.5389
+	  [B4]  scr: 0.7174
+	  [B7]  scr: 0.7315
+	  [B10]  scr: 0.7165
+     V
+	  [B1]  scr: 0.7108
+	  [B2]  scr: 0.6440
+Train Loss: 1.425591	Valid Loss: 1.646516
+
+* New best model (valid loss): 1.7510 --> 1.6465 *
+
+-------------- Epoch 11 --------------
+     T
+	  [B1]  scr: 0.6395
+	  [B4]  scr: 0.7254
+	  [B7]  scr: 0.7442
+	  [B10]  scr: 0.7658
+     V
+	  [B1]  scr: 0.7560
+	  [B2]  scr: 0.6654
+Train Loss: 1.295955	Valid Loss: 1.701982
+-------------- Epoch 12 --------------
+     T
+	  [B1]  scr: 0.5948
+	  [B4]  scr: 0.6720
+	  [B7]  scr: 0.7123
+	  [B10]  scr: 0.7457
+     V
+	  [B1]  scr: 0.7978
+	  [B2]  scr: 0.7364
+Train Loss: 1.233394	Valid Loss: 1.760457
+-------------- Epoch 13 --------------
+     T
+	  [B1]  scr: 0.8446
+	  [B4]  scr: 0.7635
+	  [B7]  scr: 0.7470
+	  [B10]  scr: 0.7484
+     V
+	  [B1]  scr: 0.7538
+	  [B2]  scr: 0.7057
+Train Loss: 1.212219	Valid Loss: 1.869193
+-------------- Epoch 14 --------------
+     T
+	  [B1]  scr: 0.7668
+	  [B4]  scr: 0.7998
+	  [B7]  scr: 0.7968
+	  [B10]  scr: 0.7950
+     V
+	  [B1]  scr: 0.6966
+	  [B2]  scr: 0.6846
+Train Loss: 1.137601	Valid Loss: 1.524880
+
+* New best model (valid loss): 1.6465 --> 1.5249 *
+
+-------------- Epoch 15 --------------
+     T
+	  [B1]  scr: 0.7617
+	  [B4]  scr: 0.7243
+	  [B7]  scr: 0.7584
+	  [B10]  scr: 0.7785
+     V
+	  [B1]  scr: 0.7672
+	  [B2]  scr: 0.7153
+Train Loss: 1.101167	Valid Loss: 1.864905
+-------------- Epoch 16 --------------
+     T
+	  [B1]  scr: 0.8799
+	  [B4]  scr: 0.8230
+	  [B7]  scr: 0.7563
+	  [B10]  scr: 0.7706
+     V
+	  [B1]  scr: 0.7814
+	  [B2]  scr: 0.7502
+Train Loss: 1.116726	Valid Loss: 1.890626
+-------------- Epoch 17 --------------
+     T
+	  [B1]  scr: 0.8551
+	  [B4]  scr: 0.8498
+	  [B7]  scr: 0.8124
+	  [B10]  scr: 0.8128
+     V
+	  [B1]  scr: 0.7451
+	  [B2]  scr: 0.7337
+Train Loss: 1.012249	Valid Loss: 1.618234
+-------------- Epoch 18 --------------
+     T
+	  [B1]  scr: 0.7779
+	  [B4]  scr: 0.8270
+	  [B7]  scr: 0.8148
+	  [B10]  scr: 0.8157
+     V
+	  [B1]  scr: 0.7314
+	  [B2]  scr: 0.7045
+Train Loss: 0.966652	Valid Loss: 1.593342
+-------------- Epoch 19 --------------
+     T
+	  [B1]  scr: 0.7818
+	  [B4]  scr: 0.8453
+	  [B7]  scr: 0.8441
+	  [B10]  scr: 0.8166
+     V
+	  [B1]  scr: 0.7426
+	  [B2]  scr: 0.7464
+Train Loss: 0.938381	Valid Loss: 1.535187
+
+* Stopped early *
+
+E. [Evaluating] from trained model TECN2v1_f1-0.68
+
+	Testing...
+	  [B1]  scr: 0.6889
+
+Test Score: 0.6889 (took 0.72s)
+
+./logs/LDSS-SP1-imdynaug100/TECN2v1/eval/aprfc/cm_f1-0.68.png
+{'0Act-0Obj': 0, '0Obj-Rep': 1, 'Dis-Pro': 2, 'Dis-Vau': 3, 'Fix-Pro': 4, 'Fix-Vau': 5}
+
+phases_preds counts: [6195  788 1571 3728  357 5137] 	 17776
+phases_gt counts: [5930 1281 1128 3955  157 5325] 	 17776
+{0: '0Act-0Obj', 1: '0Obj-Rep', 2: 'Dis-Pro', 3: 'Dis-Vau', 4: 'Fix-Pro', 5: 'Fix-Vau'}
+
+Video cf7c Phase Report
+           |  T Preds   | T Targets  ||   Error   
+0Act-0Obj  | 1h 43m 15s | 1h 38m 50s ||   4m 25s  
+0Obj-Rep   |   13m 8s   |  21m 21s   ||   8m 13s  
+Dis-Pro    |  26m 11s   |  18m 48s   ||   7m 23s  
+Dis-Vau    |  1h 2m 8s  | 1h 5m 55s  ||   3m 47s  
+Fix-Pro    |   5m 57s   |   2m 37s   ||   3m 20s  
+Fix-Vau    | 1h 25m 37s | 1h 28m 45s ||   3m 8s    
+
+invalid preds:  0  /  17776
+Series([], Name: count, dtype: int64)
+Saving aggregated phase timing results to ./logs/LDSS-SP1-imdynaug100/TECN2v1/eval/timings/timings_Summary.csv
+
+
+Number of videos: 1
+Video graphing took 0.96 seconds
+
+Saved phase metric graphs to ./logs/LDSS-SP1-imdynaug100/TECN2v1/eval/ribbons
+
+	 = = = = = 	 = = = = =
+		 Fold 1 done!
+	 = = = = = 	 = = = = =
+
+  Fold 2 splits:
+	train ['26d9', '315a', '436c', '5238', 'a909', 'b670', 'b71b', 'e6a9', 'e8d3', 'e8d7']
+	valid ['cf7c']
+	test ['a334', 'f63b']
+
+    No 'path_spaceModel' found. Using pretrained resnet50 in l4-fine-tune mode.
+    Feature size of 2048 at node 'flatten'
+    Feature size of None at node 'None'
+
+    Found feature path! (feats_f2-0.72.pt)
+  Available feature layers: ['flatten'] / Using last layer: flatten
+
+	Batch example shapes:
+	[space feature] torch.Size([577, 16, 2048])
+	[labels] [torch.Size([577, 16])]
+	[idx] torch.Size([577, 16])
+    Batch contains 1 clip(s), each with 16 frames
+
+   [optim]: adam
+   [sched]: step
+
+Teaching model:  TECN2v1_f2
+-------------- Epoch 1 --------------
+     T
+	  [B1]  scr: 0.1991
+	  [B4]  scr: 0.0845
+	  [B7]  scr: 0.0622
+	  [B10]  scr: 0.0593
+     V
+	  [B1]  scr: 0.0088
+Train Loss: 3.558886	Valid Loss: 3.514151
+
+* New best model (valid loss): inf --> 3.5142 *
+
+-------------- Epoch 2 --------------
+     T
+	  [B1]  scr: 0.0786
+	  [B4]  scr: 0.1973
+	  [B7]  scr: 0.2691
+	  [B10]  scr: 0.3083
+     V
+	  [B1]  scr: 0.4408
+Train Loss: 3.338524	Valid Loss: 3.281462
+
+* New best model (valid loss): 3.5142 --> 3.2815 *
+
+-------------- Epoch 3 --------------
+     T
+	  [B1]  scr: 0.4559
+	  [B4]  scr: 0.5332
+	  [B7]  scr: 0.5616
+	  [B10]  scr: 0.5589
+     V
+	  [B1]  scr: 0.4646
+Train Loss: 2.995078	Valid Loss: 3.038605
+
+* New best model (valid loss): 3.2815 --> 3.0386 *
+
+-------------- Epoch 4 --------------
+     T
+	  [B1]  scr: 0.5977
+	  [B4]  scr: 0.5543
+	  [B7]  scr: 0.5543
+	  [B10]  scr: 0.5487
+     V
+	  [B1]  scr: 0.4293
+Train Loss: 2.718873	Valid Loss: 2.963866
+
+* New best model (valid loss): 3.0386 --> 2.9639 *
+
+-------------- Epoch 5 --------------
+     T
+	  [B1]  scr: 0.5086
+	  [B4]  scr: 0.5191
+	  [B7]  scr: 0.5270
+	  [B10]  scr: 0.5193
+     V
+	  [B1]  scr: 0.4967
+Train Loss: 2.396904	Valid Loss: 2.690740
+
+* New best model (valid loss): 2.9639 --> 2.6907 *
+
+-------------- Epoch 6 --------------
+     T
+	  [B1]  scr: 0.6060
+	  [B4]  scr: 0.5334
+	  [B7]  scr: 0.4774
+	  [B10]  scr: 0.4713
+     V
+	  [B1]  scr: 0.3140
+Train Loss: 2.134446	Valid Loss: 2.572372
+
+* New best model (valid loss): 2.6907 --> 2.5724 *
+
+-------------- Epoch 7 --------------
+     T
+	  [B1]  scr: 0.4647
+	  [B4]  scr: 0.4885
+	  [B7]  scr: 0.4960
+	  [B10]  scr: 0.4744
+     V
+	  [B1]  scr: 0.3695
+Train Loss: 1.910510	Valid Loss: 2.719270
+-------------- Epoch 8 --------------
+     T
+	  [B1]  scr: 0.5566
+	  [B4]  scr: 0.6165
+	  [B7]  scr: 0.6222
+	  [B10]  scr: 0.6531
+     V
+	  [B1]  scr: 0.6047
+Train Loss: 1.785273	Valid Loss: 2.525433
+
+* New best model (valid loss): 2.5724 --> 2.5254 *
+
+-------------- Epoch 9 --------------
+     T
+	  [B1]  scr: 0.7523
+	  [B4]  scr: 0.7059
+	  [B7]  scr: 0.6449
+	  [B10]  scr: 0.6168
+     V
+	  [B1]  scr: 0.3721
+Train Loss: 1.624873	Valid Loss: 2.965170
+-------------- Epoch 10 --------------
+     T
+	  [B1]  scr: 0.5666
+	  [B4]  scr: 0.4725
+	  [B7]  scr: 0.4995
+	  [B10]  scr: 0.5122
+     V
+	  [B1]  scr: 0.3856
+Train Loss: 1.552455	Valid Loss: 2.512076
+
+* New best model (valid loss): 2.5254 --> 2.5121 *
+
+-------------- Epoch 11 --------------
+     T
+	  [B1]  scr: 0.5043
+	  [B4]  scr: 0.5589
+	  [B7]  scr: 0.6202
+	  [B10]  scr: 0.6336
+     V
+	  [B1]  scr: 0.4987
+Train Loss: 1.447397	Valid Loss: 2.342144
+
+* New best model (valid loss): 2.5121 --> 2.3421 *
+
+-------------- Epoch 12 --------------
+     T
+	  [B1]  scr: 0.6379
+	  [B4]  scr: 0.6801
+	  [B7]  scr: 0.7194
+	  [B10]  scr: 0.7298
+     V
+	  [B1]  scr: 0.5195
+Train Loss: 1.282892	Valid Loss: 2.481400
+-------------- Epoch 13 --------------
+     T
+	  [B1]  scr: 0.6485
+	  [B4]  scr: 0.6832
+	  [B7]  scr: 0.6738
+	  [B10]  scr: 0.7226
+     V
+	  [B1]  scr: 0.6006
+Train Loss: 1.184577	Valid Loss: 2.482306
+-------------- Epoch 14 --------------
+     T
+	  [B1]  scr: 0.8209
+	  [B4]  scr: 0.7676
+	  [B7]  scr: 0.7923
+	  [B10]  scr: 0.7882
+     V
+	  [B1]  scr: 0.6583
+Train Loss: 1.109854	Valid Loss: 2.373064
+-------------- Epoch 15 --------------
+     T
+	  [B1]  scr: 0.8444
+	  [B4]  scr: 0.7951
+	  [B7]  scr: 0.8085
+	  [B10]  scr: 0.8066
+     V
+	  [B1]  scr: 0.6409
+Train Loss: 1.031898	Valid Loss: 2.456849
+-------------- Epoch 16 --------------
+     T
+	  [B1]  scr: 0.8096
+	  [B4]  scr: 0.7473
+	  [B7]  scr: 0.7680
+	  [B10]  scr: 0.7990
+     V
+	  [B1]  scr: 0.6009
+Train Loss: 1.050348	Valid Loss: 2.610050
+
+* Stopped early *
+
+E. [Evaluating] from trained model TECN2v1_f2-0.50
+
+	Testing...
+	  [B1]  scr: 0.7190
+	  [B2]  scr: 0.6822
+
+Test Score: 0.6822 (took 0.76s)
+
+./logs/LDSS-SP1-imdynaug100/TECN2v1/eval/aprfc/cm_f2-0.50.png
+{'0Act-0Obj': 0, '0Obj-Rep': 1, 'Dis-Pro': 2, 'Dis-Vau': 3, 'Fix-Pro': 4, 'Fix-Vau': 5}
+
+phases_preds counts: [ 427 1012  159 1295  407 3110] 	 6410
+phases_gt counts: [ 579 1423   53  916  100 3339] 	 6410
+{0: '0Act-0Obj', 1: '0Obj-Rep', 2: 'Dis-Pro', 3: 'Dis-Vau', 4: 'Fix-Pro', 5: 'Fix-Vau'}
+
+Video a334 Phase Report
+           |  T Preds   | T Targets  ||   Error   
+0Act-0Obj  |   7m 7s    |   9m 39s   ||   2m 32s  
+0Obj-Rep   |  16m 52s   |  23m 43s   ||   6m 51s  
+Dis-Pro    |   2m 39s   |    53s     ||   1m 46s  
+Dis-Vau    |  21m 35s   |  15m 16s   ||   6m 19s  
+Fix-Pro    |   6m 47s   |   1m 40s   ||   5m 7s   
+Fix-Vau    |  51m 50s   |  55m 39s   ||   3m 49s   
+
+
+phases_preds counts: [1073 1379 1510 4407  844 3743] 	 12956
+phases_gt counts: [2841  718 1344 3002  155 4896] 	 12956
+{0: '0Act-0Obj', 1: '0Obj-Rep', 2: 'Dis-Pro', 3: 'Dis-Vau', 4: 'Fix-Pro', 5: 'Fix-Vau'}
+
+Video f63b Phase Report
+           |  T Preds   | T Targets  ||   Error   
+0Act-0Obj  |  17m 53s   |  47m 21s   ||  29m 28s  
+0Obj-Rep   |  22m 59s   |  11m 58s   ||   11m 1s  
+Dis-Pro    |  25m 10s   |  22m 24s   ||   2m 46s  
+Dis-Vau    | 1h 13m 27s |   50m 2s   ||  23m 25s  
+Fix-Pro    |   14m 4s   |   2m 35s   ||  11m 29s  
+Fix-Vau    | 1h 2m 23s  | 1h 21m 36s ||  19m 13s   
+
+invalid preds:  0  /  19366
+Series([], Name: count, dtype: int64)
+Saving aggregated phase timing results to ./logs/LDSS-SP1-imdynaug100/TECN2v1/eval/timings/timings_Summary.csv
+
+
+Number of videos: 2
+Video graphing took 1.23 seconds
+
+Saved phase metric graphs to ./logs/LDSS-SP1-imdynaug100/TECN2v1/eval/ribbons
+
+	 = = = = = 	 = = = = =
+		 Fold 2 done!
+	 = = = = = 	 = = = = =
+
+  Fold 3 splits:
+	train ['26d9', '315a', '436c', '5238', 'a334', 'a909', 'b670', 'b71b', 'e8d3', 'f63b']
+	valid ['cf7c']
+	test ['e6a9', 'e8d7']
+
+    No 'path_spaceModel' found. Using pretrained resnet50 in l4-fine-tune mode.
+    Feature size of 2048 at node 'flatten'
+    Feature size of None at node 'None'
+
+    Found feature path! (feats_f3-0.76.pt)
+  Available feature layers: ['flatten'] / Using last layer: flatten
+
+	Batch example shapes:
+	[space feature] torch.Size([577, 16, 2048])
+	[labels] [torch.Size([577, 16])]
+	[idx] torch.Size([577, 16])
+    Batch contains 1 clip(s), each with 16 frames
+
+   [optim]: adam
+   [sched]: step
+
+Teaching model:  TECN2v1_f3
+-------------- Epoch 1 --------------
+     T
+	  [B1]  scr: 0.2928
+	  [B4]  scr: 0.3030
+	  [B7]  scr: 0.2781
+	  [B10]  scr: 0.2615
+     V
+	  [B1]  scr: 0.2996
+Train Loss: 3.628715	Valid Loss: 3.600714
+
+* New best model (valid loss): inf --> 3.6007 *
+
+-------------- Epoch 2 --------------
+     T
+	  [B1]  scr: 0.3705
+	  [B4]  scr: 0.2970
+	  [B7]  scr: 0.2876
+	  [B10]  scr: 0.3064
+     V
+	  [B1]  scr: 0.3063
+Train Loss: 3.464752	Valid Loss: 3.495282
+
+* New best model (valid loss): 3.6007 --> 3.4953 *
+
+-------------- Epoch 3 --------------
+     T
+	  [B1]  scr: 0.3699
+	  [B4]  scr: 0.3107
+	  [B7]  scr: 0.3116
+	  [B10]  scr: 0.3162
+     V
+	  [B1]  scr: 0.2889
+Train Loss: 3.235291	Valid Loss: 3.338319
+
+* New best model (valid loss): 3.4953 --> 3.3383 *
+
+-------------- Epoch 4 --------------
+     T
+	  [B1]  scr: 0.3760
+	  [B4]  scr: 0.4584
+	  [B7]  scr: 0.5148
+	  [B10]  scr: 0.5135
+     V
+	  [B1]  scr: 0.4702
+Train Loss: 2.934205	Valid Loss: 3.156639
+
+* New best model (valid loss): 3.3383 --> 3.1566 *
+
+-------------- Epoch 5 --------------
+     T
+	  [B1]  scr: 0.5425
+	  [B4]  scr: 0.5862
+	  [B7]  scr: 0.5910
+	  [B10]  scr: 0.6126
+     V
+	  [B1]  scr: 0.4821
+Train Loss: 2.602437	Valid Loss: 2.927734
+
+* New best model (valid loss): 3.1566 --> 2.9277 *
+
+-------------- Epoch 6 --------------
+     T
+	  [B1]  scr: 0.6745
+	  [B4]  scr: 0.6496
+	  [B7]  scr: 0.6218
+	  [B10]  scr: 0.6357
+     V
+	  [B1]  scr: 0.6038
+Train Loss: 2.256486	Valid Loss: 2.640099
+
+* New best model (valid loss): 2.9277 --> 2.6401 *
+
+-------------- Epoch 7 --------------
+     T
+	  [B1]  scr: 0.6757
+	  [B4]  scr: 0.6081
+	  [B7]  scr: 0.5782
+	  [B10]  scr: 0.5974
+     V
+	  [B1]  scr: 0.5960
+Train Loss: 1.870411	Valid Loss: 2.565766
+
+* New best model (valid loss): 2.6401 --> 2.5658 *
+
+-------------- Epoch 8 --------------
+     T
+	  [B1]  scr: 0.6526
+	  [B4]  scr: 0.6331
+	  [B7]  scr: 0.6199
+	  [B10]  scr: 0.6349
+     V
+	  [B1]  scr: 0.6054
+Train Loss: 1.670402	Valid Loss: 2.683335
+-------------- Epoch 9 --------------
+     T
+	  [B1]  scr: 0.8172
+	  [B4]  scr: 0.7692
+	  [B7]  scr: 0.7142
+	  [B10]  scr: 0.7203
+     V
+	  [B1]  scr: 0.6111
+Train Loss: 1.542937	Valid Loss: 2.405826
+
+* New best model (valid loss): 2.5658 --> 2.4058 *
+
+-------------- Epoch 10 --------------
+     T
+	  [B1]  scr: 0.7832
+	  [B4]  scr: 0.7925
+	  [B7]  scr: 0.7771
+	  [B10]  scr: 0.7581
+     V
+	  [B1]  scr: 0.5766
+Train Loss: 1.327653	Valid Loss: 2.594956
+-------------- Epoch 11 --------------
+     T
+	  [B1]  scr: 0.7427
+	  [B4]  scr: 0.7982
+	  [B7]  scr: 0.7701
+	  [B10]  scr: 0.7511
+     V
+	  [B1]  scr: 0.5487
+Train Loss: 1.272354	Valid Loss: 2.646207
+-------------- Epoch 12 --------------
+     T
+	  [B1]  scr: 0.7724
+	  [B4]  scr: 0.7914
+	  [B7]  scr: 0.7924
+	  [B10]  scr: 0.7847
+     V
+	  [B1]  scr: 0.6034
+Train Loss: 1.182906	Valid Loss: 2.364467
+
+* New best model (valid loss): 2.4058 --> 2.3645 *
+
+-------------- Epoch 13 --------------
+     T
+	  [B1]  scr: 0.6949
+	  [B4]  scr: 0.7762
+	  [B7]  scr: 0.7957
+	  [B10]  scr: 0.8064
+     V
+	  [B1]  scr: 0.6237
+Train Loss: 1.050232	Valid Loss: 2.567922
+-------------- Epoch 14 --------------
+     T
+	  [B1]  scr: 0.8360
+	  [B4]  scr: 0.7965
+	  [B7]  scr: 0.8077
+	  [B10]  scr: 0.8030
+     V
+	  [B1]  scr: 0.6334
+Train Loss: 1.016840	Valid Loss: 2.322628
+
+* New best model (valid loss): 2.3645 --> 2.3226 *
+
+-------------- Epoch 15 --------------
+     T
+	  [B1]  scr: 0.8555
+	  [B4]  scr: 0.8359
+	  [B7]  scr: 0.8138
+	  [B10]  scr: 0.8201
+     V
+	  [B1]  scr: 0.6650
+Train Loss: 0.950677	Valid Loss: 2.407150
+-------------- Epoch 16 --------------
+     T
+	  [B1]  scr: 0.8385
+	  [B4]  scr: 0.8220
+	  [B7]  scr: 0.8191
+	  [B10]  scr: 0.8191
+     V
+	  [B1]  scr: 0.6804
+Train Loss: 0.919863	Valid Loss: 2.500693
+-------------- Epoch 17 --------------
+     T
+	  [B1]  scr: 0.9008
+	  [B4]  scr: 0.8723
+	  [B7]  scr: 0.8369
+	  [B10]  scr: 0.8295
+     V
+	  [B1]  scr: 0.6284
+Train Loss: 0.886307	Valid Loss: 2.561185
+-------------- Epoch 18 --------------
+     T
+	  [B1]  scr: 0.8797
+	  [B4]  scr: 0.8496
+	  [B7]  scr: 0.8319
+	  [B10]  scr: 0.8286
+     V
+	  [B1]  scr: 0.6441
+Train Loss: 0.891490	Valid Loss: 2.512630
+-------------- Epoch 19 --------------
+     T
+	  [B1]  scr: 0.7853
+	  [B4]  scr: 0.8270
+	  [B7]  scr: 0.8400
+	  [B10]  scr: 0.8412
+     V
+	  [B1]  scr: 0.6801
+Train Loss: 0.818983	Valid Loss: 2.352637
+
+* Stopped early *
+
+E. [Evaluating] from trained model TECN2v1_f3-0.63
+
+	Testing...
+	  [B1]  scr: 0.5582
+	  [B2]  scr: 0.5963
+
+Test Score: 0.5963 (took 0.85s)
+
+./logs/LDSS-SP1-imdynaug100/TECN2v1/eval/aprfc/cm_f3-0.63.png
+{'0Act-0Obj': 0, '0Obj-Rep': 1, 'Dis-Pro': 2, 'Dis-Vau': 3, 'Fix-Pro': 4, 'Fix-Vau': 5}
+
+phases_preds counts: [3103  588  613 2963 1537 3960] 	 12764
+phases_gt counts: [2072 1604  445 4324  280 4039] 	 12764
+{0: '0Act-0Obj', 1: '0Obj-Rep', 2: 'Dis-Pro', 3: 'Dis-Vau', 4: 'Fix-Pro', 5: 'Fix-Vau'}
+
+Video e6a9 Phase Report
+           |  T Preds   | T Targets  ||   Error   
+0Act-0Obj  |  51m 43s   |  34m 32s   ||  17m 11s  
+0Obj-Rep   |   9m 48s   |  26m 44s   ||  16m 56s  
+Dis-Pro    |  10m 13s   |   7m 25s   ||   2m 48s  
+Dis-Vau    |  49m 23s   | 1h 12m 4s  ||  22m 41s  
+Fix-Pro    |  25m 37s   |   4m 40s   ||  20m 57s  
+Fix-Vau    |   1h 6m    | 1h 7m 19s  ||   1m 19s   
+
+
+phases_preds counts: [1384 1370  381 1770  162 1511] 	 6578
+phases_gt counts: [ 964  890  836 1709  211 1968] 	 6578
+{0: '0Act-0Obj', 1: '0Obj-Rep', 2: 'Dis-Pro', 3: 'Dis-Vau', 4: 'Fix-Pro', 5: 'Fix-Vau'}
+
+Video e8d7 Phase Report
+           |  T Preds   | T Targets  ||   Error   
+0Act-0Obj  |   23m 4s   |   16m 4s   ||     7m    
+0Obj-Rep   |  22m 50s   |  14m 50s   ||     8m    
+Dis-Pro    |   6m 21s   |  13m 56s   ||   7m 35s  
+Dis-Vau    |  29m 30s   |  28m 29s   ||   1m 1s   
+Fix-Pro    |   2m 42s   |   3m 31s   ||    49s    
+Fix-Vau    |  25m 11s   |  32m 48s   ||   7m 37s   
+
+invalid preds:  0  /  19342
+Series([], Name: count, dtype: int64)
+Saving aggregated phase timing results to ./logs/LDSS-SP1-imdynaug100/TECN2v1/eval/timings/timings_Summary.csv
+
+
+Number of videos: 2
+Video graphing took 1.23 seconds
+
+Saved phase metric graphs to ./logs/LDSS-SP1-imdynaug100/TECN2v1/eval/ribbons
+
+	 = = = = = 	 = = = = =
+		 Fold 3 done!
+	 = = = = = 	 = = = = =
+
+  Fold 4 splits:
+	train ['26d9', '315a', '436c', 'a334', 'a909', 'b670', 'b71b', 'e6a9', 'e8d7', 'f63b']
+	valid ['cf7c']
+	test ['5238', 'e8d3']
+
+    No 'path_spaceModel' found. Using pretrained resnet50 in l4-fine-tune mode.
+    Feature size of 2048 at node 'flatten'
+    Feature size of None at node 'None'
+
+    Found feature path! (feats_f4-0.72.pt)
+  Available feature layers: ['flatten'] / Using last layer: flatten
+
+	Batch example shapes:
+	[space feature] torch.Size([798, 16, 2048])
+	[labels] [torch.Size([798, 16])]
+	[idx] torch.Size([798, 16])
+    Batch contains 1 clip(s), each with 16 frames
+
+   [optim]: adam
+   [sched]: step
+
+Teaching model:  TECN2v1_f4
+-------------- Epoch 1 --------------
+     T
+	  [B1]  scr: 0.1118
+	  [B4]  scr: 0.0833
+	  [B7]  scr: 0.0766
+	  [B10]  scr: 0.0873
+     V
+	  [B1]  scr: 0.0721
+Train Loss: 3.592945	Valid Loss: 3.574097
+
+* New best model (valid loss): inf --> 3.5741 *
+
+-------------- Epoch 2 --------------
+     T
+	  [B1]  scr: 0.1795
+	  [B4]  scr: 0.1750
+	  [B7]  scr: 0.1795
+	  [B10]  scr: 0.1866
+     V
+	  [B1]  scr: 0.2128
+Train Loss: 3.464127	Valid Loss: 3.492033
+
+* New best model (valid loss): 3.5741 --> 3.4920 *
+
+-------------- Epoch 3 --------------
+     T
+	  [B1]  scr: 0.1888
+	  [B4]  scr: 0.1866
+	  [B7]  scr: 0.2013
+	  [B10]  scr: 0.2244
+     V
+	  [B1]  scr: 0.2332
+Train Loss: 3.242507	Valid Loss: 3.343912
+
+* New best model (valid loss): 3.4920 --> 3.3439 *
+
+-------------- Epoch 4 --------------
+     T
+	  [B1]  scr: 0.3796
+	  [B4]  scr: 0.2854
+	  [B7]  scr: 0.2739
+	  [B10]  scr: 0.2798
+     V
+	  [B1]  scr: 0.2969
+Train Loss: 2.985444	Valid Loss: 3.150864
+
+* New best model (valid loss): 3.3439 --> 3.1509 *
+
+-------------- Epoch 5 --------------
+     T
+	  [B1]  scr: 0.4869
+	  [B4]  scr: 0.4638
+	  [B7]  scr: 0.4320
+	  [B10]  scr: 0.4434
+     V
+	  [B1]  scr: 0.3340
+Train Loss: 2.716351	Valid Loss: 3.216197
+-------------- Epoch 6 --------------
+     T
+	  [B1]  scr: 0.4979
+	  [B4]  scr: 0.4709
+	  [B7]  scr: 0.5208
+	  [B10]  scr: 0.5554
+     V
+	  [B1]  scr: 0.5770
+Train Loss: 2.332470	Valid Loss: 2.696253
+
+* New best model (valid loss): 3.1509 --> 2.6963 *
+
+-------------- Epoch 7 --------------
+     T
+	  [B1]  scr: 0.5965
+	  [B4]  scr: 0.5363
+	  [B7]  scr: 0.4896
+	  [B10]  scr: 0.4816
+     V
+	  [B1]  scr: 0.5527
+Train Loss: 2.045384	Valid Loss: 2.660462
+
+* New best model (valid loss): 2.6963 --> 2.6605 *
+
+-------------- Epoch 8 --------------
+     T
+	  [B1]  scr: 0.5934
+	  [B4]  scr: 0.6577
+	  [B7]  scr: 0.6684
+	  [B10]  scr: 0.6505
+     V
+	  [B1]  scr: 0.3924
+Train Loss: 1.851725	Valid Loss: 2.794357
+-------------- Epoch 9 --------------
+     T
+	  [B1]  scr: 0.5066
+	  [B4]  scr: 0.4920
+	  [B7]  scr: 0.5679
+	  [B10]  scr: 0.6319
+     V
+	  [B1]  scr: 0.4904
+Train Loss: 1.653834	Valid Loss: 2.799958
+-------------- Epoch 10 --------------
+     T
+	  [B1]  scr: 0.7386
+	  [B4]  scr: 0.7377
+	  [B7]  scr: 0.7064
+	  [B10]  scr: 0.6984
+     V
+	  [B1]  scr: 0.5447
+Train Loss: 1.458748	Valid Loss: 2.596756
+
+* New best model (valid loss): 2.6605 --> 2.5968 *
+
+-------------- Epoch 11 --------------
+     T
+	  [B1]  scr: 0.7189
+	  [B4]  scr: 0.7153
+	  [B7]  scr: 0.7299
+	  [B10]  scr: 0.7414
+     V
+	  [B1]  scr: 0.5089
+Train Loss: 1.338853	Valid Loss: 2.577332
+
+* New best model (valid loss): 2.5968 --> 2.5773 *
+
+-------------- Epoch 12 --------------
+     T
+	  [B1]  scr: 0.7450
+	  [B4]  scr: 0.7379
+	  [B7]  scr: 0.7643
+	  [B10]  scr: 0.7582
+     V
+	  [B1]  scr: 0.5591
+Train Loss: 1.232730	Valid Loss: 2.392685
+
+* New best model (valid loss): 2.5773 --> 2.3927 *
+
+-------------- Epoch 13 --------------
+     T
+	  [B1]  scr: 0.7133
+	  [B4]  scr: 0.7144
+	  [B7]  scr: 0.7316
+	  [B10]  scr: 0.7670
+     V
+	  [B1]  scr: 0.6350
+Train Loss: 1.137866	Valid Loss: 2.354194
+
+* New best model (valid loss): 2.3927 --> 2.3542 *
+
+-------------- Epoch 14 --------------
+     T
+	  [B1]  scr: 0.8407
+	  [B4]  scr: 0.7967
+	  [B7]  scr: 0.7804
+	  [B10]  scr: 0.7926
+     V
+	  [B1]  scr: 0.6369
+Train Loss: 1.035285	Valid Loss: 2.432517
+-------------- Epoch 15 --------------
+     T
+	  [B1]  scr: 0.7596
+	  [B4]  scr: 0.8074
+	  [B7]  scr: 0.8281
+	  [B10]  scr: 0.8138
+     V
+	  [B1]  scr: 0.6675
+Train Loss: 1.000132	Valid Loss: 2.327054
+
+* New best model (valid loss): 2.3542 --> 2.3271 *
+
+-------------- Epoch 16 --------------
+     T
+	  [B1]  scr: 0.7493
+	  [B4]  scr: 0.7945
+	  [B7]  scr: 0.8265
+	  [B10]  scr: 0.8221
+     V
+	  [B1]  scr: 0.6478
+Train Loss: 0.953874	Valid Loss: 2.456050
+-------------- Epoch 17 --------------
+     T
+	  [B1]  scr: 0.8549
+	  [B4]  scr: 0.8584
+	  [B7]  scr: 0.8492
+	  [B10]  scr: 0.8315
+     V
+	  [B1]  scr: 0.6666
+Train Loss: 0.883653	Valid Loss: 2.286642
+
+* New best model (valid loss): 2.3271 --> 2.2866 *
+
+-------------- Epoch 18 --------------
+     T
+	  [B1]  scr: 0.7931
+	  [B4]  scr: 0.8449
+	  [B7]  scr: 0.8357
+	  [B10]  scr: 0.8354
+     V
+	  [B1]  scr: 0.6954
+Train Loss: 0.850286	Valid Loss: 2.502379
+-------------- Epoch 19 --------------
+     T
+	  [B1]  scr: 0.8896
+	  [B4]  scr: 0.8644
+	  [B7]  scr: 0.8532
+	  [B10]  scr: 0.8477
+     V
+	  [B1]  scr: 0.6428
+Train Loss: 0.791202	Valid Loss: 2.683519
+-------------- Epoch 20 --------------
+     T
+	  [B1]  scr: 0.8210
+	  [B4]  scr: 0.8798
+	  [B7]  scr: 0.8613
+	  [B10]  scr: 0.8494
+     V
+	  [B1]  scr: 0.6466
+Train Loss: 0.789987	Valid Loss: 2.596913
+-------------- Epoch 21 --------------
+     T
+	  [B1]  scr: 0.8112
+	  [B4]  scr: 0.8690
+	  [B7]  scr: 0.8687
+	  [B10]  scr: 0.8611
+     V
+	  [B1]  scr: 0.6951
+Train Loss: 0.735130	Valid Loss: 2.562869
+-------------- Epoch 22 --------------
+     T
+	  [B1]  scr: 0.8049
+	  [B4]  scr: 0.8423
+	  [B7]  scr: 0.8662
+	  [B10]  scr: 0.8681
+     V
+	  [B1]  scr: 0.6863
+Train Loss: 0.711321	Valid Loss: 2.451241
+
+* Stopped early *
+
+E. [Evaluating] from trained model TECN2v1_f4-0.67
+
+	Testing...
+	  [B1]  scr: 0.7988
+	  [B2]  scr: 0.7734
+
+Test Score: 0.7734 (took 0.88s)
+
+./logs/LDSS-SP1-imdynaug100/TECN2v1/eval/aprfc/cm_f4-0.67.png
+{'0Act-0Obj': 0, '0Obj-Rep': 1, 'Dis-Pro': 2, 'Dis-Vau': 3, 'Fix-Pro': 4, 'Fix-Vau': 5}
+
+phases_preds counts: [2192  602  967 4354  273 2938] 	 11326
+phases_gt counts: [2439 1014  359 4849  135 2530] 	 11326
+{0: '0Act-0Obj', 1: '0Obj-Rep', 2: 'Dis-Pro', 3: 'Dis-Vau', 4: 'Fix-Pro', 5: 'Fix-Vau'}
+
+Video 5238 Phase Report
+           |  T Preds   | T Targets  ||   Error   
+0Act-0Obj  |  36m 32s   |  40m 39s   ||   4m 7s   
+0Obj-Rep   |   10m 2s   |  16m 54s   ||   6m 52s  
+Dis-Pro    |   16m 7s   |   5m 59s   ||   10m 8s  
+Dis-Vau    | 1h 12m 34s | 1h 20m 49s ||   8m 15s  
+Fix-Pro    |   4m 33s   |   2m 15s   ||   2m 18s  
+Fix-Vau    |  48m 58s   |  42m 10s   ||   6m 48s   
+
+
+phases_preds counts: [1042   11  630 2440   97 3191] 	 7411
+phases_gt counts: [ 632    0  451 3121   57 3150] 	 7411
+{0: '0Act-0Obj', 1: '0Obj-Rep', 2: 'Dis-Pro', 3: 'Dis-Vau', 4: 'Fix-Pro', 5: 'Fix-Vau'}
+
+Video e8d3 Phase Report
+           |  T Preds   | T Targets  ||   Error   
+0Act-0Obj  |  17m 22s   |  10m 32s   ||   6m 50s  
+0Obj-Rep   |    11s     |     0s     ||    11s    
+Dis-Pro    |  10m 30s   |   7m 31s   ||   2m 59s  
+Dis-Vau    |  40m 40s   |   52m 1s   ||  11m 21s  
+Fix-Pro    |   1m 37s   |    57s     ||    40s    
+Fix-Vau    |  53m 11s   |  52m 30s   ||    41s     
+
+invalid preds:  0  /  18737
+Series([], Name: count, dtype: int64)
+Saving aggregated phase timing results to ./logs/LDSS-SP1-imdynaug100/TECN2v1/eval/timings/timings_Summary.csv
+
+
+Number of videos: 2
+Video graphing took 1.22 seconds
+
+Saved phase metric graphs to ./logs/LDSS-SP1-imdynaug100/TECN2v1/eval/ribbons
+
+	 = = = = = 	 = = = = =
+		 Fold 4 done!
+	 = = = = = 	 = = = = =
+
+  Fold 5 splits:
+	train ['26d9', '315a', '436c', '5238', 'a334', 'b670', 'e6a9', 'e8d3', 'e8d7', 'f63b']
+	valid ['cf7c']
+	test ['a909', 'b71b']
+
+    No 'path_spaceModel' found. Using pretrained resnet50 in l4-fine-tune mode.
+    Feature size of 2048 at node 'flatten'
+    Feature size of None at node 'None'
+
+    Found feature path! (feats_f5-0.72.pt)
+  Available feature layers: ['flatten'] / Using last layer: flatten
+
+	Batch example shapes:
+	[space feature] torch.Size([708, 16, 2048])
+	[labels] [torch.Size([708, 16])]
+	[idx] torch.Size([708, 16])
+    Batch contains 1 clip(s), each with 16 frames
+
+   [optim]: adam
+   [sched]: step
+
+Teaching model:  TECN2v1_f5
+-------------- Epoch 1 --------------
+     T
+	  [B1]  scr: 0.0579
+	  [B4]  scr: 0.0907
+	  [B7]  scr: 0.0806
+	  [B10]  scr: 0.1064
+     V
+	  [B1]  scr: 0.1101
+Train Loss: 3.592177	Valid Loss: 3.589559
+
+* New best model (valid loss): inf --> 3.5896 *
+
+-------------- Epoch 2 --------------
+     T
+	  [B1]  scr: 0.2044
+	  [B4]  scr: 0.1792
+	  [B7]  scr: 0.1639
+	  [B10]  scr: 0.1768
+     V
+	  [B1]  scr: 0.1435
+Train Loss: 3.415398	Valid Loss: 3.478253
+
+* New best model (valid loss): 3.5896 --> 3.4783 *
+
+-------------- Epoch 3 --------------
+     T
+	  [B1]  scr: 0.1648
+	  [B4]  scr: 0.2397
+	  [B7]  scr: 0.2191
+	  [B10]  scr: 0.2040
+     V
+	  [B1]  scr: 0.1584
+Train Loss: 3.184047	Valid Loss: 3.333767
+
+* New best model (valid loss): 3.4783 --> 3.3338 *
+
+-------------- Epoch 4 --------------
+     T
+	  [B1]  scr: 0.2640
+	  [B4]  scr: 0.3092
+	  [B7]  scr: 0.3046
+	  [B10]  scr: 0.3210
+     V
+	  [B1]  scr: 0.3404
+Train Loss: 2.903211	Valid Loss: 3.124957
+
+* New best model (valid loss): 3.3338 --> 3.1250 *
+
+-------------- Epoch 5 --------------
+     T
+	  [B1]  scr: 0.4859
+	  [B4]  scr: 0.4817
+	  [B7]  scr: 0.5041
+	  [B10]  scr: 0.5006
+     V
+	  [B1]  scr: 0.4355
+Train Loss: 2.556551	Valid Loss: 3.101251
+
+* New best model (valid loss): 3.1250 --> 3.1013 *
+
+-------------- Epoch 6 --------------
+     T
+	  [B1]  scr: 0.4307
+	  [B4]  scr: 0.4208
+	  [B7]  scr: 0.4283
+	  [B10]  scr: 0.4794
+     V
+	  [B1]  scr: 0.4468
+Train Loss: 2.230702	Valid Loss: 2.710506
+
+* New best model (valid loss): 3.1013 --> 2.7105 *
+
+-------------- Epoch 7 --------------
+     T
+	  [B1]  scr: 0.6934
+	  [B4]  scr: 0.6585
+	  [B7]  scr: 0.6327
+	  [B10]  scr: 0.5693
+     V
+	  [B1]  scr: 0.4007
+Train Loss: 1.966825	Valid Loss: 2.569041
+
+* New best model (valid loss): 2.7105 --> 2.5690 *
+
+-------------- Epoch 8 --------------
+     T
+	  [B1]  scr: 0.6077
+	  [B4]  scr: 0.5764
+	  [B7]  scr: 0.5380
+	  [B10]  scr: 0.5437
+     V
+	  [B1]  scr: 0.5640
+Train Loss: 1.784982	Valid Loss: 2.693054
+-------------- Epoch 9 --------------
+     T
+	  [B1]  scr: 0.7025
+	  [B4]  scr: 0.7194
+	  [B7]  scr: 0.7045
+	  [B10]  scr: 0.6630
+     V
+	  [B1]  scr: 0.4042
+Train Loss: 1.580204	Valid Loss: 2.636608
+-------------- Epoch 10 --------------
+     T
+	  [B1]  scr: 0.5154
+	  [B4]  scr: 0.5670
+	  [B7]  scr: 0.6345
+	  [B10]  scr: 0.6801
+     V
+	  [B1]  scr: 0.5488
+Train Loss: 1.451879	Valid Loss: 2.601498
+-------------- Epoch 11 --------------
+     T
+	  [B1]  scr: 0.6321
+	  [B4]  scr: 0.6505
+	  [B7]  scr: 0.6807
+	  [B10]  scr: 0.7046
+     V
+	  [B1]  scr: 0.5977
+Train Loss: 1.309320	Valid Loss: 2.486270
+
+* New best model (valid loss): 2.5690 --> 2.4863 *
+
+-------------- Epoch 12 --------------
+     T
+	  [B1]  scr: 0.7641
+	  [B4]  scr: 0.7463
+	  [B7]  scr: 0.7535
+	  [B10]  scr: 0.7506
+     V
+	  [B1]  scr: 0.5749
+Train Loss: 1.199645	Valid Loss: 2.547065
+-------------- Epoch 13 --------------
+     T
+	  [B1]  scr: 0.7474
+	  [B4]  scr: 0.7878
+	  [B7]  scr: 0.7684
+	  [B10]  scr: 0.7797
+     V
+	  [B1]  scr: 0.6190
+Train Loss: 1.097085	Valid Loss: 2.297760
+
+* New best model (valid loss): 2.4863 --> 2.2978 *
+
+-------------- Epoch 14 --------------
+     T
+	  [B1]  scr: 0.7471
+	  [B4]  scr: 0.7928
+	  [B7]  scr: 0.8053
+	  [B10]  scr: 0.7819
+     V
+	  [B1]  scr: 0.6463
+Train Loss: 1.054929	Valid Loss: 2.323856
+-------------- Epoch 15 --------------
+     T
+	  [B1]  scr: 0.8651
+	  [B4]  scr: 0.8253
+	  [B7]  scr: 0.8058
+	  [B10]  scr: 0.8093
+     V
+	  [B1]  scr: 0.6398
+Train Loss: 0.970899	Valid Loss: 2.400995
+-------------- Epoch 16 --------------
+     T
+	  [B1]  scr: 0.8530
+	  [B4]  scr: 0.8343
+	  [B7]  scr: 0.8241
+	  [B10]  scr: 0.8125
+     V
+	  [B1]  scr: 0.6594
+Train Loss: 0.921784	Valid Loss: 2.336381
+-------------- Epoch 17 --------------
+     T
+	  [B1]  scr: 0.8391
+	  [B4]  scr: 0.8272
+	  [B7]  scr: 0.8231
+	  [B10]  scr: 0.8246
+     V
+	  [B1]  scr: 0.6529
+Train Loss: 0.883169	Valid Loss: 2.878885
+-------------- Epoch 18 --------------
+     T
+	  [B1]  scr: 0.8490
+	  [B4]  scr: 0.8305
+	  [B7]  scr: 0.8293
+	  [B10]  scr: 0.8266
+     V
+	  [B1]  scr: 0.6278
+Train Loss: 0.855961	Valid Loss: 2.872985
+
+* Stopped early *
+
+E. [Evaluating] from trained model TECN2v1_f5-0.62
+
+	Testing...
+	  [B1]  scr: 0.7408
+	  [B2]  scr: 0.7738
+
+Test Score: 0.7738 (took 0.68s)
+
+./logs/LDSS-SP1-imdynaug100/TECN2v1/eval/aprfc/cm_f5-0.62.png
+{'0Act-0Obj': 0, '0Obj-Rep': 1, 'Dis-Pro': 2, 'Dis-Vau': 3, 'Fix-Pro': 4, 'Fix-Vau': 5}
+
+phases_preds counts: [1093 1005  220 2310  120 3509] 	 8257
+phases_gt counts: [1737  802  274 2228   48 3168] 	 8257
+{0: '0Act-0Obj', 1: '0Obj-Rep', 2: 'Dis-Pro', 3: 'Dis-Vau', 4: 'Fix-Pro', 5: 'Fix-Vau'}
+
+Video a909 Phase Report
+           |  T Preds   | T Targets  ||   Error   
+0Act-0Obj  |  18m 13s   |  28m 57s   ||  10m 44s  
+0Obj-Rep   |  16m 45s   |  13m 22s   ||   3m 23s  
+Dis-Pro    |   3m 40s   |   4m 34s   ||    54s    
+Dis-Vau    |  38m 30s   |   37m 8s   ||   1m 22s  
+Fix-Pro    |     2m     |    48s     ||   1m 12s  
+Fix-Vau    |  58m 29s   |  52m 48s   ||   5m 41s   
+
+
+phases_preds counts: [ 722  703  396 5046  840 3464] 	 11171
+phases_gt counts: [ 748  733  316 5640  151 3583] 	 11171
+{0: '0Act-0Obj', 1: '0Obj-Rep', 2: 'Dis-Pro', 3: 'Dis-Vau', 4: 'Fix-Pro', 5: 'Fix-Vau'}
+
+Video b71b Phase Report
+           |  T Preds   | T Targets  ||   Error   
+0Act-0Obj  |   12m 2s   |  12m 28s   ||    26s    
+0Obj-Rep   |  11m 43s   |  12m 13s   ||    30s    
+Dis-Pro    |   6m 36s   |   5m 16s   ||   1m 20s  
+Dis-Vau    | 1h 24m 6s  |   1h 34m   ||   9m 54s  
+Fix-Pro    |    14m     |   2m 31s   ||  11m 29s  
+Fix-Vau    |  57m 44s   |  59m 43s   ||   1m 59s   
+
+invalid preds:  0  /  19428
+Series([], Name: count, dtype: int64)
+Saving aggregated phase timing results to ./logs/LDSS-SP1-imdynaug100/TECN2v1/eval/timings/timings_Summary.csv
+
+
+Number of videos: 2
+Video graphing took 1.22 seconds
+
+Saved phase metric graphs to ./logs/LDSS-SP1-imdynaug100/TECN2v1/eval/ribbons
+
+	 = = = = = 	 = = = = =
+		 Fold 5 done!
+	 = = = = = 	 = = = = =
+
+  Fold 6 splits:
+	train ['26d9', '315a', '5238', 'a334', 'a909', 'b71b', 'e6a9', 'e8d3', 'e8d7', 'f63b']
+	valid ['cf7c']
+	test ['436c', 'b670']
+
+    No 'path_spaceModel' found. Using pretrained resnet50 in l4-fine-tune mode.
+    Feature size of 2048 at node 'flatten'
+    Feature size of None at node 'None'
+
+    Found feature path! (feats_f6-0.72.pt)
+  Available feature layers: ['flatten'] / Using last layer: flatten
+
+	Batch example shapes:
+	[space feature] torch.Size([699, 16, 2048])
+	[labels] [torch.Size([699, 16])]
+	[idx] torch.Size([699, 16])
+    Batch contains 1 clip(s), each with 16 frames
+
+   [optim]: adam
+   [sched]: step
+
+Teaching model:  TECN2v1_f6
+-------------- Epoch 1 --------------
+     T
+	  [B1]  scr: 0.0492
+	  [B4]  scr: 0.0818
+	  [B7]  scr: 0.1613
+	  [B10]  scr: 0.1945
+     V
+	  [B1]  scr: 0.2993
+Train Loss: 3.570715	Valid Loss: 3.473985
+
+* New best model (valid loss): inf --> 3.4740 *
+
+-------------- Epoch 2 --------------
+     T
+	  [B1]  scr: 0.2373
+	  [B4]  scr: 0.2438
+	  [B7]  scr: 0.2485
+	  [B10]  scr: 0.2459
+     V
+	  [B1]  scr: 0.2515
+Train Loss: 3.398164	Valid Loss: 3.280052
+
+* New best model (valid loss): 3.4740 --> 3.2801 *
+
+-------------- Epoch 3 --------------
+     T
+	  [B1]  scr: 0.2714
+	  [B4]  scr: 0.2920
+	  [B7]  scr: 0.3190
+	  [B10]  scr: 0.3358
+     V
+	  [B1]  scr: 0.4392
+Train Loss: 3.153564	Valid Loss: 3.091760
+
+* New best model (valid loss): 3.2801 --> 3.0918 *
+
+-------------- Epoch 4 --------------
+     T
+	  [B1]  scr: 0.4011
+	  [B4]  scr: 0.4308
+	  [B7]  scr: 0.4565
+	  [B10]  scr: 0.4873
+     V
+	  [B1]  scr: 0.5335
+Train Loss: 2.851157	Valid Loss: 2.976979
+
+* New best model (valid loss): 3.0918 --> 2.9770 *
+
+-------------- Epoch 5 --------------
+     T
+	  [B1]  scr: 0.6337
+	  [B4]  scr: 0.5895
+	  [B7]  scr: 0.5815
+	  [B10]  scr: 0.5833
+     V
+	  [B1]  scr: 0.5543
+Train Loss: 2.491888	Valid Loss: 2.828369
+
+* New best model (valid loss): 2.9770 --> 2.8284 *
+
+-------------- Epoch 6 --------------
+     T
+	  [B1]  scr: 0.6550
+	  [B4]  scr: 0.6068
+	  [B7]  scr: 0.6029
+	  [B10]  scr: 0.5696
+     V
+	  [B1]  scr: 0.5520
+Train Loss: 2.127317	Valid Loss: 2.582900
+
+* New best model (valid loss): 2.8284 --> 2.5829 *
+
+-------------- Epoch 7 --------------
+     T
+	  [B1]  scr: 0.5839
+	  [B4]  scr: 0.6248
+	  [B7]  scr: 0.6312
+	  [B10]  scr: 0.6182
+     V
+	  [B1]  scr: 0.5718
+Train Loss: 1.913449	Valid Loss: 2.628479
+-------------- Epoch 8 --------------
+     T
+	  [B1]  scr: 0.5537
+	  [B4]  scr: 0.6409
+	  [B7]  scr: 0.6195
+	  [B10]  scr: 0.6453
+     V
+	  [B1]  scr: 0.5932
+Train Loss: 1.701762	Valid Loss: 2.609742
+-------------- Epoch 9 --------------
+     T
+	  [B1]  scr: 0.6593
+	  [B4]  scr: 0.7224
+	  [B7]  scr: 0.7495
+	  [B10]  scr: 0.7594
+     V
+	  [B1]  scr: 0.5613
+Train Loss: 1.456851	Valid Loss: 2.572391
+
+* New best model (valid loss): 2.5829 --> 2.5724 *
+
+-------------- Epoch 10 --------------
+     T
+	  [B1]  scr: 0.7887
+	  [B4]  scr: 0.7231
+	  [B7]  scr: 0.7521
+	  [B10]  scr: 0.7630
+     V
+	  [B1]  scr: 0.6130
+Train Loss: 1.310802	Valid Loss: 2.612098
+-------------- Epoch 11 --------------
+     T
+	  [B1]  scr: 0.8167
+	  [B4]  scr: 0.7607
+	  [B7]  scr: 0.7636
+	  [B10]  scr: 0.7658
+     V
+	  [B1]  scr: 0.6261
+Train Loss: 1.257891	Valid Loss: 2.608901
+-------------- Epoch 12 --------------
+     T
+	  [B1]  scr: 0.8115
+	  [B4]  scr: 0.7845
+	  [B7]  scr: 0.7991
+	  [B10]  scr: 0.8025
+     V
+	  [B1]  scr: 0.6239
+Train Loss: 1.124325	Valid Loss: 2.713596
+-------------- Epoch 13 --------------
+     T
+	  [B1]  scr: 0.8285
+	  [B4]  scr: 0.8076
+	  [B7]  scr: 0.8053
+	  [B10]  scr: 0.8091
+     V
+	  [B1]  scr: 0.6274
+Train Loss: 1.035161	Valid Loss: 2.734118
+-------------- Epoch 14 --------------
+     T
+	  [B1]  scr: 0.7919
+	  [B4]  scr: 0.8425
+	  [B7]  scr: 0.8281
+	  [B10]  scr: 0.8228
+     V
+	  [B1]  scr: 0.6512
+Train Loss: 0.994504	Valid Loss: 2.514513
+
+* New best model (valid loss): 2.5724 --> 2.5145 *
+
+-------------- Epoch 15 --------------
+     T
+	  [B1]  scr: 0.7803
+	  [B4]  scr: 0.8146
+	  [B7]  scr: 0.8355
+	  [B10]  scr: 0.8343
+     V
+	  [B1]  scr: 0.6580
+Train Loss: 0.918728	Valid Loss: 2.389978
+
+* New best model (valid loss): 2.5145 --> 2.3900 *
+
+-------------- Epoch 16 --------------
+     T
+	  [B1]  scr: 0.8501
+	  [B4]  scr: 0.8437
+	  [B7]  scr: 0.8407
+	  [B10]  scr: 0.8124
+     V
+	  [B1]  scr: 0.6810
+Train Loss: 0.966612	Valid Loss: 2.586290
+-------------- Epoch 17 --------------
+     T
+	  [B1]  scr: 0.6776
+	  [B4]  scr: 0.8023
+	  [B7]  scr: 0.8086
+	  [B10]  scr: 0.8211
+     V
+	  [B1]  scr: 0.6649
+Train Loss: 0.994952	Valid Loss: 2.918361
+-------------- Epoch 18 --------------
+     T
+	  [B1]  scr: 0.7748
+	  [B4]  scr: 0.7935
+	  [B7]  scr: 0.8140
+	  [B10]  scr: 0.8253
+     V
+	  [B1]  scr: 0.6621
+Train Loss: 0.947195	Valid Loss: 2.439759
+-------------- Epoch 19 --------------
+     T
+	  [B1]  scr: 0.8592
+	  [B4]  scr: 0.8301
+	  [B7]  scr: 0.8356
+	  [B10]  scr: 0.8299
+     V
+	  [B1]  scr: 0.6925
+Train Loss: 0.894345	Valid Loss: 2.309412
+
+* New best model (valid loss): 2.3900 --> 2.3094 *
+
+-------------- Epoch 20 --------------
+     T
+	  [B1]  scr: 0.8303
+	  [B4]  scr: 0.8037
+	  [B7]  scr: 0.8206
+	  [B10]  scr: 0.8396
+     V
+	  [B1]  scr: 0.6504
+Train Loss: 0.798772	Valid Loss: 2.507910
+-------------- Epoch 21 --------------
+     T
+	  [B1]  scr: 0.8688
+	  [B4]  scr: 0.8460
+	  [B7]  scr: 0.8562
+	  [B10]  scr: 0.8568
+     V
+	  [B1]  scr: 0.6889
+Train Loss: 0.762571	Valid Loss: 2.248834
+
+* New best model (valid loss): 2.3094 --> 2.2488 *
+
+-------------- Epoch 22 --------------
+     T
+	  [B1]  scr: 0.8226
+	  [B4]  scr: 0.8322
+	  [B7]  scr: 0.8473
+	  [B10]  scr: 0.8403
+     V
+	  [B1]  scr: 0.6760
+Train Loss: 0.804389	Valid Loss: 2.565883
+-------------- Epoch 23 --------------
+     T
+	  [B1]  scr: 0.9152
+	  [B4]  scr: 0.8546
+	  [B7]  scr: 0.8537
+	  [B10]  scr: 0.8482
+     V
+	  [B1]  scr: 0.6627
+Train Loss: 0.784728	Valid Loss: 2.448401
+-------------- Epoch 24 --------------
+     T
+	  [B1]  scr: 0.7996
+	  [B4]  scr: 0.8384
+	  [B7]  scr: 0.8462
+	  [B10]  scr: 0.8563
+     V
+	  [B1]  scr: 0.6391
+Train Loss: 0.751784	Valid Loss: 2.703037
+-------------- Epoch 25 --------------
+     T
+	  [B1]  scr: 0.8422
+	  [B4]  scr: 0.8428
+	  [B7]  scr: 0.8427
+	  [B10]  scr: 0.8541
+     V
+	  [B1]  scr: 0.6117
+Train Loss: 0.720261	Valid Loss: 3.092312
+
+* Learning rate changed to 0.000100 *
+-------------- Epoch 26 --------------
+     T
+	  [B1]  scr: 0.8995
+	  [B4]  scr: 0.8650
+	  [B7]  scr: 0.8858
+	  [B10]  scr: 0.8919
+     V
+	  [B1]  scr: 0.6708
+Train Loss: 0.673098	Valid Loss: 2.779289
+
+* Stopped early *
+
+E. [Evaluating] from trained model TECN2v1_f6-0.69
+
+	Testing...
+	  [B1]  scr: 0.7431
+	  [B2]  scr: 0.7802
+
+Test Score: 0.7802 (took 0.71s)
+
+./logs/LDSS-SP1-imdynaug100/TECN2v1/eval/aprfc/cm_f6-0.69.png
+{'0Act-0Obj': 0, '0Obj-Rep': 1, 'Dis-Pro': 2, 'Dis-Vau': 3, 'Fix-Pro': 4, 'Fix-Vau': 5}
+
+phases_preds counts: [ 353 1124  712 3383  505 3148] 	 9225
+phases_gt counts: [ 882  881 1022 2323  340 3777] 	 9225
+{0: '0Act-0Obj', 1: '0Obj-Rep', 2: 'Dis-Pro', 3: 'Dis-Vau', 4: 'Fix-Pro', 5: 'Fix-Vau'}
+
+Video 436c Phase Report
+           |  T Preds   | T Targets  ||   Error   
+0Act-0Obj  |   5m 53s   |  14m 42s   ||   8m 49s  
+0Obj-Rep   |  18m 44s   |  14m 41s   ||   4m 3s   
+Dis-Pro    |  11m 52s   |   17m 2s   ||   5m 10s  
+Dis-Vau    |  56m 23s   |  38m 43s   ||  17m 40s  
+Fix-Pro    |   8m 25s   |   5m 40s   ||   2m 45s  
+Fix-Vau    |  52m 28s   | 1h 2m 57s  ||  10m 29s   
+
+
+phases_preds counts: [ 529 1193  772 5427  290 2922] 	 11133
+phases_gt counts: [ 731  790  911 4940  618 3143] 	 11133
+{0: '0Act-0Obj', 1: '0Obj-Rep', 2: 'Dis-Pro', 3: 'Dis-Vau', 4: 'Fix-Pro', 5: 'Fix-Vau'}
+
+Video b670 Phase Report
+           |  T Preds   | T Targets  ||   Error   
+0Act-0Obj  |   8m 49s   |  12m 11s   ||   3m 22s  
+0Obj-Rep   |  19m 53s   |  13m 10s   ||   6m 43s  
+Dis-Pro    |  12m 52s   |  15m 11s   ||   2m 19s  
+Dis-Vau    | 1h 30m 27s | 1h 22m 20s ||   8m 7s   
+Fix-Pro    |   4m 50s   |  10m 18s   ||   5m 28s  
+Fix-Vau    |  48m 42s   |  52m 23s   ||   3m 41s   
+
+invalid preds:  0  /  20358
+Series([], Name: count, dtype: int64)
+Saving aggregated phase timing results to ./logs/LDSS-SP1-imdynaug100/TECN2v1/eval/timings/timings_Summary.csv
+
+
+Number of videos: 2
+Video graphing took 1.27 seconds
+
+Saved phase metric graphs to ./logs/LDSS-SP1-imdynaug100/TECN2v1/eval/ribbons
+
+	 = = = = = 	 = = = = =
+		 Fold 6 done!
+	 = = = = = 	 = = = = =
+
+  Fold 7 splits:
+	train ['436c', '5238', 'a334', 'a909', 'b670', 'b71b', 'e6a9', 'e8d3', 'e8d7', 'f63b']
+	valid ['cf7c']
+	test ['26d9', '315a']
+
+    No 'path_spaceModel' found. Using pretrained resnet50 in l4-fine-tune mode.
+    Feature size of 2048 at node 'flatten'
+    Feature size of None at node 'None'
+
+    Found feature path! (feats_f7-0.71.pt)
+  Available feature layers: ['flatten'] / Using last layer: flatten
+
+	Batch example shapes:
+	[space feature] torch.Size([577, 16, 2048])
+	[labels] [torch.Size([577, 16])]
+	[idx] torch.Size([577, 16])
+    Batch contains 1 clip(s), each with 16 frames
+
+   [optim]: adam
+   [sched]: step
+
+Teaching model:  TECN2v1_f7
+-------------- Epoch 1 --------------
+     T
+	  [B1]  scr: 0.2026
+	  [B4]  scr: 0.0996
+	  [B7]  scr: 0.1325
+	  [B10]  scr: 0.1737
+     V
+	  [B1]  scr: 0.2225
+Train Loss: 3.603098	Valid Loss: 3.578957
+
+* New best model (valid loss): inf --> 3.5790 *
+
+-------------- Epoch 2 --------------
+     T
+	  [B1]  scr: 0.2455
+	  [B4]  scr: 0.2731
+	  [B7]  scr: 0.2799
+	  [B10]  scr: 0.2555
+     V
+	  [B1]  scr: 0.1838
+Train Loss: 3.444994	Valid Loss: 3.499592
+
+* New best model (valid loss): 3.5790 --> 3.4996 *
+
+-------------- Epoch 3 --------------
+     T
+	  [B1]  scr: 0.2791
+	  [B4]  scr: 0.1887
+	  [B7]  scr: 0.1398
+	  [B10]  scr: 0.1281
+     V
+	  [B1]  scr: 0.1809
+Train Loss: 3.252125	Valid Loss: 3.351820
+
+* New best model (valid loss): 3.4996 --> 3.3518 *
+
+-------------- Epoch 4 --------------
+     T
+	  [B1]  scr: 0.3104
+	  [B4]  scr: 0.3193
+	  [B7]  scr: 0.2929
+	  [B10]  scr: 0.2906
+     V
+	  [B1]  scr: 0.3022
+Train Loss: 2.982139	Valid Loss: 3.075637
+
+* New best model (valid loss): 3.3518 --> 3.0756 *
+
+-------------- Epoch 5 --------------
+     T
+	  [B1]  scr: 0.4640
+	  [B4]  scr: 0.4477
+	  [B7]  scr: 0.4803
+	  [B10]  scr: 0.4890
+     V
+	  [B1]  scr: 0.3146
+Train Loss: 2.593523	Valid Loss: 2.803393
+
+* New best model (valid loss): 3.0756 --> 2.8034 *
+
+-------------- Epoch 6 --------------
+     T
+	  [B1]  scr: 0.4296
+	  [B4]  scr: 0.3986
+	  [B7]  scr: 0.3846
+	  [B10]  scr: 0.4211
+     V
+	  [B1]  scr: 0.4821
+Train Loss: 2.239026	Valid Loss: 2.694798
+
+* New best model (valid loss): 2.8034 --> 2.6948 *
+
+-------------- Epoch 7 --------------
+     T
+	  [B1]  scr: 0.5299
+	  [B4]  scr: 0.6042
+	  [B7]  scr: 0.6244
+	  [B10]  scr: 0.6344
+     V
+	  [B1]  scr: 0.5157
+Train Loss: 1.929198	Valid Loss: 2.582449
+
+* New best model (valid loss): 2.6948 --> 2.5824 *
+
+-------------- Epoch 8 --------------
+     T
+	  [B1]  scr: 0.6713
+	  [B4]  scr: 0.6352
+	  [B7]  scr: 0.6561
+	  [B10]  scr: 0.6800
+     V
+	  [B1]  scr: 0.5145
+Train Loss: 1.634452	Valid Loss: 2.875056
+-------------- Epoch 9 --------------
+     T
+	  [B1]  scr: 0.6270
+	  [B4]  scr: 0.5731
+	  [B7]  scr: 0.6149
+	  [B10]  scr: 0.6626
+     V
+	  [B1]  scr: 0.5658
+Train Loss: 1.632483	Valid Loss: 2.874798
+-------------- Epoch 10 --------------
+     T
+	  [B1]  scr: 0.6343
+	  [B4]  scr: 0.7033
+	  [B7]  scr: 0.7023
+	  [B10]  scr: 0.7091
+     V
+	  [B1]  scr: 0.5933
+Train Loss: 1.476118	Valid Loss: 2.565904
+
+* New best model (valid loss): 2.5824 --> 2.5659 *
+
+-------------- Epoch 11 --------------
+     T
+	  [B1]  scr: 0.7093
+	  [B4]  scr: 0.7553
+	  [B7]  scr: 0.7683
+	  [B10]  scr: 0.7654
+     V
+	  [B1]  scr: 0.6049
+Train Loss: 1.265922	Valid Loss: 2.518023
+
+* New best model (valid loss): 2.5659 --> 2.5180 *
+
+-------------- Epoch 12 --------------
+     T
+	  [B1]  scr: 0.7513
+	  [B4]  scr: 0.7599
+	  [B7]  scr: 0.7666
+	  [B10]  scr: 0.7619
+     V
+	  [B1]  scr: 0.5787
+Train Loss: 1.270592	Valid Loss: 2.940909
+-------------- Epoch 13 --------------
+     T
+	  [B1]  scr: 0.7771
+	  [B4]  scr: 0.8074
+	  [B7]  scr: 0.7938
+	  [B10]  scr: 0.7524
+     V
+	  [B1]  scr: 0.6202
+Train Loss: 1.238571	Valid Loss: 2.375938
+
+* New best model (valid loss): 2.5180 --> 2.3759 *
+
+-------------- Epoch 14 --------------
+     T
+	  [B1]  scr: 0.6446
+	  [B4]  scr: 0.7538
+	  [B7]  scr: 0.7687
+	  [B10]  scr: 0.7951
+     V
+	  [B1]  scr: 0.6218
+Train Loss: 1.133543	Valid Loss: 2.536111
+-------------- Epoch 15 --------------
+     T
+	  [B1]  scr: 0.7835
+	  [B4]  scr: 0.7640
+	  [B7]  scr: 0.7913
+	  [B10]  scr: 0.8018
+     V
+	  [B1]  scr: 0.6569
+Train Loss: 1.062917	Valid Loss: 2.628628
+-------------- Epoch 16 --------------
+     T
+	  [B1]  scr: 0.7615
+	  [B4]  scr: 0.8200
+	  [B7]  scr: 0.8294
+	  [B10]  scr: 0.8194
+     V
+	  [B1]  scr: 0.6507
+Train Loss: 0.977699	Valid Loss: 2.370258
+
+* New best model (valid loss): 2.3759 --> 2.3703 *
+
+-------------- Epoch 17 --------------
+     T
+	  [B1]  scr: 0.7511
+	  [B4]  scr: 0.8156
+	  [B7]  scr: 0.8268
+	  [B10]  scr: 0.8331
+     V
+	  [B1]  scr: 0.6689
+Train Loss: 0.913618	Valid Loss: 2.559586
+-------------- Epoch 18 --------------
+     T
+	  [B1]  scr: 0.8152
+	  [B4]  scr: 0.8211
+	  [B7]  scr: 0.8240
+	  [B10]  scr: 0.8337
+     V
+	  [B1]  scr: 0.6604
+Train Loss: 0.864246	Valid Loss: 2.654239
+-------------- Epoch 19 --------------
+     T
+	  [B1]  scr: 0.8588
+	  [B4]  scr: 0.8394
+	  [B7]  scr: 0.8461
+	  [B10]  scr: 0.8455
+     V
+	  [B1]  scr: 0.6823
+Train Loss: 0.854266	Valid Loss: 2.322241
+
+* New best model (valid loss): 2.3703 --> 2.3222 *
+
+-------------- Epoch 20 --------------
+     T
+	  [B1]  scr: 0.7835
+	  [B4]  scr: 0.8275
+	  [B7]  scr: 0.8421
+	  [B10]  scr: 0.8322
+     V
+	  [B1]  scr: 0.6860
+Train Loss: 0.865798	Valid Loss: 2.344567
+-------------- Epoch 21 --------------
+     T
+	  [B1]  scr: 0.7507
+	  [B4]  scr: 0.8546
+	  [B7]  scr: 0.8483
+	  [B10]  scr: 0.8415
+     V
+	  [B1]  scr: 0.6777
+Train Loss: 0.842996	Valid Loss: 2.320466
+
+* New best model (valid loss): 2.3222 --> 2.3205 *
+
+-------------- Epoch 22 --------------
+     T
+	  [B1]  scr: 0.6715
+	  [B4]  scr: 0.8122
+	  [B7]  scr: 0.8364
+	  [B10]  scr: 0.8364
+     V
+	  [B1]  scr: 0.6721
+Train Loss: 0.852553	Valid Loss: 2.301352
+
+* New best model (valid loss): 2.3205 --> 2.3014 *
+
+-------------- Epoch 23 --------------
+     T
+	  [B1]  scr: 0.8460
+	  [B4]  scr: 0.8494
+	  [B7]  scr: 0.8514
+	  [B10]  scr: 0.8453
+     V
+	  [B1]  scr: 0.6731
+Train Loss: 0.807326	Valid Loss: 2.428816
+-------------- Epoch 24 --------------
+     T
+	  [B1]  scr: 0.8197
+	  [B4]  scr: 0.8222
+	  [B7]  scr: 0.8405
+	  [B10]  scr: 0.8466
+     V
+	  [B1]  scr: 0.6489
+Train Loss: 0.802818	Valid Loss: 2.913958
+-------------- Epoch 25 --------------
+     T
+	  [B1]  scr: 0.8417
+	  [B4]  scr: 0.8469
+	  [B7]  scr: 0.8417
+	  [B10]  scr: 0.8318
+     V
+	  [B1]  scr: 0.6206
+Train Loss: 0.829528	Valid Loss: 3.056482
+
+* Learning rate changed to 0.000100 *
+-------------- Epoch 26 --------------
+     T
+	  [B1]  scr: 0.8771
+	  [B4]  scr: 0.8641
+	  [B7]  scr: 0.8630
+	  [B10]  scr: 0.8778
+     V
+	  [B1]  scr: 0.6528
+Train Loss: 0.712734	Valid Loss: 2.778065
+-------------- Epoch 27 --------------
+     T
+	  [B1]  scr: 0.8837
+	  [B4]  scr: 0.8623
+	  [B7]  scr: 0.8731
+	  [B10]  scr: 0.8761
+     V
+	  [B1]  scr: 0.6732
+Train Loss: 0.643394	Valid Loss: 2.498864
+
+* Stopped early *
+
+E. [Evaluating] from trained model TECN2v1_f7-0.67
+
+	Testing...
+	  [B1]  scr: 0.8617
+	  [B2]  scr: 0.7770
+
+Test Score: 0.7770 (took 0.66s)
+
+./logs/LDSS-SP1-imdynaug100/TECN2v1/eval/aprfc/cm_f7-0.67.png
+{'0Act-0Obj': 0, '0Obj-Rep': 1, 'Dis-Pro': 2, 'Dis-Vau': 3, 'Fix-Pro': 4, 'Fix-Vau': 5}
+
+phases_preds counts: [1079 1311  470 2370   73 3981] 	 9284
+phases_gt counts: [1031 1386  463 2223   42 4139] 	 9284
+{0: '0Act-0Obj', 1: '0Obj-Rep', 2: 'Dis-Pro', 3: 'Dis-Vau', 4: 'Fix-Pro', 5: 'Fix-Vau'}
+
+Video 26d9 Phase Report
+           |  T Preds   | T Targets  ||   Error   
+0Act-0Obj  |  17m 59s   |  17m 11s   ||    48s    
+0Obj-Rep   |  21m 51s   |   23m 6s   ||   1m 15s  
+Dis-Pro    |   7m 50s   |   7m 43s   ||     7s    
+Dis-Vau    |  39m 30s   |   37m 3s   ||   2m 27s  
+Fix-Pro    |   1m 13s   |    42s     ||    31s    
+Fix-Vau    | 1h 6m 21s  | 1h 8m 59s  ||   2m 38s   
+
+
+phases_preds counts: [1608 2386  471 1267  401 4074] 	 10207
+phases_gt counts: [1812 1231  558 1536  172 4898] 	 10207
+{0: '0Act-0Obj', 1: '0Obj-Rep', 2: 'Dis-Pro', 3: 'Dis-Vau', 4: 'Fix-Pro', 5: 'Fix-Vau'}
+
+Video 315a Phase Report
+           |  T Preds   | T Targets  ||   Error   
+0Act-0Obj  |  26m 48s   |  30m 12s   ||   3m 24s  
+0Obj-Rep   |  39m 46s   |  20m 31s   ||  19m 15s  
+Dis-Pro    |   7m 51s   |   9m 18s   ||   1m 27s  
+Dis-Vau    |   21m 7s   |  25m 36s   ||   4m 29s  
+Fix-Pro    |   6m 41s   |   2m 52s   ||   3m 49s  
+Fix-Vau    | 1h 7m 54s  | 1h 21m 38s ||  13m 44s   
+
+invalid preds:  0  /  19491
+Series([], Name: count, dtype: int64)
+Saving aggregated phase timing results to ./logs/LDSS-SP1-imdynaug100/TECN2v1/eval/timings/timings_Summary.csv
+
+
+Number of videos: 2
+Video graphing took 1.22 seconds
+
+Saved phase metric graphs to ./logs/LDSS-SP1-imdynaug100/TECN2v1/eval/ribbons
+
+	 = = = = = 	 = = = = =
+		 Fold 7 done!
+	 = = = = = 	 = = = = =
+
+G. [Processing] Generating all-fold confusion matrix ./logs/LDSS-SP1-imdynaug100/TECN2v1/eval/preds
+Collected 134498 predictions and 134498 targets
+Pred tensor shape: torch.Size([134498]), Target tensor shape: torch.Size([134498])
+./logs/LDSS-SP1-imdynaug100/TECN2v1/eval/aprfc/cm_global
+
+
+ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨
+
+
+Running 15cfg_SP1-tecno2_B.yml...
+
+diff model with same name
+A. [classroom] LDSS-SP1-imdynaug100 (Matched)
+   [model] TECN2v2 (New)
+   For ('train', 'process', 'eval')
+
+B. [dataset] LDSS-local (#134498)
+   [label type] single-phase-top1
+   [preprocessing] imagenet-dynaug
+   [classes] #6 (Unbalanced) ['0Act-0Obj', '0Obj-Rep', 'Dis-Pro', 'Dis-Vau', 'Fix-Pro', 'Fix-Vau']
+   [weights] [tensor([0.3846, 0.6755, 1.0557, 0.2113, 3.4933, 0.1796])]
+   [phases] #6  ['0Act-0Obj', '0Obj-Rep', 'Dis-Pro', 'Dis-Vau', 'Fix-Pro', 'Fix-Vau'] 
+
+C. [training] start on [device] cpu
+   [folds] #7 [epochs] #100 [batch sizes] s32 / t1
+   [criterions] [CrossEntropyLoss()] w/ weights [tensor([0.3846, 0.6755, 1.0557, 0.2113, 3.4933, 0.1796])]
+   [headtype] [6] 
+
+  Fold 1 splits:
+	train ['26d9', '315a', '436c', '5238', 'a909', 'b670', 'b71b', 'e6a9', 'e8d3', 'e8d7']
+	valid ['a334', 'f63b']
+	test ['cf7c']
+
+    No 'path_spaceModel' found. Using pretrained resnet50 in l4-fine-tune mode.
+    Feature size of 2048 at node 'flatten'
+    Feature size of None at node 'None'
+
+    Found feature path! (feats_f1-0.80.pt)
+  Available feature layers: ['flatten'] / Using last layer: flatten
+
+	Batch example shapes:
+	[space feature] torch.Size([581, 16, 2048])
+	[labels] [torch.Size([581, 16])]
+	[idx] torch.Size([581, 16])
+    Batch contains 1 clip(s), each with 16 frames
+
+   [optim]: adam
+   [sched]: step
+
+Teaching model:  TECN2v2_f1
+-------------- Epoch 1 --------------
+     T
+	  [B1]  scr: 0.0563
+	  [B4]  scr: 0.2225
+	  [B7]  scr: 0.2630
+	  [B10]  scr: 0.2912
+     V
+	  [B1]  scr: 0.2303
+	  [B2]  scr: 0.1827
+Train Loss: 3.604880	Valid Loss: 3.196871
+
+* New best model (valid loss): inf --> 3.1969 *
+
+-------------- Epoch 2 --------------
+     T
+	  [B1]  scr: 0.2430
+	  [B4]  scr: 0.2156
+	  [B7]  scr: 0.2338
+	  [B10]  scr: 0.2843
+     V
+	  [B1]  scr: 0.6236
+	  [B2]  scr: 0.5012
+Train Loss: 2.755694	Valid Loss: 2.944966
+
+* New best model (valid loss): 3.1969 --> 2.9450 *
+
+-------------- Epoch 3 --------------
+     T
+	  [B1]  scr: 0.5909
+	  [B4]  scr: 0.5711
+	  [B7]  scr: 0.6078
+	  [B10]  scr: 0.5927
+     V
+	  [B1]  scr: 0.5780
+	  [B2]  scr: 0.5543
+Train Loss: 2.070125	Valid Loss: 2.017859
+
+* New best model (valid loss): 2.9450 --> 2.0179 *
+
+-------------- Epoch 4 --------------
+     T
+	  [B1]  scr: 0.7273
+	  [B4]  scr: 0.6474
+	  [B7]  scr: 0.6951
+	  [B10]  scr: 0.7089
+     V
+	  [B1]  scr: 0.7087
+	  [B2]  scr: 0.6411
+Train Loss: 1.459216	Valid Loss: 2.200559
+-------------- Epoch 5 --------------
+     T
+	  [B1]  scr: 0.7157
+	  [B4]  scr: 0.8069
+	  [B7]  scr: 0.7843
+	  [B10]  scr: 0.7913
+     V
+	  [B1]  scr: 0.6604
+	  [B2]  scr: 0.6990
+Train Loss: 1.258635	Valid Loss: 2.432586
+-------------- Epoch 6 --------------
+     T
+	  [B1]  scr: 0.8369
+	  [B4]  scr: 0.8415
+	  [B7]  scr: 0.8354
+	  [B10]  scr: 0.8304
+     V
+	  [B1]  scr: 0.8083
+	  [B2]  scr: 0.6623
+Train Loss: 1.017824	Valid Loss: 2.726245
+-------------- Epoch 7 --------------
+     T
+	  [B1]  scr: 0.8681
+	  [B4]  scr: 0.8683
+	  [B7]  scr: 0.8527
+	  [B10]  scr: 0.8576
+     V
+	  [B1]  scr: 0.8006
+	  [B2]  scr: 0.7196
+Train Loss: 0.890651	Valid Loss: 2.610916
+-------------- Epoch 8 --------------
+     T
+	  [B1]  scr: 0.9133
+	  [B4]  scr: 0.8941
+	  [B7]  scr: 0.8916
+	  [B10]  scr: 0.9005
+     V
+	  [B1]  scr: 0.6774
+	  [B2]  scr: 0.7136
+Train Loss: 0.614849	Valid Loss: 2.247596
+
+* Stopped early *
+
+E. [Evaluating] from trained model TECN2v2_f1-0.55
+
+	Testing...
+	  [B1]  scr: 0.6962
+
+Test Score: 0.6962 (took 0.80s)
+
+./logs/LDSS-SP1-imdynaug100/TECN2v2/eval/aprfc/cm_f1-0.55.png
+{'0Act-0Obj': 0, '0Obj-Rep': 1, 'Dis-Pro': 2, 'Dis-Vau': 3, 'Fix-Pro': 4, 'Fix-Vau': 5}
+
+phases_preds counts: [3167 1144 1254 7581  686 3944] 	 17776
+phases_gt counts: [5930 1281 1128 3955  157 5325] 	 17776
+{0: '0Act-0Obj', 1: '0Obj-Rep', 2: 'Dis-Pro', 3: 'Dis-Vau', 4: 'Fix-Pro', 5: 'Fix-Vau'}
+
+Video cf7c Phase Report
+           |  T Preds   | T Targets  ||   Error   
+0Act-0Obj  |  52m 47s   | 1h 38m 50s ||   46m 3s  
+0Obj-Rep   |   19m 4s   |  21m 21s   ||   2m 17s  
+Dis-Pro    |  20m 54s   |  18m 48s   ||   2m 6s   
+Dis-Vau    | 2h 6m 21s  | 1h 5m 55s  ||   1h 26s  
+Fix-Pro    |  11m 26s   |   2m 37s   ||   8m 49s  
+Fix-Vau    | 1h 5m 44s  | 1h 28m 45s ||   23m 1s   
+
+invalid preds:  0  /  17776
+Series([], Name: count, dtype: int64)
+Saving aggregated phase timing results to ./logs/LDSS-SP1-imdynaug100/TECN2v2/eval/timings/timings_Summary.csv
+
+
+Number of videos: 1
+Video graphing took 0.96 seconds
+
+Saved phase metric graphs to ./logs/LDSS-SP1-imdynaug100/TECN2v2/eval/ribbons
+
+	 = = = = = 	 = = = = =
+		 Fold 1 done!
+	 = = = = = 	 = = = = =
+
+  Fold 2 splits:
+	train ['26d9', '315a', '436c', '5238', 'a909', 'b670', 'b71b', 'e6a9', 'e8d3', 'e8d7']
+	valid ['cf7c']
+	test ['a334', 'f63b']
+
+    No 'path_spaceModel' found. Using pretrained resnet50 in l4-fine-tune mode.
+    Feature size of 2048 at node 'flatten'
+    Feature size of None at node 'None'
+
+    Found feature path! (feats_f2-0.72.pt)
+  Available feature layers: ['flatten'] / Using last layer: flatten
+
+	Batch example shapes:
+	[space feature] torch.Size([708, 16, 2048])
+	[labels] [torch.Size([708, 16])]
+	[idx] torch.Size([708, 16])
+    Batch contains 1 clip(s), each with 16 frames
+
+   [optim]: adam
+   [sched]: step
+
+Teaching model:  TECN2v2_f2
+-------------- Epoch 1 --------------
+     T
+	  [B1]  scr: 0.1519
+	  [B4]  scr: 0.1427
+	  [B7]  scr: 0.1918
+	  [B10]  scr: 0.2716
+     V
+	  [B1]  scr: 0.2225
+Train Loss: 3.460454	Valid Loss: 3.539163
+
+* New best model (valid loss): inf --> 3.5392 *
+
+-------------- Epoch 2 --------------
+     T
+	  [B1]  scr: 0.4384
+	  [B4]  scr: 0.3895
+	  [B7]  scr: 0.3762
+	  [B10]  scr: 0.3694
+     V
+	  [B1]  scr: 0.1352
+Train Loss: 2.636433	Valid Loss: 3.104945
+
+* New best model (valid loss): 3.5392 --> 3.1049 *
+
+-------------- Epoch 3 --------------
+     T
+	  [B1]  scr: 0.3418
+	  [B4]  scr: 0.4417
+	  [B7]  scr: 0.5240
+	  [B10]  scr: 0.5474
+     V
+	  [B1]  scr: 0.5072
+Train Loss: 2.098840	Valid Loss: 2.797641
+
+* New best model (valid loss): 3.1049 --> 2.7976 *
+
+-------------- Epoch 4 --------------
+     T
+	  [B1]  scr: 0.4559
+	  [B4]  scr: 0.5443
+	  [B7]  scr: 0.5860
+	  [B10]  scr: 0.6008
+     V
+	  [B1]  scr: 0.5331
+Train Loss: 1.678596	Valid Loss: 2.330760
+
+* New best model (valid loss): 2.7976 --> 2.3308 *
+
+-------------- Epoch 5 --------------
+     T
+	  [B1]  scr: 0.7300
+	  [B4]  scr: 0.7445
+	  [B7]  scr: 0.7598
+	  [B10]  scr: 0.7649
+     V
+	  [B1]  scr: 0.6496
+Train Loss: 1.132978	Valid Loss: 2.503219
+-------------- Epoch 6 --------------
+     T
+	  [B1]  scr: 0.6726
+	  [B4]  scr: 0.7551
+	  [B7]  scr: 0.7844
+	  [B10]  scr: 0.7979
+     V
+	  [B1]  scr: 0.7088
+Train Loss: 1.047725	Valid Loss: 2.065590
+
+* New best model (valid loss): 2.3308 --> 2.0656 *
+
+-------------- Epoch 7 --------------
+     T
+	  [B1]  scr: 0.9065
+	  [B4]  scr: 0.8291
+	  [B7]  scr: 0.8329
+	  [B10]  scr: 0.8525
+     V
+	  [B1]  scr: 0.6699
+Train Loss: 0.821899	Valid Loss: 4.994592
+-------------- Epoch 8 --------------
+     T
+	  [B1]  scr: 0.9435
+	  [B4]  scr: 0.8996
+	  [B7]  scr: 0.8936
+	  [B10]  scr: 0.8858
+     V
+	  [B1]  scr: 0.6849
+Train Loss: 0.628256	Valid Loss: 2.507491
+-------------- Epoch 9 --------------
+     T
+	  [B1]  scr: 0.8969
+	  [B4]  scr: 0.9077
+	  [B7]  scr: 0.9015
+	  [B10]  scr: 0.9030
+     V
+	  [B1]  scr: 0.7216
+Train Loss: 0.565835	Valid Loss: 2.185826
+-------------- Epoch 10 --------------
+     T
+	  [B1]  scr: 0.8940
+	  [B4]  scr: 0.9158
+	  [B7]  scr: 0.8785
+	  [B10]  scr: 0.8684
+     V
+	  [B1]  scr: 0.6610
+Train Loss: 0.696767	Valid Loss: 2.310987
+-------------- Epoch 11 --------------
+     T
+	  [B1]  scr: 0.8373
+	  [B4]  scr: 0.8851
+	  [B7]  scr: 0.8798
+	  [B10]  scr: 0.8752
+     V
+	  [B1]  scr: 0.6378
+Train Loss: 0.709033	Valid Loss: 3.149170
+
+* Stopped early *
+
+E. [Evaluating] from trained model TECN2v2_f2-0.71
+
+	Testing...
+	  [B1]  scr: 0.6825
+	  [B2]  scr: 0.6637
+
+Test Score: 0.6637 (took 0.82s)
+
+./logs/LDSS-SP1-imdynaug100/TECN2v2/eval/aprfc/cm_f2-0.71.png
+{'0Act-0Obj': 0, '0Obj-Rep': 1, 'Dis-Pro': 2, 'Dis-Vau': 3, 'Fix-Pro': 4, 'Fix-Vau': 5}
+
+phases_preds counts: [ 843  985    0 1483  441 2658] 	 6410
+phases_gt counts: [ 579 1423   53  916  100 3339] 	 6410
+{0: '0Act-0Obj', 1: '0Obj-Rep', 2: 'Dis-Pro', 3: 'Dis-Vau', 4: 'Fix-Pro', 5: 'Fix-Vau'}
+
+Video a334 Phase Report
+           |  T Preds   | T Targets  ||   Error   
+0Act-0Obj  |   14m 3s   |   9m 39s   ||   4m 24s  
+0Obj-Rep   |  16m 25s   |  23m 43s   ||   7m 18s  
+Dis-Pro    |     0s     |    53s     ||    53s    
+Dis-Vau    |  24m 43s   |  15m 16s   ||   9m 27s  
+Fix-Pro    |   7m 21s   |   1m 40s   ||   5m 41s  
+Fix-Vau    |  44m 18s   |  55m 39s   ||  11m 21s   
+
+
+phases_preds counts: [ 904  969    0 6353  595 4135] 	 12956
+phases_gt counts: [2841  718 1344 3002  155 4896] 	 12956
+{0: '0Act-0Obj', 1: '0Obj-Rep', 2: 'Dis-Pro', 3: 'Dis-Vau', 4: 'Fix-Pro', 5: 'Fix-Vau'}
+
+Video f63b Phase Report
+           |  T Preds   | T Targets  ||   Error   
+0Act-0Obj  |   15m 4s   |  47m 21s   ||  32m 17s  
+0Obj-Rep   |   16m 9s   |  11m 58s   ||   4m 11s  
+Dis-Pro    |     0s     |  22m 24s   ||  22m 24s  
+Dis-Vau    | 1h 45m 53s |   50m 2s   ||  55m 51s  
+Fix-Pro    |   9m 55s   |   2m 35s   ||   7m 20s  
+Fix-Vau    | 1h 8m 55s  | 1h 21m 36s ||  12m 41s   
+
+invalid preds:  0  /  19366
+Series([], Name: count, dtype: int64)
+Saving aggregated phase timing results to ./logs/LDSS-SP1-imdynaug100/TECN2v2/eval/timings/timings_Summary.csv
+
+
+Number of videos: 2
+Video graphing took 1.22 seconds
+
+Saved phase metric graphs to ./logs/LDSS-SP1-imdynaug100/TECN2v2/eval/ribbons
+
+	 = = = = = 	 = = = = =
+		 Fold 2 done!
+	 = = = = = 	 = = = = =
+
+  Fold 3 splits:
+	train ['26d9', '315a', '436c', '5238', 'a334', 'a909', 'b670', 'b71b', 'e8d3', 'f63b']
+	valid ['cf7c']
+	test ['e6a9', 'e8d7']
+
+    No 'path_spaceModel' found. Using pretrained resnet50 in l4-fine-tune mode.
+    Feature size of 2048 at node 'flatten'
+    Feature size of None at node 'None'
+
+    Found feature path! (feats_f3-0.76.pt)
+  Available feature layers: ['flatten'] / Using last layer: flatten
+
+	Batch example shapes:
+	[space feature] torch.Size([581, 16, 2048])
+	[labels] [torch.Size([581, 16])]
+	[idx] torch.Size([581, 16])
+    Batch contains 1 clip(s), each with 16 frames
+
+   [optim]: adam
+   [sched]: step
+
+Teaching model:  TECN2v2_f3
+-------------- Epoch 1 --------------
+     T
+	  [B1]  scr: 0.2313
+	  [B4]  scr: 0.1362
+	  [B7]  scr: 0.1823
+	  [B10]  scr: 0.2419
+     V
+	  [B1]  scr: 0.3344
+Train Loss: 3.624092	Valid Loss: 3.511245
+
+* New best model (valid loss): inf --> 3.5112 *
+
+-------------- Epoch 2 --------------
+     T
+	  [B1]  scr: 0.2635
+	  [B4]  scr: 0.2588
+	  [B7]  scr: 0.2935
+	  [B10]  scr: 0.3038
+     V
+	  [B1]  scr: 0.3666
+Train Loss: 2.926577	Valid Loss: 3.313550
+
+* New best model (valid loss): 3.5112 --> 3.3136 *
+
+-------------- Epoch 3 --------------
+     T
+	  [B1]  scr: 0.4470
+	  [B4]  scr: 0.4903
+	  [B7]  scr: 0.5355
+	  [B10]  scr: 0.5320
+     V
+	  [B1]  scr: 0.5290
+Train Loss: 2.209279	Valid Loss: 2.466852
+
+* New best model (valid loss): 3.3136 --> 2.4669 *
+
+-------------- Epoch 4 --------------
+     T
+	  [B1]  scr: 0.6074
+	  [B4]  scr: 0.6163
+	  [B7]  scr: 0.5977
+	  [B10]  scr: 0.6480
+     V
+	  [B1]  scr: 0.5343
+Train Loss: 1.727187	Valid Loss: 2.572265
+-------------- Epoch 5 --------------
+     T
+	  [B1]  scr: 0.7317
+	  [B4]  scr: 0.7802
+	  [B7]  scr: 0.7664
+	  [B10]  scr: 0.7331
+     V
+	  [B1]  scr: 0.6033
+Train Loss: 1.246039	Valid Loss: 2.031994
+
+* New best model (valid loss): 2.4669 --> 2.0320 *
+
+-------------- Epoch 6 --------------
+     T
+	  [B1]  scr: 0.6338
+	  [B4]  scr: 0.6841
+	  [B7]  scr: 0.7406
+	  [B10]  scr: 0.7730
+     V
+	  [B1]  scr: 0.7723
+Train Loss: 1.071077	Valid Loss: 1.679605
+
+* New best model (valid loss): 2.0320 --> 1.6796 *
+
+-------------- Epoch 7 --------------
+     T
+	  [B1]  scr: 0.8065
+	  [B4]  scr: 0.8150
+	  [B7]  scr: 0.8499
+	  [B10]  scr: 0.8566
+     V
+	  [B1]  scr: 0.7108
+Train Loss: 0.890518	Valid Loss: 1.715108
+-------------- Epoch 8 --------------
+     T
+	  [B1]  scr: 0.7259
+	  [B4]  scr: 0.8490
+	  [B7]  scr: 0.8567
+	  [B10]  scr: 0.8570
+     V
+	  [B1]  scr: 0.7373
+Train Loss: 0.851546	Valid Loss: 1.574401
+
+* New best model (valid loss): 1.6796 --> 1.5744 *
+
+-------------- Epoch 9 --------------
+     T
+	  [B1]  scr: 0.8750
+	  [B4]  scr: 0.8668
+	  [B7]  scr: 0.8541
+	  [B10]  scr: 0.8442
+     V
+	  [B1]  scr: 0.7535
+Train Loss: 0.738243	Valid Loss: 1.460881
+
+* New best model (valid loss): 1.5744 --> 1.4609 *
+
+-------------- Epoch 10 --------------
+     T
+	  [B1]  scr: 0.8837
+	  [B4]  scr: 0.8906
+	  [B7]  scr: 0.9052
+	  [B10]  scr: 0.9071
+     V
+	  [B1]  scr: 0.7260
+Train Loss: 0.561823	Valid Loss: 1.896202
+-------------- Epoch 11 --------------
+     T
+	  [B1]  scr: 0.9025
+	  [B4]  scr: 0.9072
+	  [B7]  scr: 0.9242
+	  [B10]  scr: 0.9174
+     V
+	  [B1]  scr: 0.7082
+Train Loss: 0.473754	Valid Loss: 2.023719
+-------------- Epoch 12 --------------
+     T
+	  [B1]  scr: 0.8871
+	  [B4]  scr: 0.9343
+	  [B7]  scr: 0.9274
+	  [B10]  scr: 0.9182
+     V
+	  [B1]  scr: 0.7128
+Train Loss: 0.466679	Valid Loss: 1.919427
+-------------- Epoch 13 --------------
+     T
+	  [B1]  scr: 0.9645
+	  [B4]  scr: 0.9165
+	  [B7]  scr: 0.9178
+	  [B10]  scr: 0.9246
+     V
+	  [B1]  scr: 0.7057
+Train Loss: 0.444628	Valid Loss: 2.030577
+-------------- Epoch 14 --------------
+     T
+	  [B1]  scr: 0.9433
+	  [B4]  scr: 0.9486
+	  [B7]  scr: 0.9408
+	  [B10]  scr: 0.9329
+     V
+	  [B1]  scr: 0.7301
+Train Loss: 0.381991	Valid Loss: 2.068541
+
+* Stopped early *
+
+E. [Evaluating] from trained model TECN2v2_f3-0.75
+
+	Testing...
+	  [B1]  scr: 0.8042
+	  [B2]  scr: 0.8169
+
+Test Score: 0.8169 (took 0.73s)
+
+./logs/LDSS-SP1-imdynaug100/TECN2v2/eval/aprfc/cm_f3-0.75.png
+{'0Act-0Obj': 0, '0Obj-Rep': 1, 'Dis-Pro': 2, 'Dis-Vau': 3, 'Fix-Pro': 4, 'Fix-Vau': 5}
+
+phases_preds counts: [ 633 1479 1164 4300    0 5188] 	 12764
+phases_gt counts: [2072 1604  445 4324  280 4039] 	 12764
+{0: '0Act-0Obj', 1: '0Obj-Rep', 2: 'Dis-Pro', 3: 'Dis-Vau', 4: 'Fix-Pro', 5: 'Fix-Vau'}
+
+Video e6a9 Phase Report
+           |  T Preds   | T Targets  ||   Error   
+0Act-0Obj  |  10m 33s   |  34m 32s   ||  23m 59s  
+0Obj-Rep   |  24m 39s   |  26m 44s   ||   2m 5s   
+Dis-Pro    |  19m 24s   |   7m 25s   ||  11m 59s  
+Dis-Vau    | 1h 11m 40s | 1h 12m 4s  ||    24s    
+Fix-Pro    |     0s     |   4m 40s   ||   4m 40s  
+Fix-Vau    | 1h 26m 28s | 1h 7m 19s  ||   19m 9s   
+
+
+phases_preds counts: [ 639 1417  636 1745   10 2131] 	 6578
+phases_gt counts: [ 964  890  836 1709  211 1968] 	 6578
+{0: '0Act-0Obj', 1: '0Obj-Rep', 2: 'Dis-Pro', 3: 'Dis-Vau', 4: 'Fix-Pro', 5: 'Fix-Vau'}
+
+Video e8d7 Phase Report
+           |  T Preds   | T Targets  ||   Error   
+0Act-0Obj  |  10m 39s   |   16m 4s   ||   5m 25s  
+0Obj-Rep   |  23m 37s   |  14m 50s   ||   8m 47s  
+Dis-Pro    |  10m 36s   |  13m 56s   ||   3m 20s  
+Dis-Vau    |   29m 5s   |  28m 29s   ||    36s    
+Fix-Pro    |    10s     |   3m 31s   ||   3m 21s  
+Fix-Vau    |  35m 31s   |  32m 48s   ||   2m 43s   
+
+invalid preds:  0  /  19342
+Series([], Name: count, dtype: int64)
+Saving aggregated phase timing results to ./logs/LDSS-SP1-imdynaug100/TECN2v2/eval/timings/timings_Summary.csv
+
+
+Number of videos: 2
+Video graphing took 1.22 seconds
+
+Saved phase metric graphs to ./logs/LDSS-SP1-imdynaug100/TECN2v2/eval/ribbons
+
+	 = = = = = 	 = = = = =
+		 Fold 3 done!
+	 = = = = = 	 = = = = =
+
+  Fold 4 splits:
+	train ['26d9', '315a', '436c', 'a334', 'a909', 'b670', 'b71b', 'e6a9', 'e8d7', 'f63b']
+	valid ['cf7c']
+	test ['5238', 'e8d3']
+
+    No 'path_spaceModel' found. Using pretrained resnet50 in l4-fine-tune mode.
+    Feature size of 2048 at node 'flatten'
+    Feature size of None at node 'None'
+
+    Found feature path! (feats_f4-0.72.pt)
+  Available feature layers: ['flatten'] / Using last layer: flatten
+
+	Batch example shapes:
+	[space feature] torch.Size([412, 16, 2048])
+	[labels] [torch.Size([412, 16])]
+	[idx] torch.Size([412, 16])
+    Batch contains 1 clip(s), each with 16 frames
+
+   [optim]: adam
+   [sched]: step
+
+Teaching model:  TECN2v2_f4
+-------------- Epoch 1 --------------
+     T
+	  [B1]  scr: 0.1873
+	  [B4]  scr: 0.1867
+	  [B7]  scr: 0.1984
+	  [B10]  scr: 0.2151
+     V
+	  [B1]  scr: 0.2225
+Train Loss: 3.474743	Valid Loss: 3.312428
+
+* New best model (valid loss): inf --> 3.3124 *
+
+-------------- Epoch 2 --------------
+     T
+	  [B1]  scr: 0.3924
+	  [B4]  scr: 0.3255
+	  [B7]  scr: 0.3337
+	  [B10]  scr: 0.3252
+     V
+	  [B1]  scr: 0.4012
+Train Loss: 2.699549	Valid Loss: 3.018693
+
+* New best model (valid loss): 3.3124 --> 3.0187 *
+
+-------------- Epoch 3 --------------
+     T
+	  [B1]  scr: 0.4659
+	  [B4]  scr: 0.5018
+	  [B7]  scr: 0.5852
+	  [B10]  scr: 0.5990
+     V
+	  [B1]  scr: 0.4938
+Train Loss: 2.040694	Valid Loss: 2.205315
+
+* New best model (valid loss): 3.0187 --> 2.2053 *
+
+-------------- Epoch 4 --------------
+     T
+	  [B1]  scr: 0.5161
+	  [B4]  scr: 0.5086
+	  [B7]  scr: 0.5346
+	  [B10]  scr: 0.5823
+     V
+	  [B1]  scr: 0.6103
+Train Loss: 1.676032	Valid Loss: 2.340474
+-------------- Epoch 5 --------------
+     T
+	  [B1]  scr: 0.8372
+	  [B4]  scr: 0.6951
+	  [B7]  scr: 0.7191
+	  [B10]  scr: 0.7140
+     V
+	  [B1]  scr: 0.6582
+Train Loss: 1.417128	Valid Loss: 1.510971
+
+* New best model (valid loss): 2.2053 --> 1.5110 *
+
+-------------- Epoch 6 --------------
+     T
+	  [B1]  scr: 0.6536
+	  [B4]  scr: 0.6701
+	  [B7]  scr: 0.7059
+	  [B10]  scr: 0.7230
+     V
+	  [B1]  scr: 0.7453
+Train Loss: 1.114043	Valid Loss: 1.492806
+
+* New best model (valid loss): 1.5110 --> 1.4928 *
+
+-------------- Epoch 7 --------------
+     T
+	  [B1]  scr: 0.7430
+	  [B4]  scr: 0.8140
+	  [B7]  scr: 0.8211
+	  [B10]  scr: 0.8377
+     V
+	  [B1]  scr: 0.7816
+Train Loss: 0.840012	Valid Loss: 1.317840
+
+* New best model (valid loss): 1.4928 --> 1.3178 *
+
+-------------- Epoch 8 --------------
+     T
+	  [B1]  scr: 0.7846
+	  [B4]  scr: 0.8647
+	  [B7]  scr: 0.8735
+	  [B10]  scr: 0.8732
+     V
+	  [B1]  scr: 0.8095
+Train Loss: 0.719897	Valid Loss: 1.352388
+-------------- Epoch 9 --------------
+     T
+	  [B1]  scr: 0.9395
+	  [B4]  scr: 0.8982
+	  [B7]  scr: 0.9006
+	  [B10]  scr: 0.8958
+     V
+	  [B1]  scr: 0.7805
+Train Loss: 0.584716	Valid Loss: 1.394578
+-------------- Epoch 10 --------------
+     T
+	  [B1]  scr: 0.9407
+	  [B4]  scr: 0.8984
+	  [B7]  scr: 0.8965
+	  [B10]  scr: 0.9030
+     V
+	  [B1]  scr: 0.7467
+Train Loss: 0.532880	Valid Loss: 1.684187
+-------------- Epoch 11 --------------
+     T
+	  [B1]  scr: 0.9411
+	  [B4]  scr: 0.9077
+	  [B7]  scr: 0.9228
+	  [B10]  scr: 0.9169
+     V
+	  [B1]  scr: 0.7856
+Train Loss: 0.458155	Valid Loss: 1.922693
+-------------- Epoch 12 --------------
+     T
+	  [B1]  scr: 0.9540
+	  [B4]  scr: 0.9003
+	  [B7]  scr: 0.9247
+	  [B10]  scr: 0.9312
+     V
+	  [B1]  scr: 0.7712
+Train Loss: 0.391627	Valid Loss: 1.619269
+
+* Stopped early *
+
+E. [Evaluating] from trained model TECN2v2_f4-0.78
+
+	Testing...
+	  [B1]  scr: 0.7748
+	  [B2]  scr: 0.8657
+
+Test Score: 0.8657 (took 0.76s)
+
+./logs/LDSS-SP1-imdynaug100/TECN2v2/eval/aprfc/cm_f4-0.78.png
+{'0Act-0Obj': 0, '0Obj-Rep': 1, 'Dis-Pro': 2, 'Dis-Vau': 3, 'Fix-Pro': 4, 'Fix-Vau': 5}
+
+phases_preds counts: [1989 1042  566 4581  167 2981] 	 11326
+phases_gt counts: [2439 1014  359 4849  135 2530] 	 11326
+{0: '0Act-0Obj', 1: '0Obj-Rep', 2: 'Dis-Pro', 3: 'Dis-Vau', 4: 'Fix-Pro', 5: 'Fix-Vau'}
+
+Video 5238 Phase Report
+           |  T Preds   | T Targets  ||   Error   
+0Act-0Obj  |   33m 9s   |  40m 39s   ||   7m 30s  
+0Obj-Rep   |  17m 22s   |  16m 54s   ||    28s    
+Dis-Pro    |   9m 26s   |   5m 59s   ||   3m 27s  
+Dis-Vau    | 1h 16m 21s | 1h 20m 49s ||   4m 28s  
+Fix-Pro    |   2m 47s   |   2m 15s   ||    32s    
+Fix-Vau    |  49m 41s   |  42m 10s   ||   7m 31s   
+
+/home/dcerveira/SurgeNet/src/teaching.py:704: RuntimeWarning: More than 20 figures have been opened. Figures created through the pyplot interface (`matplotlib.pyplot.figure`) are retained until explicitly closed and may consume too much memory. (To control this warning, see the rcParam `figure.max_open_warning`). Consider using `matplotlib.pyplot.close()`.
+  fig, ax = plt.subplots()
+
+phases_preds counts: [1355  424  513 2133  117 2869] 	 7411
+phases_gt counts: [ 632    0  451 3121   57 3150] 	 7411
+{0: '0Act-0Obj', 1: '0Obj-Rep', 2: 'Dis-Pro', 3: 'Dis-Vau', 4: 'Fix-Pro', 5: 'Fix-Vau'}
+
+Video e8d3 Phase Report
+           |  T Preds   | T Targets  ||   Error   
+0Act-0Obj  |  22m 35s   |  10m 32s   ||   12m 3s  
+0Obj-Rep   |   7m 4s    |     0s     ||   7m 4s   
+Dis-Pro    |   8m 33s   |   7m 31s   ||   1m 2s   
+Dis-Vau    |  35m 33s   |   52m 1s   ||  16m 28s  
+Fix-Pro    |   1m 57s   |    57s     ||     1m    
+Fix-Vau    |  47m 49s   |  52m 30s   ||   4m 41s   
+
+/home/dcerveira/SurgeNet/src/teaching.py:704: RuntimeWarning: More than 20 figures have been opened. Figures created through the pyplot interface (`matplotlib.pyplot.figure`) are retained until explicitly closed and may consume too much memory. (To control this warning, see the rcParam `figure.max_open_warning`). Consider using `matplotlib.pyplot.close()`.
+  fig, ax = plt.subplots()
+invalid preds:  0  /  18737
+Series([], Name: count, dtype: int64)
+Saving aggregated phase timing results to ./logs/LDSS-SP1-imdynaug100/TECN2v2/eval/timings/timings_Summary.csv
+
+
+Number of videos: 2
+/home/dcerveira/SurgeNet/src/teaching.py:746: RuntimeWarning: More than 20 figures have been opened. Figures created through the pyplot interface (`matplotlib.pyplot.figure`) are retained until explicitly closed and may consume too much memory. (To control this warning, see the rcParam `figure.max_open_warning`). Consider using `matplotlib.pyplot.close()`.
+  fig, (ax, ax_text) = plt.subplots(nrows=2, gridspec_kw={'height_ratios': [3, 1]}, figsize=(9, 6))
+/home/dcerveira/SurgeNet/src/teaching.py:746: RuntimeWarning: More than 20 figures have been opened. Figures created through the pyplot interface (`matplotlib.pyplot.figure`) are retained until explicitly closed and may consume too much memory. (To control this warning, see the rcParam `figure.max_open_warning`). Consider using `matplotlib.pyplot.close()`.
+  fig, (ax, ax_text) = plt.subplots(nrows=2, gridspec_kw={'height_ratios': [3, 1]}, figsize=(9, 6))
+Video graphing took 1.24 seconds
+
+Saved phase metric graphs to ./logs/LDSS-SP1-imdynaug100/TECN2v2/eval/ribbons
+
+	 = = = = = 	 = = = = =
+		 Fold 4 done!
+	 = = = = = 	 = = = = =
+
+  Fold 5 splits:
+	train ['26d9', '315a', '436c', '5238', 'a334', 'b670', 'e6a9', 'e8d3', 'e8d7', 'f63b']
+	valid ['cf7c']
+	test ['a909', 'b71b']
+
+    No 'path_spaceModel' found. Using pretrained resnet50 in l4-fine-tune mode.
+    Feature size of 2048 at node 'flatten'
+    Feature size of None at node 'None'
+
+    Found feature path! (feats_f5-0.72.pt)
+  Available feature layers: ['flatten'] / Using last layer: flatten
+
+	Batch example shapes:
+	[space feature] torch.Size([464, 16, 2048])
+	[labels] [torch.Size([464, 16])]
+	[idx] torch.Size([464, 16])
+    Batch contains 1 clip(s), each with 16 frames
+
+   [optim]: adam
+   [sched]: step
+
+Teaching model:  TECN2v2_f5
+-------------- Epoch 1 --------------
+     T
+	  [B1]  scr: 0.0727
+	  [B4]  scr: 0.1491
+	  [B7]  scr: 0.1991
+	  [B10]  scr: 0.2448
+     V
+	  [B1]  scr: 0.0088
+Train Loss: 3.518779	Valid Loss: 3.723734
+
+* New best model (valid loss): inf --> 3.7237 *
+
+-------------- Epoch 2 --------------
+     T
+	  [B1]  scr: 0.2852
+	  [B4]  scr: 0.2792
+	  [B7]  scr: 0.2947
+	  [B10]  scr: 0.3270
+     V
+	  [B1]  scr: 0.4601
+Train Loss: 2.659871	Valid Loss: 3.547065
+
+* New best model (valid loss): 3.7237 --> 3.5471 *
+
+-------------- Epoch 3 --------------
+     T
+	  [B1]  scr: 0.3940
+	  [B4]  scr: 0.4912
+	  [B7]  scr: 0.5029
+	  [B10]  scr: 0.5440
+     V
+	  [B1]  scr: 0.5430
+Train Loss: 2.031356	Valid Loss: 2.440921
+
+* New best model (valid loss): 3.5471 --> 2.4409 *
+
+-------------- Epoch 4 --------------
+     T
+	  [B1]  scr: 0.5481
+	  [B4]  scr: 0.6140
+	  [B7]  scr: 0.5994
+	  [B10]  scr: 0.6200
+     V
+	  [B1]  scr: 0.5776
+Train Loss: 1.552899	Valid Loss: 2.598204
+-------------- Epoch 5 --------------
+     T
+	  [B1]  scr: 0.8403
+	  [B4]  scr: 0.8208
+	  [B7]  scr: 0.7852
+	  [B10]  scr: 0.7565
+     V
+	  [B1]  scr: 0.7292
+Train Loss: 1.266692	Valid Loss: 1.800179
+
+* New best model (valid loss): 2.4409 --> 1.8002 *
+
+-------------- Epoch 6 --------------
+     T
+	  [B1]  scr: 0.7628
+	  [B4]  scr: 0.8213
+	  [B7]  scr: 0.7974
+	  [B10]  scr: 0.8137
+     V
+	  [B1]  scr: 0.7196
+Train Loss: 0.935944	Valid Loss: 1.873312
+-------------- Epoch 7 --------------
+     T
+	  [B1]  scr: 0.8625
+	  [B4]  scr: 0.8720
+	  [B7]  scr: 0.8852
+	  [B10]  scr: 0.8687
+     V
+	  [B1]  scr: 0.8320
+Train Loss: 0.790819	Valid Loss: 1.467235
+
+* New best model (valid loss): 1.8002 --> 1.4672 *
+
+-------------- Epoch 8 --------------
+     T
+	  [B1]  scr: 0.8702
+	  [B4]  scr: 0.8765
+	  [B7]  scr: 0.8892
+	  [B10]  scr: 0.8902
+     V
+	  [B1]  scr: 0.7651
+Train Loss: 0.635985	Valid Loss: 1.691407
+-------------- Epoch 9 --------------
+     T
+	  [B1]  scr: 0.9269
+	  [B4]  scr: 0.9159
+	  [B7]  scr: 0.9167
+	  [B10]  scr: 0.9100
+     V
+	  [B1]  scr: 0.7191
+Train Loss: 0.521263	Valid Loss: 1.957513
+-------------- Epoch 10 --------------
+     T
+	  [B1]  scr: 0.9273
+	  [B4]  scr: 0.9117
+	  [B7]  scr: 0.9113
+	  [B10]  scr: 0.9154
+     V
+	  [B1]  scr: 0.7786
+Train Loss: 0.454171	Valid Loss: 1.654596
+-------------- Epoch 11 --------------
+     T
+	  [B1]  scr: 0.9687
+	  [B4]  scr: 0.9467
+	  [B7]  scr: 0.9313
+	  [B10]  scr: 0.9250
+     V
+	  [B1]  scr: 0.7596
+Train Loss: 0.389710	Valid Loss: 1.972746
+-------------- Epoch 12 --------------
+     T
+	  [B1]  scr: 0.9476
+	  [B4]  scr: 0.9364
+	  [B7]  scr: 0.9282
+	  [B10]  scr: 0.9315
+     V
+	  [B1]  scr: 0.7595
+Train Loss: 0.415276	Valid Loss: 1.860604
+
+* Stopped early *
+
+E. [Evaluating] from trained model TECN2v2_f5-0.83
+
+	Testing...
+	  [B1]  scr: 0.8669
+	  [B2]  scr: 0.8877
+
+Test Score: 0.8877 (took 0.75s)
+
+/home/dcerveira/SurgeNet/src/teaching.py:961: RuntimeWarning: More than 20 figures have been opened. Figures created through the pyplot interface (`matplotlib.pyplot.figure`) are retained until explicitly closed and may consume too much memory. (To control this warning, see the rcParam `figure.max_open_warning`). Consider using `matplotlib.pyplot.close()`.
+  fig, ax = plt.subplots(figsize=(10, 7))
+./logs/LDSS-SP1-imdynaug100/TECN2v2/eval/aprfc/cm_f5-0.83.png
+{'0Act-0Obj': 0, '0Obj-Rep': 1, 'Dis-Pro': 2, 'Dis-Vau': 3, 'Fix-Pro': 4, 'Fix-Vau': 5}
+
+phases_preds counts: [ 973  869  455 2336   14 3610] 	 8257
+phases_gt counts: [1737  802  274 2228   48 3168] 	 8257
+{0: '0Act-0Obj', 1: '0Obj-Rep', 2: 'Dis-Pro', 3: 'Dis-Vau', 4: 'Fix-Pro', 5: 'Fix-Vau'}
+
+Video a909 Phase Report
+           |  T Preds   | T Targets  ||   Error   
+0Act-0Obj  |  16m 13s   |  28m 57s   ||  12m 44s  
+0Obj-Rep   |  14m 29s   |  13m 22s   ||   1m 7s   
+Dis-Pro    |   7m 35s   |   4m 34s   ||   3m 1s   
+Dis-Vau    |  38m 56s   |   37m 8s   ||   1m 48s  
+Fix-Pro    |    14s     |    48s     ||    34s    
+Fix-Vau    |   1h 10s   |  52m 48s   ||   7m 22s   
+
+
+phases_preds counts: [1135  997  358 5245  240 3196] 	 11171
+phases_gt counts: [ 748  733  316 5640  151 3583] 	 11171
+{0: '0Act-0Obj', 1: '0Obj-Rep', 2: 'Dis-Pro', 3: 'Dis-Vau', 4: 'Fix-Pro', 5: 'Fix-Vau'}
+
+Video b71b Phase Report
+           |  T Preds   | T Targets  ||   Error   
+0Act-0Obj  |  18m 55s   |  12m 28s   ||   6m 27s  
+0Obj-Rep   |  16m 37s   |  12m 13s   ||   4m 24s  
+Dis-Pro    |   5m 58s   |   5m 16s   ||    42s    
+Dis-Vau    | 1h 27m 25s |   1h 34m   ||   6m 35s  
+Fix-Pro    |     4m     |   2m 31s   ||   1m 29s  
+Fix-Vau    |  53m 16s   |  59m 43s   ||   6m 27s   
+
+invalid preds:  0  /  19428
+Series([], Name: count, dtype: int64)
+Saving aggregated phase timing results to ./logs/LDSS-SP1-imdynaug100/TECN2v2/eval/timings/timings_Summary.csv
+
+
+Number of videos: 2
+Video graphing took 1.25 seconds
+
+Saved phase metric graphs to ./logs/LDSS-SP1-imdynaug100/TECN2v2/eval/ribbons
+
+	 = = = = = 	 = = = = =
+		 Fold 5 done!
+	 = = = = = 	 = = = = =
+
+  Fold 6 splits:
+	train ['26d9', '315a', '5238', 'a334', 'a909', 'b71b', 'e6a9', 'e8d3', 'e8d7', 'f63b']
+	valid ['cf7c']
+	test ['436c', 'b670']
+
+    No 'path_spaceModel' found. Using pretrained resnet50 in l4-fine-tune mode.
+    Feature size of 2048 at node 'flatten'
+    Feature size of None at node 'None'
+
+    Found feature path! (feats_f6-0.72.pt)
+  Available feature layers: ['flatten'] / Using last layer: flatten
+
+	Batch example shapes:
+	[space feature] torch.Size([464, 16, 2048])
+	[labels] [torch.Size([464, 16])]
+	[idx] torch.Size([464, 16])
+    Batch contains 1 clip(s), each with 16 frames
+
+   [optim]: adam
+   [sched]: step
+
+Teaching model:  TECN2v2_f6
+-------------- Epoch 1 --------------
+     T
+	  [B1]  scr: 0.1291
+	  [B4]  scr: 0.1656
+	  [B7]  scr: 0.1590
+	  [B10]  scr: 0.1661
+     V
+	  [B1]  scr: 0.0721
+Train Loss: 3.576678	Valid Loss: 3.466261
+
+* New best model (valid loss): inf --> 3.4663 *
+
+-------------- Epoch 2 --------------
+     T
+	  [B1]  scr: 0.1941
+	  [B4]  scr: 0.3341
+	  [B7]  scr: 0.4295
+	  [B10]  scr: 0.4314
+     V
+	  [B1]  scr: 0.5123
+Train Loss: 2.705893	Valid Loss: 2.504499
+
+* New best model (valid loss): 3.4663 --> 2.5045 *
+
+-------------- Epoch 3 --------------
+     T
+	  [B1]  scr: 0.4895
+	  [B4]  scr: 0.5316
+	  [B7]  scr: 0.5549
+	  [B10]  scr: 0.5718
+     V
+	  [B1]  scr: 0.6822
+Train Loss: 2.091635	Valid Loss: 1.732895
+
+* New best model (valid loss): 2.5045 --> 1.7329 *
+
+-------------- Epoch 4 --------------
+     T
+	  [B1]  scr: 0.7477
+	  [B4]  scr: 0.6756
+	  [B7]  scr: 0.6418
+	  [B10]  scr: 0.6835
+     V
+	  [B1]  scr: 0.7144
+Train Loss: 1.333193	Valid Loss: 2.380146
+-------------- Epoch 5 --------------
+     T
+	  [B1]  scr: 0.8988
+	  [B4]  scr: 0.8656
+	  [B7]  scr: 0.8160
+	  [B10]  scr: 0.8004
+     V
+	  [B1]  scr: 0.7215
+Train Loss: 1.148486	Valid Loss: 1.596661
+
+* New best model (valid loss): 1.7329 --> 1.5967 *
+
+-------------- Epoch 6 --------------
+     T
+	  [B1]  scr: 0.8960
+	  [B4]  scr: 0.8848
+	  [B7]  scr: 0.8495
+	  [B10]  scr: 0.8660
+     V
+	  [B1]  scr: 0.7690
+Train Loss: 0.853799	Valid Loss: 1.986293
+-------------- Epoch 7 --------------
+     T
+	  [B1]  scr: 0.9216
+	  [B4]  scr: 0.9251
+	  [B7]  scr: 0.9002
+	  [B10]  scr: 0.8962
+     V
+	  [B1]  scr: 0.7467
+Train Loss: 0.675562	Valid Loss: 2.982824
+-------------- Epoch 8 --------------
+     T
+	  [B1]  scr: 0.9189
+	  [B4]  scr: 0.9367
+	  [B7]  scr: 0.9128
+	  [B10]  scr: 0.9058
+     V
+	  [B1]  scr: 0.7482
+Train Loss: 0.521316	Valid Loss: 1.983456
+-------------- Epoch 9 --------------
+     T
+	  [B1]  scr: 0.9152
+	  [B4]  scr: 0.9213
+	  [B7]  scr: 0.9255
+	  [B10]  scr: 0.9198
+     V
+	  [B1]  scr: 0.7366
+Train Loss: 0.500789	Valid Loss: 1.944747
+-------------- Epoch 10 --------------
+     T
+	  [B1]  scr: 0.9623
+	  [B4]  scr: 0.9202
+	  [B7]  scr: 0.9066
+	  [B10]  scr: 0.9191
+     V
+	  [B1]  scr: 0.7368
+Train Loss: 0.462746	Valid Loss: 2.031577
+
+* Stopped early *
+
+E. [Evaluating] from trained model TECN2v2_f6-0.72
+
+	Testing...
+	  [B1]  scr: 0.8876
+	  [B2]  scr: 0.8973
+
+Test Score: 0.8973 (took 0.50s)
+
+./logs/LDSS-SP1-imdynaug100/TECN2v2/eval/aprfc/cm_f6-0.72.png
+{'0Act-0Obj': 0, '0Obj-Rep': 1, 'Dis-Pro': 2, 'Dis-Vau': 3, 'Fix-Pro': 4, 'Fix-Vau': 5}
+
+phases_preds counts: [ 584 1132 1035 2645  496 3333] 	 9225
+phases_gt counts: [ 882  881 1022 2323  340 3777] 	 9225
+{0: '0Act-0Obj', 1: '0Obj-Rep', 2: 'Dis-Pro', 3: 'Dis-Vau', 4: 'Fix-Pro', 5: 'Fix-Vau'}
+
+Video 436c Phase Report
+           |  T Preds   | T Targets  ||   Error   
+0Act-0Obj  |   9m 44s   |  14m 42s   ||   4m 58s  
+0Obj-Rep   |  18m 52s   |  14m 41s   ||   4m 11s  
+Dis-Pro    |  17m 15s   |   17m 2s   ||    13s    
+Dis-Vau    |   44m 5s   |  38m 43s   ||   5m 22s  
+Fix-Pro    |   8m 16s   |   5m 40s   ||   2m 36s  
+Fix-Vau    |  55m 33s   | 1h 2m 57s  ||   7m 24s   
+
+
+phases_preds counts: [ 392  893 1393 4439  713 3303] 	 11133
+phases_gt counts: [ 731  790  911 4940  618 3143] 	 11133
+{0: '0Act-0Obj', 1: '0Obj-Rep', 2: 'Dis-Pro', 3: 'Dis-Vau', 4: 'Fix-Pro', 5: 'Fix-Vau'}
+
+Video b670 Phase Report
+           |  T Preds   | T Targets  ||   Error   
+0Act-0Obj  |   6m 32s   |  12m 11s   ||   5m 39s  
+0Obj-Rep   |  14m 53s   |  13m 10s   ||   1m 43s  
+Dis-Pro    |  23m 13s   |  15m 11s   ||   8m 2s   
+Dis-Vau    | 1h 13m 59s | 1h 22m 20s ||   8m 21s  
+Fix-Pro    |  11m 53s   |  10m 18s   ||   1m 35s  
+Fix-Vau    |   55m 3s   |  52m 23s   ||   2m 40s   
+
+invalid preds:  0  /  20358
+Series([], Name: count, dtype: int64)
+Saving aggregated phase timing results to ./logs/LDSS-SP1-imdynaug100/TECN2v2/eval/timings/timings_Summary.csv
+
+
+Number of videos: 2
+Video graphing took 1.29 seconds
+
+Saved phase metric graphs to ./logs/LDSS-SP1-imdynaug100/TECN2v2/eval/ribbons
+
+	 = = = = = 	 = = = = =
+		 Fold 6 done!
+	 = = = = = 	 = = = = =
+
+  Fold 7 splits:
+	train ['436c', '5238', 'a334', 'a909', 'b670', 'b71b', 'e6a9', 'e8d3', 'e8d7', 'f63b']
+	valid ['cf7c']
+	test ['26d9', '315a']
+
+    No 'path_spaceModel' found. Using pretrained resnet50 in l4-fine-tune mode.
+    Feature size of 2048 at node 'flatten'
+    Feature size of None at node 'None'
+
+    Found feature path! (feats_f7-0.71.pt)
+  Available feature layers: ['flatten'] / Using last layer: flatten
+
+	Batch example shapes:
+	[space feature] torch.Size([696, 16, 2048])
+	[labels] [torch.Size([696, 16])]
+	[idx] torch.Size([696, 16])
+    Batch contains 1 clip(s), each with 16 frames
+
+   [optim]: adam
+   [sched]: step
+
+Teaching model:  TECN2v2_f7
+-------------- Epoch 1 --------------
+     T
+	  [B1]  scr: 0.1950
+	  [B4]  scr: 0.2633
+	  [B7]  scr: 0.2781
+	  [B10]  scr: 0.2693
+     V
+	  [B1]  scr: 0.0088
+Train Loss: 3.568279	Valid Loss: 3.562762
+
+* New best model (valid loss): inf --> 3.5628 *
+
+-------------- Epoch 2 --------------
+     T
+	  [B1]  scr: 0.2503
+	  [B4]  scr: 0.3201
+	  [B7]  scr: 0.3564
+	  [B10]  scr: 0.4110
+     V
+	  [B1]  scr: 0.4337
+Train Loss: 2.601165	Valid Loss: 3.222215
+
+* New best model (valid loss): 3.5628 --> 3.2222 *
+
+-------------- Epoch 3 --------------
+     T
+	  [B1]  scr: 0.4872
+	  [B4]  scr: 0.4829
+	  [B7]  scr: 0.5364
+	  [B10]  scr: 0.5659
+     V
+	  [B1]  scr: 0.7105
+Train Loss: 1.793044	Valid Loss: 2.126578
+
+* New best model (valid loss): 3.2222 --> 2.1266 *
+
+-------------- Epoch 4 --------------
+     T
+	  [B1]  scr: 0.7672
+	  [B4]  scr: 0.7430
+	  [B7]  scr: 0.6643
+	  [B10]  scr: 0.6638
+     V
+	  [B1]  scr: 0.6908
+Train Loss: 1.408718	Valid Loss: 3.020222
+-------------- Epoch 5 --------------
+     T
+	  [B1]  scr: 0.8422
+	  [B4]  scr: 0.7731
+	  [B7]  scr: 0.7191
+	  [B10]  scr: 0.7175
+     V
+	  [B1]  scr: 0.7479
+Train Loss: 1.393109	Valid Loss: 1.851688
+
+* New best model (valid loss): 2.1266 --> 1.8517 *
+
+-------------- Epoch 6 --------------
+     T
+	  [B1]  scr: 0.6232
+	  [B4]  scr: 0.6723
+	  [B7]  scr: 0.7069
+	  [B10]  scr: 0.7136
+     V
+	  [B1]  scr: 0.6378
+Train Loss: 1.351319	Valid Loss: 2.149864
+-------------- Epoch 7 --------------
+     T
+	  [B1]  scr: 0.6576
+	  [B4]  scr: 0.6962
+	  [B7]  scr: 0.7348
+	  [B10]  scr: 0.7633
+     V
+	  [B1]  scr: 0.6728
+Train Loss: 1.119184	Valid Loss: 1.790915
+
+* New best model (valid loss): 1.8517 --> 1.7909 *
+
+-------------- Epoch 8 --------------
+     T
+	  [B1]  scr: 0.7498
+	  [B4]  scr: 0.7152
+	  [B7]  scr: 0.7240
+	  [B10]  scr: 0.7205
+     V
+	  [B1]  scr: 0.7357
+Train Loss: 0.989690	Valid Loss: 1.942916
+-------------- Epoch 9 --------------
+     T
+	  [B1]  scr: 0.9184
+	  [B4]  scr: 0.9088
+	  [B7]  scr: 0.8765
+	  [B10]  scr: 0.8477
+     V
+	  [B1]  scr: 0.7996
+Train Loss: 0.862918	Valid Loss: 1.519466
+
+* New best model (valid loss): 1.7909 --> 1.5195 *
+
+-------------- Epoch 10 --------------
+     T
+	  [B1]  scr: 0.7658
+	  [B4]  scr: 0.8512
+	  [B7]  scr: 0.8688
+	  [B10]  scr: 0.8741
+     V
+	  [B1]  scr: 0.6838
+Train Loss: 0.673695	Valid Loss: 2.352435
+-------------- Epoch 11 --------------
+     T
+	  [B1]  scr: 0.8772
+	  [B4]  scr: 0.8888
+	  [B7]  scr: 0.8832
+	  [B10]  scr: 0.8768
+     V
+	  [B1]  scr: 0.7406
+Train Loss: 0.561899	Valid Loss: 2.529978
+-------------- Epoch 12 --------------
+     T
+	  [B1]  scr: 0.8674
+	  [B4]  scr: 0.9069
+	  [B7]  scr: 0.9212
+	  [B10]  scr: 0.9214
+     V
+	  [B1]  scr: 0.7027
+Train Loss: 0.445877	Valid Loss: 2.680032
+-------------- Epoch 13 --------------
+     T
+	  [B1]  scr: 0.9443
+	  [B4]  scr: 0.9420
+	  [B7]  scr: 0.9383
+	  [B10]  scr: 0.9329
+     V
+	  [B1]  scr: 0.7259
+Train Loss: 0.352075	Valid Loss: 2.458689
+-------------- Epoch 14 --------------
+     T
+	  [B1]  scr: 0.9120
+	  [B4]  scr: 0.9303
+	  [B7]  scr: 0.9285
+	  [B10]  scr: 0.9281
+     V
+	  [B1]  scr: 0.7660
+Train Loss: 0.413897	Valid Loss: 2.518924
+
+* Stopped early *
+
+E. [Evaluating] from trained model TECN2v2_f7-0.80
+
+	Testing...
+	  [B1]  scr: 0.8342
+	  [B2]  scr: 0.8305
+
+Test Score: 0.8305 (took 0.49s)
+
+./logs/LDSS-SP1-imdynaug100/TECN2v2/eval/aprfc/cm_f7-0.80.png
+{'0Act-0Obj': 0, '0Obj-Rep': 1, 'Dis-Pro': 2, 'Dis-Vau': 3, 'Fix-Pro': 4, 'Fix-Vau': 5}
+
+phases_preds counts: [1118  916  481 2582  514 3673] 	 9284
+phases_gt counts: [1031 1386  463 2223   42 4139] 	 9284
+{0: '0Act-0Obj', 1: '0Obj-Rep', 2: 'Dis-Pro', 3: 'Dis-Vau', 4: 'Fix-Pro', 5: 'Fix-Vau'}
+
+Video 26d9 Phase Report
+           |  T Preds   | T Targets  ||   Error   
+0Act-0Obj  |  18m 38s   |  17m 11s   ||   1m 27s  
+0Obj-Rep   |  15m 16s   |   23m 6s   ||   7m 50s  
+Dis-Pro    |   8m 1s    |   7m 43s   ||    18s    
+Dis-Vau    |   43m 2s   |   37m 3s   ||   5m 59s  
+Fix-Pro    |   8m 34s   |    42s     ||   7m 52s  
+Fix-Vau    | 1h 1m 13s  | 1h 8m 59s  ||   7m 46s   
+
+
+phases_preds counts: [2273 1029  188 1457  508 4752] 	 10207
+phases_gt counts: [1812 1231  558 1536  172 4898] 	 10207
+{0: '0Act-0Obj', 1: '0Obj-Rep', 2: 'Dis-Pro', 3: 'Dis-Vau', 4: 'Fix-Pro', 5: 'Fix-Vau'}
+
+Video 315a Phase Report
+           |  T Preds   | T Targets  ||   Error   
+0Act-0Obj  |  37m 53s   |  30m 12s   ||   7m 41s  
+0Obj-Rep   |   17m 9s   |  20m 31s   ||   3m 22s  
+Dis-Pro    |   3m 8s    |   9m 18s   ||   6m 10s  
+Dis-Vau    |  24m 17s   |  25m 36s   ||   1m 19s  
+Fix-Pro    |   8m 28s   |   2m 52s   ||   5m 36s  
+Fix-Vau    | 1h 19m 12s | 1h 21m 38s ||   2m 26s   
+
+invalid preds:  0  /  19491
+Series([], Name: count, dtype: int64)
+Saving aggregated phase timing results to ./logs/LDSS-SP1-imdynaug100/TECN2v2/eval/timings/timings_Summary.csv
+
+
+Number of videos: 2
+Video graphing took 1.26 seconds
+
+Saved phase metric graphs to ./logs/LDSS-SP1-imdynaug100/TECN2v2/eval/ribbons
+
+	 = = = = = 	 = = = = =
+		 Fold 7 done!
+	 = = = = = 	 = = = = =
+
+G. [Processing] Generating all-fold confusion matrix ./logs/LDSS-SP1-imdynaug100/TECN2v2/eval/preds
+Collected 134498 predictions and 134498 targets
+Pred tensor shape: torch.Size([134498]), Target tensor shape: torch.Size([134498])
+./logs/LDSS-SP1-imdynaug100/TECN2v2/eval/aprfc/cm_global
+
+
+ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨
+
+
+Running 16cfg_SP1-tecno2_C.yml...
+
+diff model with same name
+diff model with same name
+A. [classroom] LDSS-SP1-imdynaug100 (Matched)
+   [model] TECN2v3 (New)
+   For ('train', 'process', 'eval')
+
+B. [dataset] LDSS-local (#134498)
+   [label type] single-phase-top1
+   [preprocessing] imagenet-dynaug
+   [classes] #6 (Unbalanced) ['0Act-0Obj', '0Obj-Rep', 'Dis-Pro', 'Dis-Vau', 'Fix-Pro', 'Fix-Vau']
+   [weights] [tensor([0.3846, 0.6755, 1.0557, 0.2113, 3.4933, 0.1796])]
+   [phases] #6  ['0Act-0Obj', '0Obj-Rep', 'Dis-Pro', 'Dis-Vau', 'Fix-Pro', 'Fix-Vau'] 
+
+C. [training] start on [device] cpu
+   [folds] #7 [epochs] #100 [batch sizes] s32 / t1
+   [criterions] [CrossEntropyLoss()] w/ weights [tensor([0.3846, 0.6755, 1.0557, 0.2113, 3.4933, 0.1796])]
+   [headtype] [6] 
+
+  Fold 1 splits:
+	train ['26d9', '315a', '436c', '5238', 'a909', 'b670', 'b71b', 'e6a9', 'e8d3', 'e8d7']
+	valid ['a334', 'f63b']
+	test ['cf7c']
+
+    No 'path_spaceModel' found. Using pretrained resnet50 in l4-fine-tune mode.
+    Feature size of 2048 at node 'flatten'
+    Feature size of None at node 'None'
+
+    Found feature path! (feats_f1-0.80.pt)
+  Available feature layers: ['flatten'] / Using last layer: flatten
+
+	Batch example shapes:
+	[space feature] torch.Size([696, 16, 2048])
+	[labels] [torch.Size([696, 16])]
+	[idx] torch.Size([696, 16])
+    Batch contains 1 clip(s), each with 16 frames
+
+   [optim]: adam
+   [sched]: step
+
+Teaching model:  TECN2v3_f1
+-------------- Epoch 1 --------------
+     T
+	  [B1]  scr: 0.0606
+	  [B4]  scr: 0.1054
+	  [B7]  scr: 0.1176
+	  [B10]  scr: 0.1235
+     V
+	  [B1]  scr: 0.1810
+	  [B2]  scr: 0.2775
+Train Loss: 3.783041	Valid Loss: 3.499302
+
+* New best model (valid loss): inf --> 3.4993 *
+
+-------------- Epoch 2 --------------
+     T
+	  [B1]  scr: 0.1490
+	  [B4]  scr: 0.1721
+	  [B7]  scr: 0.1895
+	  [B10]  scr: 0.1920
+     V
+	  [B1]  scr: 0.1429
+	  [B2]  scr: 0.2023
+Train Loss: 3.541502	Valid Loss: 3.380493
+
+* New best model (valid loss): 3.4993 --> 3.3805 *
+
+-------------- Epoch 3 --------------
+     T
+	  [B1]  scr: 0.2022
+	  [B4]  scr: 0.2218
+	  [B7]  scr: 0.2223
+	  [B10]  scr: 0.2230
+     V
+	  [B1]  scr: 0.2736
+	  [B2]  scr: 0.2827
+Train Loss: 3.329265	Valid Loss: 3.171359
+
+* New best model (valid loss): 3.3805 --> 3.1714 *
+
+-------------- Epoch 4 --------------
+     T
+	  [B1]  scr: 0.2130
+	  [B4]  scr: 0.2182
+	  [B7]  scr: 0.2330
+	  [B10]  scr: 0.2383
+     V
+	  [B1]  scr: 0.2524
+	  [B2]  scr: 0.2770
+Train Loss: 3.128212	Valid Loss: 2.959377
+
+* New best model (valid loss): 3.1714 --> 2.9594 *
+
+-------------- Epoch 5 --------------
+     T
+	  [B1]  scr: 0.2352
+	  [B4]  scr: 0.2728
+	  [B7]  scr: 0.2645
+	  [B10]  scr: 0.2503
+     V
+	  [B1]  scr: 0.2449
+	  [B2]  scr: 0.2780
+Train Loss: 2.848050	Valid Loss: 2.656258
+
+* New best model (valid loss): 2.9594 --> 2.6563 *
+
+-------------- Epoch 6 --------------
+     T
+	  [B1]  scr: 0.3103
+	  [B4]  scr: 0.3161
+	  [B7]  scr: 0.3226
+	  [B10]  scr: 0.3235
+     V
+	  [B1]  scr: 0.5226
+	  [B2]  scr: 0.4680
+Train Loss: 2.465814	Valid Loss: 2.416181
+
+* New best model (valid loss): 2.6563 --> 2.4162 *
+
+-------------- Epoch 7 --------------
+     T
+	  [B1]  scr: 0.3466
+	  [B4]  scr: 0.3606
+	  [B7]  scr: 0.3946
+	  [B10]  scr: 0.4269
+     V
+	  [B1]  scr: 0.6930
+	  [B2]  scr: 0.5633
+Train Loss: 2.230611	Valid Loss: 2.122905
+
+* New best model (valid loss): 2.4162 --> 2.1229 *
+
+-------------- Epoch 8 --------------
+     T
+	  [B1]  scr: 0.4675
+	  [B4]  scr: 0.4982
+	  [B7]  scr: 0.4662
+	  [B10]  scr: 0.4899
+     V
+	  [B1]  scr: 0.4062
+	  [B2]  scr: 0.4577
+Train Loss: 1.892462	Valid Loss: 1.917950
+
+* New best model (valid loss): 2.1229 --> 1.9179 *
+
+-------------- Epoch 9 --------------
+     T
+	  [B1]  scr: 0.5509
+	  [B4]  scr: 0.5475
+	  [B7]  scr: 0.5503
+	  [B10]  scr: 0.6124
+     V
+	  [B1]  scr: 0.7490
+	  [B2]  scr: 0.7119
+Train Loss: 1.637942	Valid Loss: 1.755182
+
+* New best model (valid loss): 1.9179 --> 1.7552 *
+
+-------------- Epoch 10 --------------
+     T
+	  [B1]  scr: 0.7755
+	  [B4]  scr: 0.7459
+	  [B7]  scr: 0.7347
+	  [B10]  scr: 0.7412
+     V
+	  [B1]  scr: 0.7482
+	  [B2]  scr: 0.6760
+Train Loss: 1.344498	Valid Loss: 1.469168
+
+* New best model (valid loss): 1.7552 --> 1.4692 *
+
+-------------- Epoch 11 --------------
+     T
+	  [B1]  scr: 0.7204
+	  [B4]  scr: 0.7511
+	  [B7]  scr: 0.7685
+	  [B10]  scr: 0.7654
+     V
+	  [B1]  scr: 0.7697
+	  [B2]  scr: 0.7024
+Train Loss: 1.151857	Valid Loss: 1.420687
+
+* New best model (valid loss): 1.4692 --> 1.4207 *
+
+-------------- Epoch 12 --------------
+     T
+	  [B1]  scr: 0.7335
+	  [B4]  scr: 0.7921
+	  [B7]  scr: 0.7917
+	  [B10]  scr: 0.7717
+     V
+	  [B1]  scr: 0.4930
+	  [B2]  scr: 0.5789
+Train Loss: 1.153412	Valid Loss: 1.329721
+
+* New best model (valid loss): 1.4207 --> 1.3297 *
+
+-------------- Epoch 13 --------------
+     T
+	  [B1]  scr: 0.7273
+	  [B4]  scr: 0.7165
+	  [B7]  scr: 0.7306
+	  [B10]  scr: 0.7656
+     V
+	  [B1]  scr: 0.7672
+	  [B2]  scr: 0.6856
+Train Loss: 1.033098	Valid Loss: 1.314458
+
+* New best model (valid loss): 1.3297 --> 1.3145 *
+
+-------------- Epoch 14 --------------
+     T
+	  [B1]  scr: 0.8606
+	  [B4]  scr: 0.8258
+	  [B7]  scr: 0.8268
+	  [B10]  scr: 0.8319
+     V
+	  [B1]  scr: 0.7534
+	  [B2]  scr: 0.7044
+Train Loss: 0.876392	Valid Loss: 1.207010
+
+* New best model (valid loss): 1.3145 --> 1.2070 *
+
+-------------- Epoch 15 --------------
+     T
+	  [B1]  scr: 0.8805
+	  [B4]  scr: 0.8098
+	  [B7]  scr: 0.8317
+	  [B10]  scr: 0.8477
+     V
+	  [B1]  scr: 0.8654
+	  [B2]  scr: 0.8032
+Train Loss: 0.829833	Valid Loss: 1.380129
+-------------- Epoch 16 --------------
+     T
+	  [B1]  scr: 0.9099
+	  [B4]  scr: 0.8999
+	  [B7]  scr: 0.8758
+	  [B10]  scr: 0.8700
+     V
+	  [B1]  scr: 0.8396
+	  [B2]  scr: 0.8421
+Train Loss: 0.724796	Valid Loss: 1.201044
+
+* New best model (valid loss): 1.2070 --> 1.2010 *
+
+-------------- Epoch 17 --------------
+     T
+	  [B1]  scr: 0.9346
+	  [B4]  scr: 0.9297
+	  [B7]  scr: 0.9070
+	  [B10]  scr: 0.9029
+     V
+	  [B1]  scr: 0.8630
+	  [B2]  scr: 0.8412
+Train Loss: 0.656569	Valid Loss: 1.111342
+
+* New best model (valid loss): 1.2010 --> 1.1113 *
+
+-------------- Epoch 18 --------------
+     T
+	  [B1]  scr: 0.9246
+	  [B4]  scr: 0.9298
+	  [B7]  scr: 0.9196
+	  [B10]  scr: 0.9160
+     V
+	  [B1]  scr: 0.8607
+	  [B2]  scr: 0.8189
+Train Loss: 0.543120	Valid Loss: 1.061928
+
+* New best model (valid loss): 1.1113 --> 1.0619 *
+
+-------------- Epoch 19 --------------
+     T
+	  [B1]  scr: 0.9123
+	  [B4]  scr: 0.9015
+	  [B7]  scr: 0.9171
+	  [B10]  scr: 0.9214
+     V
+	  [B1]  scr: 0.8588
+	  [B2]  scr: 0.8218
+Train Loss: 0.524838	Valid Loss: 1.089855
+-------------- Epoch 20 --------------
+     T
+	  [B1]  scr: 0.9380
+	  [B4]  scr: 0.8985
+	  [B7]  scr: 0.9146
+	  [B10]  scr: 0.9294
+     V
+	  [B1]  scr: 0.8657
+	  [B2]  scr: 0.8290
+Train Loss: 0.467169	Valid Loss: 1.156052
+-------------- Epoch 21 --------------
+     T
+	  [B1]  scr: 0.9251
+	  [B4]  scr: 0.9124
+	  [B7]  scr: 0.9297
+	  [B10]  scr: 0.9327
+     V
+	  [B1]  scr: 0.8471
+	  [B2]  scr: 0.8340
+Train Loss: 0.455647	Valid Loss: 0.994578
+
+* New best model (valid loss): 1.0619 --> 0.9946 *
+
+-------------- Epoch 22 --------------
+     T
+	  [B1]  scr: 0.9121
+	  [B4]  scr: 0.9216
+	  [B7]  scr: 0.9369
+	  [B10]  scr: 0.9287
+     V
+	  [B1]  scr: 0.8590
+	  [B2]  scr: 0.8209
+Train Loss: 0.467871	Valid Loss: 1.253829
+-------------- Epoch 23 --------------
+     T
+	  [B1]  scr: 0.9468
+	  [B4]  scr: 0.9397
+	  [B7]  scr: 0.9282
+	  [B10]  scr: 0.9338
+     V
+	  [B1]  scr: 0.8657
+	  [B2]  scr: 0.8347
+Train Loss: 0.444364	Valid Loss: 1.366739
+-------------- Epoch 24 --------------
+     T
+	  [B1]  scr: 0.9597
+	  [B4]  scr: 0.9162
+	  [B7]  scr: 0.9223
+	  [B10]  scr: 0.9266
+     V
+	  [B1]  scr: 0.8637
+	  [B2]  scr: 0.8271
+Train Loss: 0.450659	Valid Loss: 1.463395
+-------------- Epoch 25 --------------
+     T
+	  [B1]  scr: 0.9545
+	  [B4]  scr: 0.9525
+	  [B7]  scr: 0.9422
+	  [B10]  scr: 0.9394
+     V
+	  [B1]  scr: 0.8529
+	  [B2]  scr: 0.8155
+Train Loss: 0.398089	Valid Loss: 1.775581
+
+* Learning rate changed to 0.000100 *
+-------------- Epoch 26 --------------
+     T
+	  [B1]  scr: 0.9650
+	  [B4]  scr: 0.9557
+	  [B7]  scr: 0.9490
+	  [B10]  scr: 0.9521
+     V
+	  [B1]  scr: 0.8619
+	  [B2]  scr: 0.8215
+Train Loss: 0.372214	Valid Loss: 1.565542
+
+* Stopped early *
+
+E. [Evaluating] from trained model TECN2v3_f1-0.83
+
+	Testing...
+	  [B1]  scr: 0.7278
+
+Test Score: 0.7278 (took 0.47s)
+
+./logs/LDSS-SP1-imdynaug100/TECN2v3/eval/aprfc/cm_f1-0.83.png
+{'0Act-0Obj': 0, '0Obj-Rep': 1, 'Dis-Pro': 2, 'Dis-Vau': 3, 'Fix-Pro': 4, 'Fix-Vau': 5}
+
+phases_preds counts: [2814 1695 1004 7111  200 4952] 	 17776
+phases_gt counts: [5930 1281 1128 3955  157 5325] 	 17776
+{0: '0Act-0Obj', 1: '0Obj-Rep', 2: 'Dis-Pro', 3: 'Dis-Vau', 4: 'Fix-Pro', 5: 'Fix-Vau'}
+
+Video cf7c Phase Report
+           |  T Preds   | T Targets  ||   Error   
+0Act-0Obj  |  46m 54s   | 1h 38m 50s ||  51m 56s  
+0Obj-Rep   |  28m 15s   |  21m 21s   ||   6m 54s  
+Dis-Pro    |  16m 44s   |  18m 48s   ||   2m 4s   
+Dis-Vau    | 1h 58m 31s | 1h 5m 55s  ||  52m 36s  
+Fix-Pro    |   3m 20s   |   2m 37s   ||    43s    
+Fix-Vau    | 1h 22m 32s | 1h 28m 45s ||   6m 13s   
+
+invalid preds:  0  /  17776
+Series([], Name: count, dtype: int64)
+Saving aggregated phase timing results to ./logs/LDSS-SP1-imdynaug100/TECN2v3/eval/timings/timings_Summary.csv
+
+
+Number of videos: 1
+Video graphing took 0.98 seconds
+
+Saved phase metric graphs to ./logs/LDSS-SP1-imdynaug100/TECN2v3/eval/ribbons
+
+	 = = = = = 	 = = = = =
+		 Fold 1 done!
+	 = = = = = 	 = = = = =
+
+  Fold 2 splits:
+	train ['26d9', '315a', '436c', '5238', 'a909', 'b670', 'b71b', 'e6a9', 'e8d3', 'e8d7']
+	valid ['cf7c']
+	test ['a334', 'f63b']
+
+    No 'path_spaceModel' found. Using pretrained resnet50 in l4-fine-tune mode.
+    Feature size of 2048 at node 'flatten'
+    Feature size of None at node 'None'
+
+    Found feature path! (feats_f2-0.72.pt)
+  Available feature layers: ['flatten'] / Using last layer: flatten
+
+	Batch example shapes:
+	[space feature] torch.Size([638, 16, 2048])
+	[labels] [torch.Size([638, 16])]
+	[idx] torch.Size([638, 16])
+    Batch contains 1 clip(s), each with 16 frames
+
+   [optim]: adam
+   [sched]: step
+
+Teaching model:  TECN2v3_f2
+-------------- Epoch 1 --------------
+     T
+	  [B1]  scr: 0.1139
+	  [B4]  scr: 0.0944
+	  [B7]  scr: 0.0821
+	  [B10]  scr: 0.0869
+     V
+	  [B1]  scr: 0.0088
+Train Loss: 3.734284	Valid Loss: 3.697329
+
+* New best model (valid loss): inf --> 3.6973 *
+
+-------------- Epoch 2 --------------
+     T
+	  [B1]  scr: 0.1276
+	  [B4]  scr: 0.1508
+	  [B7]  scr: 0.1746
+	  [B10]  scr: 0.1850
+     V
+	  [B1]  scr: 0.2225
+Train Loss: 3.504741	Valid Loss: 3.463558
+
+* New best model (valid loss): 3.6973 --> 3.4636 *
+
+-------------- Epoch 3 --------------
+     T
+	  [B1]  scr: 0.2237
+	  [B4]  scr: 0.2430
+	  [B7]  scr: 0.2492
+	  [B10]  scr: 0.2538
+     V
+	  [B1]  scr: 0.2202
+Train Loss: 3.211727	Valid Loss: 3.298072
+
+* New best model (valid loss): 3.4636 --> 3.2981 *
+
+-------------- Epoch 4 --------------
+     T
+	  [B1]  scr: 0.2478
+	  [B4]  scr: 0.2849
+	  [B7]  scr: 0.2941
+	  [B10]  scr: 0.3088
+     V
+	  [B1]  scr: 0.2885
+Train Loss: 2.828670	Valid Loss: 2.994645
+
+* New best model (valid loss): 3.2981 --> 2.9946 *
+
+-------------- Epoch 5 --------------
+     T
+	  [B1]  scr: 0.3476
+	  [B4]  scr: 0.3219
+	  [B7]  scr: 0.3577
+	  [B10]  scr: 0.3815
+     V
+	  [B1]  scr: 0.5204
+Train Loss: 2.407085	Valid Loss: 2.762004
+
+* New best model (valid loss): 2.9946 --> 2.7620 *
+
+-------------- Epoch 6 --------------
+     T
+	  [B1]  scr: 0.5008
+	  [B4]  scr: 0.4685
+	  [B7]  scr: 0.4851
+	  [B10]  scr: 0.4821
+     V
+	  [B1]  scr: 0.5041
+Train Loss: 2.056995	Valid Loss: 2.756170
+
+* New best model (valid loss): 2.7620 --> 2.7562 *
+
+-------------- Epoch 7 --------------
+     T
+	  [B1]  scr: 0.6159
+	  [B4]  scr: 0.6274
+	  [B7]  scr: 0.6521
+	  [B10]  scr: 0.6465
+     V
+	  [B1]  scr: 0.5848
+Train Loss: 1.761317	Valid Loss: 2.625329
+
+* New best model (valid loss): 2.7562 --> 2.6253 *
+
+-------------- Epoch 8 --------------
+     T
+	  [B1]  scr: 0.5939
+	  [B4]  scr: 0.6599
+	  [B7]  scr: 0.6490
+	  [B10]  scr: 0.6294
+     V
+	  [B1]  scr: 0.6763
+Train Loss: 1.498622	Valid Loss: 2.335046
+
+* New best model (valid loss): 2.6253 --> 2.3350 *
+
+-------------- Epoch 9 --------------
+     T
+	  [B1]  scr: 0.6763
+	  [B4]  scr: 0.6764
+	  [B7]  scr: 0.6633
+	  [B10]  scr: 0.6987
+     V
+	  [B1]  scr: 0.7107
+Train Loss: 1.325986	Valid Loss: 2.274546
+
+* New best model (valid loss): 2.3350 --> 2.2745 *
+
+-------------- Epoch 10 --------------
+     T
+	  [B1]  scr: 0.7000
+	  [B4]  scr: 0.7035
+	  [B7]  scr: 0.7170
+	  [B10]  scr: 0.7223
+     V
+	  [B1]  scr: 0.6703
+Train Loss: 1.203972	Valid Loss: 2.377701
+-------------- Epoch 11 --------------
+     T
+	  [B1]  scr: 0.7461
+	  [B4]  scr: 0.7269
+	  [B7]  scr: 0.7368
+	  [B10]  scr: 0.7392
+     V
+	  [B1]  scr: 0.6590
+Train Loss: 1.064469	Valid Loss: 2.419629
+-------------- Epoch 12 --------------
+     T
+	  [B1]  scr: 0.7836
+	  [B4]  scr: 0.8117
+	  [B7]  scr: 0.8223
+	  [B10]  scr: 0.8261
+     V
+	  [B1]  scr: 0.6440
+Train Loss: 0.932415	Valid Loss: 2.792577
+-------------- Epoch 13 --------------
+     T
+	  [B1]  scr: 0.8065
+	  [B4]  scr: 0.8147
+	  [B7]  scr: 0.8331
+	  [B10]  scr: 0.8440
+     V
+	  [B1]  scr: 0.6819
+Train Loss: 0.809476	Valid Loss: 2.715747
+-------------- Epoch 14 --------------
+     T
+	  [B1]  scr: 0.8532
+	  [B4]  scr: 0.8769
+	  [B7]  scr: 0.8589
+	  [B10]  scr: 0.8653
+     V
+	  [B1]  scr: 0.6968
+Train Loss: 0.716129	Valid Loss: 2.485232
+
+* Stopped early *
+
+E. [Evaluating] from trained model TECN2v3_f2-0.71
+
+	Testing...
+	  [B1]  scr: 0.8711
+	  [B2]  scr: 0.8016
+
+Test Score: 0.8016 (took 0.47s)
+
+./logs/LDSS-SP1-imdynaug100/TECN2v3/eval/aprfc/cm_f2-0.71.png
+{'0Act-0Obj': 0, '0Obj-Rep': 1, 'Dis-Pro': 2, 'Dis-Vau': 3, 'Fix-Pro': 4, 'Fix-Vau': 5}
+
+phases_preds counts: [ 355 1501   61 1128  351 3014] 	 6410
+phases_gt counts: [ 579 1423   53  916  100 3339] 	 6410
+{0: '0Act-0Obj', 1: '0Obj-Rep', 2: 'Dis-Pro', 3: 'Dis-Vau', 4: 'Fix-Pro', 5: 'Fix-Vau'}
+
+Video a334 Phase Report
+           |  T Preds   | T Targets  ||   Error   
+0Act-0Obj  |   5m 55s   |   9m 39s   ||   3m 44s  
+0Obj-Rep   |   25m 1s   |  23m 43s   ||   1m 18s  
+Dis-Pro    |   1m 1s    |    53s     ||     8s    
+Dis-Vau    |  18m 48s   |  15m 16s   ||   3m 32s  
+Fix-Pro    |   5m 51s   |   1m 40s   ||   4m 11s  
+Fix-Vau    |  50m 14s   |  55m 39s   ||   5m 25s   
+
+
+phases_preds counts: [ 743 1095 1810 4388  264 4656] 	 12956
+phases_gt counts: [2841  718 1344 3002  155 4896] 	 12956
+{0: '0Act-0Obj', 1: '0Obj-Rep', 2: 'Dis-Pro', 3: 'Dis-Vau', 4: 'Fix-Pro', 5: 'Fix-Vau'}
+
+Video f63b Phase Report
+           |  T Preds   | T Targets  ||   Error   
+0Act-0Obj  |  12m 23s   |  47m 21s   ||  34m 58s  
+0Obj-Rep   |  18m 15s   |  11m 58s   ||   6m 17s  
+Dis-Pro    |  30m 10s   |  22m 24s   ||   7m 46s  
+Dis-Vau    | 1h 13m 8s  |   50m 2s   ||   23m 6s  
+Fix-Pro    |   4m 24s   |   2m 35s   ||   1m 49s  
+Fix-Vau    | 1h 17m 36s | 1h 21m 36s ||     4m     
+
+invalid preds:  0  /  19366
+Series([], Name: count, dtype: int64)
+Saving aggregated phase timing results to ./logs/LDSS-SP1-imdynaug100/TECN2v3/eval/timings/timings_Summary.csv
+
+
+Number of videos: 2
+Video graphing took 1.49 seconds
+
+Saved phase metric graphs to ./logs/LDSS-SP1-imdynaug100/TECN2v3/eval/ribbons
+
+	 = = = = = 	 = = = = =
+		 Fold 2 done!
+	 = = = = = 	 = = = = =
+
+  Fold 3 splits:
+	train ['26d9', '315a', '436c', '5238', 'a334', 'a909', 'b670', 'b71b', 'e8d3', 'f63b']
+	valid ['cf7c']
+	test ['e6a9', 'e8d7']
+
+    No 'path_spaceModel' found. Using pretrained resnet50 in l4-fine-tune mode.
+    Feature size of 2048 at node 'flatten'
+    Feature size of None at node 'None'
+
+    Found feature path! (feats_f3-0.76.pt)
+  Available feature layers: ['flatten'] / Using last layer: flatten
+
+	Batch example shapes:
+	[space feature] torch.Size([699, 16, 2048])
+	[labels] [torch.Size([699, 16])]
+	[idx] torch.Size([699, 16])
+    Batch contains 1 clip(s), each with 16 frames
+
+   [optim]: adam
+   [sched]: step
+
+Teaching model:  TECN2v3_f3
+-------------- Epoch 1 --------------
+     T
+	  [B1]  scr: 0.0482
+	  [B4]  scr: 0.0744
+	  [B7]  scr: 0.0929
+	  [B10]  scr: 0.1082
+     V
+	  [B1]  scr: 0.0088
+Train Loss: 3.821832	Valid Loss: 3.526752
+
+* New best model (valid loss): inf --> 3.5268 *
+
+-------------- Epoch 2 --------------
+     T
+	  [B1]  scr: 0.1902
+	  [B4]  scr: 0.2060
+	  [B7]  scr: 0.2153
+	  [B10]  scr: 0.2174
+     V
+	  [B1]  scr: 0.0524
+Train Loss: 3.582932	Valid Loss: 3.471361
+
+* New best model (valid loss): 3.5268 --> 3.4714 *
+
+-------------- Epoch 3 --------------
+     T
+	  [B1]  scr: 0.2268
+	  [B4]  scr: 0.2343
+	  [B7]  scr: 0.2248
+	  [B10]  scr: 0.2325
+     V
+	  [B1]  scr: 0.1156
+Train Loss: 3.392201	Valid Loss: 3.421288
+
+* New best model (valid loss): 3.4714 --> 3.4213 *
+
+-------------- Epoch 4 --------------
+     T
+	  [B1]  scr: 0.2870
+	  [B4]  scr: 0.2541
+	  [B7]  scr: 0.2716
+	  [B10]  scr: 0.2773
+     V
+	  [B1]  scr: 0.2057
+Train Loss: 3.155020	Valid Loss: 3.188383
+
+* New best model (valid loss): 3.4213 --> 3.1884 *
+
+-------------- Epoch 5 --------------
+     T
+	  [B1]  scr: 0.3076
+	  [B4]  scr: 0.3425
+	  [B7]  scr: 0.3449
+	  [B10]  scr: 0.3794
+     V
+	  [B1]  scr: 0.3987
+Train Loss: 2.838978	Valid Loss: 3.093834
+
+* New best model (valid loss): 3.1884 --> 3.0938 *
+
+-------------- Epoch 6 --------------
+     T
+	  [B1]  scr: 0.4029
+	  [B4]  scr: 0.4843
+	  [B7]  scr: 0.4855
+	  [B10]  scr: 0.4812
+     V
+	  [B1]  scr: 0.5033
+Train Loss: 2.396929	Valid Loss: 2.603354
+
+* New best model (valid loss): 3.0938 --> 2.6034 *
+
+-------------- Epoch 7 --------------
+     T
+	  [B1]  scr: 0.6356
+	  [B4]  scr: 0.6096
+	  [B7]  scr: 0.5911
+	  [B10]  scr: 0.5583
+     V
+	  [B1]  scr: 0.5770
+Train Loss: 1.965985	Valid Loss: 2.022257
+
+* New best model (valid loss): 2.6034 --> 2.0223 *
+
+-------------- Epoch 8 --------------
+     T
+	  [B1]  scr: 0.5401
+	  [B4]  scr: 0.5886
+	  [B7]  scr: 0.6234
+	  [B10]  scr: 0.6346
+     V
+	  [B1]  scr: 0.6151
+Train Loss: 1.592741	Valid Loss: 1.885977
+
+* New best model (valid loss): 2.0223 --> 1.8860 *
+
+-------------- Epoch 9 --------------
+     T
+	  [B1]  scr: 0.6735
+	  [B4]  scr: 0.6659
+	  [B7]  scr: 0.6555
+	  [B10]  scr: 0.6568
+     V
+	  [B1]  scr: 0.7362
+Train Loss: 1.356962	Valid Loss: 1.801144
+
+* New best model (valid loss): 1.8860 --> 1.8011 *
+
+-------------- Epoch 10 --------------
+     T
+	  [B1]  scr: 0.5842
+	  [B4]  scr: 0.6827
+	  [B7]  scr: 0.6906
+	  [B10]  scr: 0.7228
+     V
+	  [B1]  scr: 0.7929
+Train Loss: 1.132359	Valid Loss: 1.297207
+
+* New best model (valid loss): 1.8011 --> 1.2972 *
+
+-------------- Epoch 11 --------------
+     T
+	  [B1]  scr: 0.8202
+	  [B4]  scr: 0.7732
+	  [B7]  scr: 0.7777
+	  [B10]  scr: 0.7646
+     V
+	  [B1]  scr: 0.8785
+Train Loss: 0.950922	Valid Loss: 1.130990
+
+* New best model (valid loss): 1.2972 --> 1.1310 *
+
+-------------- Epoch 12 --------------
+     T
+	  [B1]  scr: 0.7143
+	  [B4]  scr: 0.7898
+	  [B7]  scr: 0.8025
+	  [B10]  scr: 0.8288
+     V
+	  [B1]  scr: 0.7430
+Train Loss: 0.802825	Valid Loss: 2.339644
+-------------- Epoch 13 --------------
+     T
+	  [B1]  scr: 0.8612
+	  [B4]  scr: 0.8395
+	  [B7]  scr: 0.8455
+	  [B10]  scr: 0.8566
+     V
+	  [B1]  scr: 0.8490
+Train Loss: 0.799123	Valid Loss: 1.442125
+-------------- Epoch 14 --------------
+     T
+	  [B1]  scr: 0.9006
+	  [B4]  scr: 0.8845
+	  [B7]  scr: 0.8750
+	  [B10]  scr: 0.8808
+     V
+	  [B1]  scr: 0.7249
+Train Loss: 0.723607	Valid Loss: 2.606261
+-------------- Epoch 15 --------------
+     T
+	  [B1]  scr: 0.4849
+	  [B4]  scr: 0.7837
+	  [B7]  scr: 0.8183
+	  [B10]  scr: 0.8411
+     V
+	  [B1]  scr: 0.7098
+Train Loss: 0.936774	Valid Loss: 2.396724
+-------------- Epoch 16 --------------
+     T
+	  [B1]  scr: 0.9551
+	  [B4]  scr: 0.8660
+	  [B7]  scr: 0.8432
+	  [B10]  scr: 0.8563
+     V
+	  [B1]  scr: 0.8600
+Train Loss: 0.737472	Valid Loss: 1.207007
+
+* Stopped early *
+
+E. [Evaluating] from trained model TECN2v3_f3-0.88
+
+	Testing...
+	  [B1]  scr: 0.8157
+	  [B2]  scr: 0.8141
+
+Test Score: 0.8141 (took 0.45s)
+
+./logs/LDSS-SP1-imdynaug100/TECN2v3/eval/aprfc/cm_f3-0.88.png
+{'0Act-0Obj': 0, '0Obj-Rep': 1, 'Dis-Pro': 2, 'Dis-Vau': 3, 'Fix-Pro': 4, 'Fix-Vau': 5}
+
+phases_preds counts: [1840  718  777 3926  619 4884] 	 12764
+phases_gt counts: [2072 1604  445 4324  280 4039] 	 12764
+{0: '0Act-0Obj', 1: '0Obj-Rep', 2: 'Dis-Pro', 3: 'Dis-Vau', 4: 'Fix-Pro', 5: 'Fix-Vau'}
+
+Video e6a9 Phase Report
+           |  T Preds   | T Targets  ||   Error   
+0Act-0Obj  |  30m 40s   |  34m 32s   ||   3m 52s  
+0Obj-Rep   |  11m 58s   |  26m 44s   ||  14m 46s  
+Dis-Pro    |  12m 57s   |   7m 25s   ||   5m 32s  
+Dis-Vau    | 1h 5m 26s  | 1h 12m 4s  ||   6m 38s  
+Fix-Pro    |  10m 19s   |   4m 40s   ||   5m 39s  
+Fix-Vau    | 1h 21m 24s | 1h 7m 19s  ||   14m 5s   
+
+
+phases_preds counts: [1382  959  775 1165  325 1972] 	 6578
+phases_gt counts: [ 964  890  836 1709  211 1968] 	 6578
+{0: '0Act-0Obj', 1: '0Obj-Rep', 2: 'Dis-Pro', 3: 'Dis-Vau', 4: 'Fix-Pro', 5: 'Fix-Vau'}
+
+Video e8d7 Phase Report
+           |  T Preds   | T Targets  ||   Error   
+0Act-0Obj  |   23m 2s   |   16m 4s   ||   6m 58s  
+0Obj-Rep   |  15m 59s   |  14m 50s   ||   1m 9s   
+Dis-Pro    |  12m 55s   |  13m 56s   ||   1m 1s   
+Dis-Vau    |  19m 25s   |  28m 29s   ||   9m 4s   
+Fix-Pro    |   5m 25s   |   3m 31s   ||   1m 54s  
+Fix-Vau    |  32m 52s   |  32m 48s   ||     4s     
+
+invalid preds:  0  /  19342
+Series([], Name: count, dtype: int64)
+Saving aggregated phase timing results to ./logs/LDSS-SP1-imdynaug100/TECN2v3/eval/timings/timings_Summary.csv
+
+
+Number of videos: 2
+Video graphing took 1.48 seconds
+
+Saved phase metric graphs to ./logs/LDSS-SP1-imdynaug100/TECN2v3/eval/ribbons
+
+	 = = = = = 	 = = = = =
+		 Fold 3 done!
+	 = = = = = 	 = = = = =
+
+  Fold 4 splits:
+	train ['26d9', '315a', '436c', 'a334', 'a909', 'b670', 'b71b', 'e6a9', 'e8d7', 'f63b']
+	valid ['cf7c']
+	test ['5238', 'e8d3']
+
+    No 'path_spaceModel' found. Using pretrained resnet50 in l4-fine-tune mode.
+    Feature size of 2048 at node 'flatten'
+    Feature size of None at node 'None'
+
+    Found feature path! (feats_f4-0.72.pt)
+  Available feature layers: ['flatten'] / Using last layer: flatten
+
+	Batch example shapes:
+	[space feature] torch.Size([412, 16, 2048])
+	[labels] [torch.Size([412, 16])]
+	[idx] torch.Size([412, 16])
+    Batch contains 1 clip(s), each with 16 frames
+
+   [optim]: adam
+   [sched]: step
+
+Teaching model:  TECN2v3_f4
+-------------- Epoch 1 --------------
+     T
+	  [B1]  scr: 0.2499
+	  [B4]  scr: 0.2189
+	  [B7]  scr: 0.2056
+	  [B10]  scr: 0.2017
+     V
+	  [B1]  scr: 0.3628
+Train Loss: 3.726421	Valid Loss: 3.548536
+
+* New best model (valid loss): inf --> 3.5485 *
+
+-------------- Epoch 2 --------------
+     T
+	  [B1]  scr: 0.1928
+	  [B4]  scr: 0.2222
+	  [B7]  scr: 0.2347
+	  [B10]  scr: 0.2388
+     V
+	  [B1]  scr: 0.2913
+Train Loss: 3.485188	Valid Loss: 3.505711
+
+* New best model (valid loss): 3.5485 --> 3.5057 *
+
+-------------- Epoch 3 --------------
+     T
+	  [B1]  scr: 0.2909
+	  [B4]  scr: 0.2780
+	  [B7]  scr: 0.2832
+	  [B10]  scr: 0.2910
+     V
+	  [B1]  scr: 0.2996
+Train Loss: 3.209909	Valid Loss: 3.292035
+
+* New best model (valid loss): 3.5057 --> 3.2920 *
+
+-------------- Epoch 4 --------------
+     T
+	  [B1]  scr: 0.3397
+	  [B4]  scr: 0.3342
+	  [B7]  scr: 0.3492
+	  [B10]  scr: 0.3591
+     V
+	  [B1]  scr: 0.2996
+Train Loss: 2.875478	Valid Loss: 3.197492
+
+* New best model (valid loss): 3.2920 --> 3.1975 *
+
+-------------- Epoch 5 --------------
+     T
+	  [B1]  scr: 0.4309
+	  [B4]  scr: 0.4457
+	  [B7]  scr: 0.4211
+	  [B10]  scr: 0.4107
+     V
+	  [B1]  scr: 0.3406
+Train Loss: 2.512244	Valid Loss: 2.936492
+
+* New best model (valid loss): 3.1975 --> 2.9365 *
+
+-------------- Epoch 6 --------------
+     T
+	  [B1]  scr: 0.4292
+	  [B4]  scr: 0.4532
+	  [B7]  scr: 0.4488
+	  [B10]  scr: 0.4537
+     V
+	  [B1]  scr: 0.5503
+Train Loss: 2.112446	Valid Loss: 2.716672
+
+* New best model (valid loss): 2.9365 --> 2.7167 *
+
+-------------- Epoch 7 --------------
+     T
+	  [B1]  scr: 0.4388
+	  [B4]  scr: 0.4790
+	  [B7]  scr: 0.5205
+	  [B10]  scr: 0.5436
+     V
+	  [B1]  scr: 0.5958
+Train Loss: 1.729724	Valid Loss: 2.372015
+
+* New best model (valid loss): 2.7167 --> 2.3720 *
+
+-------------- Epoch 8 --------------
+     T
+	  [B1]  scr: 0.6078
+	  [B4]  scr: 0.5878
+	  [B7]  scr: 0.6576
+	  [B10]  scr: 0.6746
+     V
+	  [B1]  scr: 0.5192
+Train Loss: 1.375072	Valid Loss: 2.632365
+-------------- Epoch 9 --------------
+     T
+	  [B1]  scr: 0.6283
+	  [B4]  scr: 0.6739
+	  [B7]  scr: 0.7160
+	  [B10]  scr: 0.7050
+     V
+	  [B1]  scr: 0.4950
+Train Loss: 1.290727	Valid Loss: 2.414853
+-------------- Epoch 10 --------------
+     T
+	  [B1]  scr: 0.7157
+	  [B4]  scr: 0.7610
+	  [B7]  scr: 0.7829
+	  [B10]  scr: 0.7903
+     V
+	  [B1]  scr: 0.6648
+Train Loss: 1.018030	Valid Loss: 1.966403
+
+* New best model (valid loss): 2.3720 --> 1.9664 *
+
+-------------- Epoch 11 --------------
+     T
+	  [B1]  scr: 0.8069
+	  [B4]  scr: 0.8129
+	  [B7]  scr: 0.8405
+	  [B10]  scr: 0.8422
+     V
+	  [B1]  scr: 0.7552
+Train Loss: 0.848265	Valid Loss: 1.896231
+
+* New best model (valid loss): 1.9664 --> 1.8962 *
+
+-------------- Epoch 12 --------------
+     T
+	  [B1]  scr: 0.8623
+	  [B4]  scr: 0.8551
+	  [B7]  scr: 0.8740
+	  [B10]  scr: 0.8739
+     V
+	  [B1]  scr: 0.7216
+Train Loss: 0.715852	Valid Loss: 2.289487
+-------------- Epoch 13 --------------
+     T
+	  [B1]  scr: 0.8979
+	  [B4]  scr: 0.8919
+	  [B7]  scr: 0.8909
+	  [B10]  scr: 0.8902
+     V
+	  [B1]  scr: 0.7284
+Train Loss: 0.703408	Valid Loss: 2.082651
+-------------- Epoch 14 --------------
+     T
+	  [B1]  scr: 0.8641
+	  [B4]  scr: 0.8691
+	  [B7]  scr: 0.8858
+	  [B10]  scr: 0.8992
+     V
+	  [B1]  scr: 0.7392
+Train Loss: 0.613210	Valid Loss: 1.927681
+-------------- Epoch 15 --------------
+     T
+	  [B1]  scr: 0.9191
+	  [B4]  scr: 0.9159
+	  [B7]  scr: 0.9123
+	  [B10]  scr: 0.9128
+     V
+	  [B1]  scr: 0.7240
+Train Loss: 0.557808	Valid Loss: 2.060409
+-------------- Epoch 16 --------------
+     T
+	  [B1]  scr: 0.8816
+	  [B4]  scr: 0.9088
+	  [B7]  scr: 0.9151
+	  [B10]  scr: 0.9175
+     V
+	  [B1]  scr: 0.7567
+Train Loss: 0.518765	Valid Loss: 1.740311
+
+* New best model (valid loss): 1.8962 --> 1.7403 *
+
+-------------- Epoch 17 --------------
+     T
+	  [B1]  scr: 0.8571
+	  [B4]  scr: 0.9257
+	  [B7]  scr: 0.9257
+	  [B10]  scr: 0.9216
+     V
+	  [B1]  scr: 0.6984
+Train Loss: 0.507917	Valid Loss: 2.289137
+-------------- Epoch 18 --------------
+     T
+	  [B1]  scr: 0.8726
+	  [B4]  scr: 0.8909
+	  [B7]  scr: 0.9157
+	  [B10]  scr: 0.9207
+     V
+	  [B1]  scr: 0.7299
+Train Loss: 0.480675	Valid Loss: 2.529724
+-------------- Epoch 19 --------------
+     T
+	  [B1]  scr: 0.9547
+	  [B4]  scr: 0.9350
+	  [B7]  scr: 0.9322
+	  [B10]  scr: 0.9352
+     V
+	  [B1]  scr: 0.6674
+Train Loss: 0.426406	Valid Loss: 3.143894
+-------------- Epoch 20 --------------
+     T
+	  [B1]  scr: 0.9588
+	  [B4]  scr: 0.9607
+	  [B7]  scr: 0.9466
+	  [B10]  scr: 0.9407
+     V
+	  [B1]  scr: 0.7207
+Train Loss: 0.389084	Valid Loss: 2.623212
+-------------- Epoch 21 --------------
+     T
+	  [B1]  scr: 0.9395
+	  [B4]  scr: 0.9387
+	  [B7]  scr: 0.9438
+	  [B10]  scr: 0.9371
+     V
+	  [B1]  scr: 0.7218
+Train Loss: 0.376646	Valid Loss: 2.639502
+
+* Stopped early *
+
+E. [Evaluating] from trained model TECN2v3_f4-0.76
+
+	Testing...
+	  [B1]  scr: 0.8151
+	  [B2]  scr: 0.8777
+
+Test Score: 0.8777 (took 0.44s)
+
+./logs/LDSS-SP1-imdynaug100/TECN2v3/eval/aprfc/cm_f4-0.76.png
+{'0Act-0Obj': 0, '0Obj-Rep': 1, 'Dis-Pro': 2, 'Dis-Vau': 3, 'Fix-Pro': 4, 'Fix-Vau': 5}
+
+phases_preds counts: [1985  964  607 4569  218 2983] 	 11326
+phases_gt counts: [2439 1014  359 4849  135 2530] 	 11326
+{0: '0Act-0Obj', 1: '0Obj-Rep', 2: 'Dis-Pro', 3: 'Dis-Vau', 4: 'Fix-Pro', 5: 'Fix-Vau'}
+
+Video 5238 Phase Report
+           |  T Preds   | T Targets  ||   Error   
+0Act-0Obj  |   33m 5s   |  40m 39s   ||   7m 34s  
+0Obj-Rep   |   16m 4s   |  16m 54s   ||    50s    
+Dis-Pro    |   10m 7s   |   5m 59s   ||   4m 8s   
+Dis-Vau    | 1h 16m 9s  | 1h 20m 49s ||   4m 40s  
+Fix-Pro    |   3m 38s   |   2m 15s   ||   1m 23s  
+Fix-Vau    |  49m 43s   |  42m 10s   ||   7m 33s   
+
+
+phases_preds counts: [1552    0  502 2069  175 3113] 	 7411
+phases_gt counts: [ 632    0  451 3121   57 3150] 	 7411
+{0: '0Act-0Obj', 1: '0Obj-Rep', 2: 'Dis-Pro', 3: 'Dis-Vau', 4: 'Fix-Pro', 5: 'Fix-Vau'}
+
+Video e8d3 Phase Report
+           |  T Preds   | T Targets  ||   Error   
+0Act-0Obj  |  25m 52s   |  10m 32s   ||  15m 20s  
+0Obj-Rep   |     0s     |     0s     ||     0s    
+Dis-Pro    |   8m 22s   |   7m 31s   ||    51s    
+Dis-Vau    |  34m 29s   |   52m 1s   ||  17m 32s  
+Fix-Pro    |   2m 55s   |    57s     ||   1m 58s  
+Fix-Vau    |  51m 53s   |  52m 30s   ||    37s     
+
+invalid preds:  0  /  18737
+Series([], Name: count, dtype: int64)
+Saving aggregated phase timing results to ./logs/LDSS-SP1-imdynaug100/TECN2v3/eval/timings/timings_Summary.csv
+
+
+Number of videos: 2
+Video graphing took 1.39 seconds
+
+Saved phase metric graphs to ./logs/LDSS-SP1-imdynaug100/TECN2v3/eval/ribbons
+
+	 = = = = = 	 = = = = =
+		 Fold 4 done!
+	 = = = = = 	 = = = = =
+
+  Fold 5 splits:
+	train ['26d9', '315a', '436c', '5238', 'a334', 'b670', 'e6a9', 'e8d3', 'e8d7', 'f63b']
+	valid ['cf7c']
+	test ['a909', 'b71b']
+
+    No 'path_spaceModel' found. Using pretrained resnet50 in l4-fine-tune mode.
+    Feature size of 2048 at node 'flatten'
+    Feature size of None at node 'None'
+
+    Found feature path! (feats_f5-0.72.pt)
+  Available feature layers: ['flatten'] / Using last layer: flatten
+
+	Batch example shapes:
+	[space feature] torch.Size([401, 16, 2048])
+	[labels] [torch.Size([401, 16])]
+	[idx] torch.Size([401, 16])
+    Batch contains 1 clip(s), each with 16 frames
+
+   [optim]: adam
+   [sched]: step
+
+Teaching model:  TECN2v3_f5
+-------------- Epoch 1 --------------
+     T
+	  [B1]  scr: 0.1959
+	  [B4]  scr: 0.1806
+	  [B7]  scr: 0.1565
+	  [B10]  scr: 0.1509
+     V
+	  [B1]  scr: 0.3591
+Train Loss: 3.742853	Valid Loss: 3.578005
+
+* New best model (valid loss): inf --> 3.5780 *
+
+-------------- Epoch 2 --------------
+     T
+	  [B1]  scr: 0.1709
+	  [B4]  scr: 0.1771
+	  [B7]  scr: 0.1836
+	  [B10]  scr: 0.1834
+     V
+	  [B1]  scr: 0.2996
+Train Loss: 3.519905	Valid Loss: 3.517770
+
+* New best model (valid loss): 3.5780 --> 3.5178 *
+
+-------------- Epoch 3 --------------
+     T
+	  [B1]  scr: 0.2006
+	  [B4]  scr: 0.1985
+	  [B7]  scr: 0.2059
+	  [B10]  scr: 0.2115
+     V
+	  [B1]  scr: 0.4660
+Train Loss: 3.296053	Valid Loss: 3.392324
+
+* New best model (valid loss): 3.5178 --> 3.3923 *
+
+-------------- Epoch 4 --------------
+     T
+	  [B1]  scr: 0.2454
+	  [B4]  scr: 0.2564
+	  [B7]  scr: 0.2393
+	  [B10]  scr: 0.2404
+     V
+	  [B1]  scr: 0.5460
+Train Loss: 2.944582	Valid Loss: 3.057589
+
+* New best model (valid loss): 3.3923 --> 3.0576 *
+
+-------------- Epoch 5 --------------
+     T
+	  [B1]  scr: 0.2891
+	  [B4]  scr: 0.2979
+	  [B7]  scr: 0.3005
+	  [B10]  scr: 0.3276
+     V
+	  [B1]  scr: 0.4233
+Train Loss: 2.524636	Valid Loss: 2.712805
+
+* New best model (valid loss): 3.0576 --> 2.7128 *
+
+-------------- Epoch 6 --------------
+     T
+	  [B1]  scr: 0.3021
+	  [B4]  scr: 0.3174
+	  [B7]  scr: 0.3837
+	  [B10]  scr: 0.3742
+     V
+	  [B1]  scr: 0.4239
+Train Loss: 2.118485	Valid Loss: 2.351682
+
+* New best model (valid loss): 2.7128 --> 2.3517 *
+
+-------------- Epoch 7 --------------
+     T
+	  [B1]  scr: 0.4437
+	  [B4]  scr: 0.4005
+	  [B7]  scr: 0.4452
+	  [B10]  scr: 0.4850
+     V
+	  [B1]  scr: 0.4275
+Train Loss: 1.750031	Valid Loss: 2.493786
+-------------- Epoch 8 --------------
+     T
+	  [B1]  scr: 0.5508
+	  [B4]  scr: 0.5738
+	  [B7]  scr: 0.5972
+	  [B10]  scr: 0.6168
+     V
+	  [B1]  scr: 0.6211
+Train Loss: 1.610552	Valid Loss: 1.871471
+
+* New best model (valid loss): 2.3517 --> 1.8715 *
+
+-------------- Epoch 9 --------------
+     T
+	  [B1]  scr: 0.6831
+	  [B4]  scr: 0.6913
+	  [B7]  scr: 0.7123
+	  [B10]  scr: 0.7081
+     V
+	  [B1]  scr: 0.7209
+Train Loss: 1.303469	Valid Loss: 1.623287
+
+* New best model (valid loss): 1.8715 --> 1.6233 *
+
+-------------- Epoch 10 --------------
+     T
+	  [B1]  scr: 0.7004
+	  [B4]  scr: 0.7052
+	  [B7]  scr: 0.7124
+	  [B10]  scr: 0.7299
+     V
+	  [B1]  scr: 0.7068
+Train Loss: 1.155953	Valid Loss: 1.889636
+-------------- Epoch 11 --------------
+     T
+	  [B1]  scr: 0.7951
+	  [B4]  scr: 0.7924
+	  [B7]  scr: 0.7788
+	  [B10]  scr: 0.7737
+     V
+	  [B1]  scr: 0.6921
+Train Loss: 1.050682	Valid Loss: 2.051783
+-------------- Epoch 12 --------------
+     T
+	  [B1]  scr: 0.8118
+	  [B4]  scr: 0.8198
+	  [B7]  scr: 0.8012
+	  [B10]  scr: 0.7937
+     V
+	  [B1]  scr: 0.7726
+Train Loss: 0.946856	Valid Loss: 1.724498
+-------------- Epoch 13 --------------
+     T
+	  [B1]  scr: 0.8279
+	  [B4]  scr: 0.8414
+	  [B7]  scr: 0.8420
+	  [B10]  scr: 0.8378
+     V
+	  [B1]  scr: 0.7602
+Train Loss: 0.905732	Valid Loss: 1.955704
+-------------- Epoch 14 --------------
+     T
+	  [B1]  scr: 0.9033
+	  [B4]  scr: 0.8416
+	  [B7]  scr: 0.8347
+	  [B10]  scr: 0.8385
+     V
+	  [B1]  scr: 0.8432
+Train Loss: 0.814598	Valid Loss: 1.607219
+
+* New best model (valid loss): 1.6233 --> 1.6072 *
+
+-------------- Epoch 15 --------------
+     T
+	  [B1]  scr: 0.8227
+	  [B4]  scr: 0.8674
+	  [B7]  scr: 0.8686
+	  [B10]  scr: 0.8737
+     V
+	  [B1]  scr: 0.6932
+Train Loss: 0.784595	Valid Loss: 2.134266
+-------------- Epoch 16 --------------
+     T
+	  [B1]  scr: 0.8749
+	  [B4]  scr: 0.8627
+	  [B7]  scr: 0.8582
+	  [B10]  scr: 0.8454
+     V
+	  [B1]  scr: 0.7758
+Train Loss: 0.720143	Valid Loss: 2.149838
+-------------- Epoch 17 --------------
+     T
+	  [B1]  scr: 0.8658
+	  [B4]  scr: 0.8894
+	  [B7]  scr: 0.8887
+	  [B10]  scr: 0.8958
+     V
+	  [B1]  scr: 0.8328
+Train Loss: 0.682836	Valid Loss: 1.629602
+-------------- Epoch 18 --------------
+     T
+	  [B1]  scr: 0.8848
+	  [B4]  scr: 0.8765
+	  [B7]  scr: 0.8742
+	  [B10]  scr: 0.8879
+     V
+	  [B1]  scr: 0.7666
+Train Loss: 0.671715	Valid Loss: 2.418985
+-------------- Epoch 19 --------------
+     T
+	  [B1]  scr: 0.9227
+	  [B4]  scr: 0.9219
+	  [B7]  scr: 0.9180
+	  [B10]  scr: 0.9164
+     V
+	  [B1]  scr: 0.7061
+Train Loss: 0.572506	Valid Loss: 2.612550
+
+* Stopped early *
+
+E. [Evaluating] from trained model TECN2v3_f5-0.84
+
+	Testing...
+	  [B1]  scr: 0.8422
+	  [B2]  scr: 0.8618
+
+Test Score: 0.8618 (took 0.48s)
+
+./logs/LDSS-SP1-imdynaug100/TECN2v3/eval/aprfc/cm_f5-0.84.png
+{'0Act-0Obj': 0, '0Obj-Rep': 1, 'Dis-Pro': 2, 'Dis-Vau': 3, 'Fix-Pro': 4, 'Fix-Vau': 5}
+
+phases_preds counts: [ 796 1014  337 2936  177 2997] 	 8257
+phases_gt counts: [1737  802  274 2228   48 3168] 	 8257
+{0: '0Act-0Obj', 1: '0Obj-Rep', 2: 'Dis-Pro', 3: 'Dis-Vau', 4: 'Fix-Pro', 5: 'Fix-Vau'}
+
+Video a909 Phase Report
+           |  T Preds   | T Targets  ||   Error   
+0Act-0Obj  |  13m 16s   |  28m 57s   ||  15m 41s  
+0Obj-Rep   |  16m 54s   |  13m 22s   ||   3m 32s  
+Dis-Pro    |   5m 37s   |   4m 34s   ||   1m 3s   
+Dis-Vau    |  48m 56s   |   37m 8s   ||  11m 48s  
+Fix-Pro    |   2m 57s   |    48s     ||   2m 9s   
+Fix-Vau    |  49m 57s   |  52m 48s   ||   2m 51s   
+
+
+phases_preds counts: [ 952 1293  324 5607  626 2369] 	 11171
+phases_gt counts: [ 748  733  316 5640  151 3583] 	 11171
+{0: '0Act-0Obj', 1: '0Obj-Rep', 2: 'Dis-Pro', 3: 'Dis-Vau', 4: 'Fix-Pro', 5: 'Fix-Vau'}
+
+Video b71b Phase Report
+           |  T Preds   | T Targets  ||   Error   
+0Act-0Obj  |  15m 52s   |  12m 28s   ||   3m 24s  
+0Obj-Rep   |  21m 33s   |  12m 13s   ||   9m 20s  
+Dis-Pro    |   5m 24s   |   5m 16s   ||     8s    
+Dis-Vau    | 1h 33m 27s |   1h 34m   ||    33s    
+Fix-Pro    |  10m 26s   |   2m 31s   ||   7m 55s  
+Fix-Vau    |  39m 29s   |  59m 43s   ||  20m 14s   
+
+invalid preds:  0  /  19428
+Series([], Name: count, dtype: int64)
+Saving aggregated phase timing results to ./logs/LDSS-SP1-imdynaug100/TECN2v3/eval/timings/timings_Summary.csv
+
+
+Number of videos: 2
+Video graphing took 1.61 seconds
+
+Saved phase metric graphs to ./logs/LDSS-SP1-imdynaug100/TECN2v3/eval/ribbons
+
+	 = = = = = 	 = = = = =
+		 Fold 5 done!
+	 = = = = = 	 = = = = =
+
+  Fold 6 splits:
+	train ['26d9', '315a', '5238', 'a334', 'a909', 'b71b', 'e6a9', 'e8d3', 'e8d7', 'f63b']
+	valid ['cf7c']
+	test ['436c', 'b670']
+
+    No 'path_spaceModel' found. Using pretrained resnet50 in l4-fine-tune mode.
+    Feature size of 2048 at node 'flatten'
+    Feature size of None at node 'None'
+
+    Found feature path! (feats_f6-0.72.pt)
+  Available feature layers: ['flatten'] / Using last layer: flatten
+
+	Batch example shapes:
+	[space feature] torch.Size([464, 16, 2048])
+	[labels] [torch.Size([464, 16])]
+	[idx] torch.Size([464, 16])
+    Batch contains 1 clip(s), each with 16 frames
+
+   [optim]: adam
+   [sched]: step
+
+Teaching model:  TECN2v3_f6
+-------------- Epoch 1 --------------
+     T
+	  [B1]  scr: 0.1942
+	  [B4]  scr: 0.1929
+	  [B7]  scr: 0.2043
+	  [B10]  scr: 0.2097
+     V
+	  [B1]  scr: 0.2996
+Train Loss: 3.795649	Valid Loss: 3.476344
+
+* New best model (valid loss): inf --> 3.4763 *
+
+-------------- Epoch 2 --------------
+     T
+	  [B1]  scr: 0.2405
+	  [B4]  scr: 0.2302
+	  [B7]  scr: 0.2431
+	  [B10]  scr: 0.2512
+     V
+	  [B1]  scr: 0.2225
+Train Loss: 3.507691	Valid Loss: 3.445784
+
+* New best model (valid loss): 3.4763 --> 3.4458 *
+
+-------------- Epoch 3 --------------
+     T
+	  [B1]  scr: 0.2616
+	  [B4]  scr: 0.2939
+	  [B7]  scr: 0.2911
+	  [B10]  scr: 0.3068
+     V
+	  [B1]  scr: 0.4353
+Train Loss: 3.248805	Valid Loss: 3.147034
+
+* New best model (valid loss): 3.4458 --> 3.1470 *
+
+-------------- Epoch 4 --------------
+     T
+	  [B1]  scr: 0.3480
+	  [B4]  scr: 0.3944
+	  [B7]  scr: 0.3588
+	  [B10]  scr: 0.3786
+     V
+	  [B1]  scr: 0.4541
+Train Loss: 2.847079	Valid Loss: 2.670348
+
+* New best model (valid loss): 3.1470 --> 2.6703 *
+
+-------------- Epoch 5 --------------
+     T
+	  [B1]  scr: 0.3691
+	  [B4]  scr: 0.3975
+	  [B7]  scr: 0.4127
+	  [B10]  scr: 0.4347
+     V
+	  [B1]  scr: 0.5810
+Train Loss: 2.434285	Valid Loss: 2.283981
+
+* New best model (valid loss): 2.6703 --> 2.2840 *
+
+-------------- Epoch 6 --------------
+     T
+	  [B1]  scr: 0.5159
+	  [B4]  scr: 0.5106
+	  [B7]  scr: 0.5152
+	  [B10]  scr: 0.4927
+     V
+	  [B1]  scr: 0.5799
+Train Loss: 2.095497	Valid Loss: 2.122598
+
+* New best model (valid loss): 2.2840 --> 2.1226 *
+
+-------------- Epoch 7 --------------
+     T
+	  [B1]  scr: 0.5607
+	  [B4]  scr: 0.5159
+	  [B7]  scr: 0.4993
+	  [B10]  scr: 0.5237
+     V
+	  [B1]  scr: 0.7186
+Train Loss: 1.847152	Valid Loss: 1.871193
+
+* New best model (valid loss): 2.1226 --> 1.8712 *
+
+-------------- Epoch 8 --------------
+     T
+	  [B1]  scr: 0.6796
+	  [B4]  scr: 0.6638
+	  [B7]  scr: 0.6726
+	  [B10]  scr: 0.6708
+     V
+	  [B1]  scr: 0.7541
+Train Loss: 1.484351	Valid Loss: 1.502357
+
+* New best model (valid loss): 1.8712 --> 1.5024 *
+
+-------------- Epoch 9 --------------
+     T
+	  [B1]  scr: 0.7033
+	  [B4]  scr: 0.7598
+	  [B7]  scr: 0.7672
+	  [B10]  scr: 0.7672
+     V
+	  [B1]  scr: 0.7394
+Train Loss: 1.165664	Valid Loss: 1.504353
+-------------- Epoch 10 --------------
+     T
+	  [B1]  scr: 0.7861
+	  [B4]  scr: 0.8370
+	  [B7]  scr: 0.8375
+	  [B10]  scr: 0.8240
+     V
+	  [B1]  scr: 0.7407
+Train Loss: 0.965522	Valid Loss: 1.925138
+-------------- Epoch 11 --------------
+     T
+	  [B1]  scr: 0.7952
+	  [B4]  scr: 0.8624
+	  [B7]  scr: 0.8454
+	  [B10]  scr: 0.8450
+     V
+	  [B1]  scr: 0.6913
+Train Loss: 0.915083	Valid Loss: 2.288006
+-------------- Epoch 12 --------------
+     T
+	  [B1]  scr: 0.9167
+	  [B4]  scr: 0.8800
+	  [B7]  scr: 0.8747
+	  [B10]  scr: 0.8688
+     V
+	  [B1]  scr: 0.7268
+Train Loss: 0.789687	Valid Loss: 1.951657
+-------------- Epoch 13 --------------
+     T
+	  [B1]  scr: 0.8948
+	  [B4]  scr: 0.8901
+	  [B7]  scr: 0.8919
+	  [B10]  scr: 0.8933
+     V
+	  [B1]  scr: 0.7314
+Train Loss: 0.643290	Valid Loss: 1.958685
+
+* Stopped early *
+
+E. [Evaluating] from trained model TECN2v3_f6-0.75
+
+	Testing...
+	  [B1]  scr: 0.8332
+	  [B2]  scr: 0.8670
+
+Test Score: 0.8670 (took 0.45s)
+
+./logs/LDSS-SP1-imdynaug100/TECN2v3/eval/aprfc/cm_f6-0.75.png
+{'0Act-0Obj': 0, '0Obj-Rep': 1, 'Dis-Pro': 2, 'Dis-Vau': 3, 'Fix-Pro': 4, 'Fix-Vau': 5}
+
+phases_preds counts: [ 117 1399 1203 2718  674 3114] 	 9225
+phases_gt counts: [ 882  881 1022 2323  340 3777] 	 9225
+{0: '0Act-0Obj', 1: '0Obj-Rep', 2: 'Dis-Pro', 3: 'Dis-Vau', 4: 'Fix-Pro', 5: 'Fix-Vau'}
+
+Video 436c Phase Report
+           |  T Preds   | T Targets  ||   Error   
+0Act-0Obj  |   1m 57s   |  14m 42s   ||  12m 45s  
+0Obj-Rep   |  23m 19s   |  14m 41s   ||   8m 38s  
+Dis-Pro    |   20m 3s   |   17m 2s   ||   3m 1s   
+Dis-Vau    |  45m 18s   |  38m 43s   ||   6m 35s  
+Fix-Pro    |  11m 14s   |   5m 40s   ||   5m 34s  
+Fix-Vau    |  51m 54s   | 1h 2m 57s  ||   11m 3s   
+
+
+phases_preds counts: [ 370  816 1364 4630  673 3280] 	 11133
+phases_gt counts: [ 731  790  911 4940  618 3143] 	 11133
+{0: '0Act-0Obj', 1: '0Obj-Rep', 2: 'Dis-Pro', 3: 'Dis-Vau', 4: 'Fix-Pro', 5: 'Fix-Vau'}
+
+Video b670 Phase Report
+           |  T Preds   | T Targets  ||   Error   
+0Act-0Obj  |   6m 10s   |  12m 11s   ||   6m 1s   
+0Obj-Rep   |  13m 36s   |  13m 10s   ||    26s    
+Dis-Pro    |  22m 44s   |  15m 11s   ||   7m 33s  
+Dis-Vau    | 1h 17m 10s | 1h 22m 20s ||   5m 10s  
+Fix-Pro    |  11m 13s   |  10m 18s   ||    55s    
+Fix-Vau    |  54m 40s   |  52m 23s   ||   2m 17s   
+
+invalid preds:  0  /  20358
+Series([], Name: count, dtype: int64)
+Saving aggregated phase timing results to ./logs/LDSS-SP1-imdynaug100/TECN2v3/eval/timings/timings_Summary.csv
+
+
+Number of videos: 2
+Video graphing took 1.53 seconds
+
+Saved phase metric graphs to ./logs/LDSS-SP1-imdynaug100/TECN2v3/eval/ribbons
+
+	 = = = = = 	 = = = = =
+		 Fold 6 done!
+	 = = = = = 	 = = = = =
+
+  Fold 7 splits:
+	train ['436c', '5238', 'a334', 'a909', 'b670', 'b71b', 'e6a9', 'e8d3', 'e8d7', 'f63b']
+	valid ['cf7c']
+	test ['26d9', '315a']
+
+    No 'path_spaceModel' found. Using pretrained resnet50 in l4-fine-tune mode.
+    Feature size of 2048 at node 'flatten'
+    Feature size of None at node 'None'
+
+    Found feature path! (feats_f7-0.71.pt)
+  Available feature layers: ['flatten'] / Using last layer: flatten
+
+	Batch example shapes:
+	[space feature] torch.Size([401, 16, 2048])
+	[labels] [torch.Size([401, 16])]
+	[idx] torch.Size([401, 16])
+    Batch contains 1 clip(s), each with 16 frames
+
+   [optim]: adam
+   [sched]: step
+
+Teaching model:  TECN2v3_f7
+-------------- Epoch 1 --------------
+     T
+	  [B1]  scr: 0.1640
+	  [B4]  scr: 0.1445
+	  [B7]  scr: 0.1522
+	  [B10]  scr: 0.1541
+     V
+	  [B1]  scr: 0.0088
+Train Loss: 3.675520	Valid Loss: 3.622709
+
+* New best model (valid loss): inf --> 3.6227 *
+
+-------------- Epoch 2 --------------
+     T
+	  [B1]  scr: 0.1637
+	  [B4]  scr: 0.1815
+	  [B7]  scr: 0.1844
+	  [B10]  scr: 0.1889
+     V
+	  [B1]  scr: 0.0088
+Train Loss: 3.450975	Valid Loss: 3.350995
+
+* New best model (valid loss): 3.6227 --> 3.3510 *
+
+-------------- Epoch 3 --------------
+     T
+	  [B1]  scr: 0.2210
+	  [B4]  scr: 0.2533
+	  [B7]  scr: 0.2562
+	  [B10]  scr: 0.2616
+     V
+	  [B1]  scr: 0.4295
+Train Loss: 3.099494	Valid Loss: 2.941506
+
+* New best model (valid loss): 3.3510 --> 2.9415 *
+
+-------------- Epoch 4 --------------
+     T
+	  [B1]  scr: 0.3352
+	  [B4]  scr: 0.3286
+	  [B7]  scr: 0.3362
+	  [B10]  scr: 0.3783
+     V
+	  [B1]  scr: 0.4378
+Train Loss: 2.728310	Valid Loss: 2.546969
+
+* New best model (valid loss): 2.9415 --> 2.5470 *
+
+-------------- Epoch 5 --------------
+     T
+	  [B1]  scr: 0.4383
+	  [B4]  scr: 0.4624
+	  [B7]  scr: 0.4982
+	  [B10]  scr: 0.5207
+     V
+	  [B1]  scr: 0.4613
+Train Loss: 2.284943	Valid Loss: 2.533154
+
+* New best model (valid loss): 2.5470 --> 2.5332 *
+
+-------------- Epoch 6 --------------
+     T
+	  [B1]  scr: 0.4997
+	  [B4]  scr: 0.5404
+	  [B7]  scr: 0.5128
+	  [B10]  scr: 0.5159
+     V
+	  [B1]  scr: 0.6430
+Train Loss: 1.957949	Valid Loss: 2.214232
+
+* New best model (valid loss): 2.5332 --> 2.2142 *
+
+-------------- Epoch 7 --------------
+     T
+	  [B1]  scr: 0.6344
+	  [B4]  scr: 0.6407
+	  [B7]  scr: 0.6782
+	  [B10]  scr: 0.6815
+     V
+	  [B1]  scr: 0.6247
+Train Loss: 1.657526	Valid Loss: 1.876982
+
+* New best model (valid loss): 2.2142 --> 1.8770 *
+
+-------------- Epoch 8 --------------
+     T
+	  [B1]  scr: 0.6316
+	  [B4]  scr: 0.6926
+	  [B7]  scr: 0.7196
+	  [B10]  scr: 0.7441
+     V
+	  [B1]  scr: 0.6598
+Train Loss: 1.375516	Valid Loss: 2.079362
+-------------- Epoch 9 --------------
+     T
+	  [B1]  scr: 0.7545
+	  [B4]  scr: 0.7920
+	  [B7]  scr: 0.7695
+	  [B10]  scr: 0.7809
+     V
+	  [B1]  scr: 0.6699
+Train Loss: 1.232851	Valid Loss: 2.079725
+-------------- Epoch 10 --------------
+     T
+	  [B1]  scr: 0.8000
+	  [B4]  scr: 0.7970
+	  [B7]  scr: 0.7889
+	  [B10]  scr: 0.7968
+     V
+	  [B1]  scr: 0.5849
+Train Loss: 1.089545	Valid Loss: 2.339699
+-------------- Epoch 11 --------------
+     T
+	  [B1]  scr: 0.8029
+	  [B4]  scr: 0.8280
+	  [B7]  scr: 0.8444
+	  [B10]  scr: 0.8398
+     V
+	  [B1]  scr: 0.6463
+Train Loss: 0.987084	Valid Loss: 2.285096
+-------------- Epoch 12 --------------
+     T
+	  [B1]  scr: 0.8240
+	  [B4]  scr: 0.8048
+	  [B7]  scr: 0.8478
+	  [B10]  scr: 0.8509
+     V
+	  [B1]  scr: 0.6752
+Train Loss: 0.839208	Valid Loss: 1.982717
+
+* Stopped early *
+
+E. [Evaluating] from trained model TECN2v3_f7-0.62
+
+	Testing...
+	  [B1]  scr: 0.9019
+	  [B2]  scr: 0.8497
+
+Test Score: 0.8497 (took 0.46s)
+
+./logs/LDSS-SP1-imdynaug100/TECN2v3/eval/aprfc/cm_f7-0.62.png
+{'0Act-0Obj': 0, '0Obj-Rep': 1, 'Dis-Pro': 2, 'Dis-Vau': 3, 'Fix-Pro': 4, 'Fix-Vau': 5}
+
+phases_preds counts: [ 532 1366  610 2512  382 3882] 	 9284
+phases_gt counts: [1031 1386  463 2223   42 4139] 	 9284
+{0: '0Act-0Obj', 1: '0Obj-Rep', 2: 'Dis-Pro', 3: 'Dis-Vau', 4: 'Fix-Pro', 5: 'Fix-Vau'}
+
+Video 26d9 Phase Report
+           |  T Preds   | T Targets  ||   Error   
+0Act-0Obj  |   8m 52s   |  17m 11s   ||   8m 19s  
+0Obj-Rep   |  22m 46s   |   23m 6s   ||    20s    
+Dis-Pro    |  10m 10s   |   7m 43s   ||   2m 27s  
+Dis-Vau    |  41m 52s   |   37m 3s   ||   4m 49s  
+Fix-Pro    |   6m 22s   |    42s     ||   5m 40s  
+Fix-Vau    | 1h 4m 42s  | 1h 8m 59s  ||   4m 17s   
+
+
+phases_preds counts: [1307 1897  806 1336  929 3932] 	 10207
+phases_gt counts: [1812 1231  558 1536  172 4898] 	 10207
+{0: '0Act-0Obj', 1: '0Obj-Rep', 2: 'Dis-Pro', 3: 'Dis-Vau', 4: 'Fix-Pro', 5: 'Fix-Vau'}
+
+Video 315a Phase Report
+           |  T Preds   | T Targets  ||   Error   
+0Act-0Obj  |  21m 47s   |  30m 12s   ||   8m 25s  
+0Obj-Rep   |  31m 37s   |  20m 31s   ||   11m 6s  
+Dis-Pro    |  13m 26s   |   9m 18s   ||   4m 8s   
+Dis-Vau    |  22m 16s   |  25m 36s   ||   3m 20s  
+Fix-Pro    |  15m 29s   |   2m 52s   ||  12m 37s  
+Fix-Vau    | 1h 5m 32s  | 1h 21m 38s ||   16m 6s   
+
+invalid preds:  0  /  19491
+Series([], Name: count, dtype: int64)
+Saving aggregated phase timing results to ./logs/LDSS-SP1-imdynaug100/TECN2v3/eval/timings/timings_Summary.csv
+
+
+Number of videos: 2
+Video graphing took 1.53 seconds
+
+Saved phase metric graphs to ./logs/LDSS-SP1-imdynaug100/TECN2v3/eval/ribbons
+
+	 = = = = = 	 = = = = =
+		 Fold 7 done!
+	 = = = = = 	 = = = = =
+
+G. [Processing] Generating all-fold confusion matrix ./logs/LDSS-SP1-imdynaug100/TECN2v3/eval/preds
+Collected 134498 predictions and 134498 targets
+Pred tensor shape: torch.Size([134498]), Target tensor shape: torch.Size([134498])
+./logs/LDSS-SP1-imdynaug100/TECN2v3/eval/aprfc/cm_global
+
+
+ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨ ¨
+
+

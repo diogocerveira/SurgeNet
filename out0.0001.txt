@@ -1,0 +1,658 @@
+nohup: ignoring input
+Running 11cfg_SP1-tecno.yml...
+
+A. [classroom] LDSS-2509-1 (New)
+   [model] TECNOv1 (New)
+   For ('train', 'process', 'eval')
+
+B. [dataset] LDSS-local (#134498)
+   [label type] single-phase-top1
+   [preprocessing] imagenet-dynaug
+   [classes] #6 (Unbalanced) ['0Act-0Obj', '0Obj-Rep', 'Dis-Pro', 'Dis-Vau', 'Fix-Pro', 'Fix-Vau']
+   [weights] [tensor([0.3846, 0.6755, 1.0557, 0.2113, 3.4933, 0.1796])]
+   [phases] #6  ['0Act-0Obj', '0Obj-Rep', 'Dis-Pro', 'Dis-Vau', 'Fix-Pro', 'Fix-Vau'] 
+
+C. [training] start on [device] cpu
+   [folds] #7 [epochs] #100 [batch sizes] s32 / t1
+   [criterions] [CrossEntropyLoss()] w/ weights [tensor([0.3846, 0.6755, 1.0557, 0.2113, 3.4933, 0.1796])]
+   [headtype] [6] 
+
+  Fold 1 splits:
+	train ['26d9', '315a', '436c', '5238', 'a909', 'b670', 'b71b', 'e6a9', 'e8d3', 'e8d7']
+	valid ['a334', 'f63b']
+	test ['cf7c']
+
+    No 'path_spaceModel' found. Using pretrained resnet50 in l4-fine-tune mode.
+    Feature size of 2048 at node 'flatten'
+    Feature size of None at node 'None'
+
+    Found feature path! (feats_f1-0.80.pt)
+  Available feature layers: ['flatten'] / Using last layer: flatten
+
+	Batch example shapes:
+	[space feature] torch.Size([708, 16, 2048])
+	[labels] [torch.Size([708, 16])]
+	[idx] torch.Size([708, 16])
+    Batch contains 1 clip(s), each with 16 frames
+
+   [optim]: adam
+   [sched]: step
+
+Teaching model:  TECNOv1_f1
+-------------- Epoch 1 --------------
+     T
+	  [B1]  scr: 0.2030
+	  [B4]  scr: 0.2520
+	  [B7]  scr: 0.2605
+	  [B10]  scr: 0.2447
+     V
+	  [B1]  scr: 0.1429
+	  [B2]  scr: 0.2023
+Train Loss: 3.605473	Valid Loss: 3.614898
+
+* New best model (valid loss): inf --> 3.6149 *
+
+-------------- Epoch 2 --------------
+     T
+	  [B1]  scr: 0.3236
+	  [B4]  scr: 0.2878
+	  [B7]  scr: 0.2671
+	  [B10]  scr: 0.2529
+     V
+	  [B1]  scr: 0.1429
+	  [B2]  scr: 0.2023
+Train Loss: 3.541943	Valid Loss: 3.573947
+
+* New best model (valid loss): 3.6149 --> 3.5739 *
+
+-------------- Epoch 3 --------------
+     T
+	  [B1]  scr: 0.3190
+	  [B4]  scr: 0.2349
+	  [B7]  scr: 0.2575
+	  [B10]  scr: 0.2593
+     V
+	  [B1]  scr: 0.1429
+	  [B2]  scr: 0.2023
+Train Loss: 3.506483	Valid Loss: 3.522899
+
+* New best model (valid loss): 3.5739 --> 3.5229 *
+
+-------------- Epoch 4 --------------
+     T
+	  [B1]  scr: 0.3126
+	  [B4]  scr: 0.2264
+	  [B7]  scr: 0.2268
+	  [B10]  scr: 0.2572
+     V
+	  [B1]  scr: 0.1429
+	  [B2]  scr: 0.2023
+Train Loss: 3.458213	Valid Loss: 3.483908
+
+* New best model (valid loss): 3.5229 --> 3.4839 *
+
+-------------- Epoch 5 --------------
+     T
+	  [B1]  scr: 0.2007
+	  [B4]  scr: 0.2648
+	  [B7]  scr: 0.2491
+	  [B10]  scr: 0.2540
+     V
+	  [B1]  scr: 0.1429
+	  [B2]  scr: 0.2023
+Train Loss: 3.414211	Valid Loss: 3.459001
+
+* New best model (valid loss): 3.4839 --> 3.4590 *
+
+-------------- Epoch 6 --------------
+     T
+	  [B1]  scr: 0.1978
+	  [B4]  scr: 0.2589
+	  [B7]  scr: 0.2574
+	  [B10]  scr: 0.2538
+     V
+	  [B1]  scr: 0.1429
+	  [B2]  scr: 0.2023
+Train Loss: 3.365525	Valid Loss: 3.413885
+
+* New best model (valid loss): 3.4590 --> 3.4139 *
+
+-------------- Epoch 7 --------------
+     T
+	  [B1]  scr: 0.2162
+	  [B4]  scr: 0.2811
+	  [B7]  scr: 0.2808
+	  [B10]  scr: 0.2732
+     V
+	  [B1]  scr: 0.1429
+	  [B2]  scr: 0.2023
+Train Loss: 3.313086	Valid Loss: 3.352866
+
+* New best model (valid loss): 3.4139 --> 3.3529 *
+
+-------------- Epoch 8 --------------
+     T
+	  [B1]  scr: 0.2314
+	  [B4]  scr: 0.2149
+	  [B7]  scr: 0.2655
+	  [B10]  scr: 0.2795
+     V
+	  [B1]  scr: 0.1429
+	  [B2]  scr: 0.2040
+Train Loss: 3.253554	Valid Loss: 3.298166
+
+* New best model (valid loss): 3.3529 --> 3.2982 *
+
+-------------- Epoch 9 --------------
+     T
+	  [B1]  scr: 0.2011
+	  [B4]  scr: 0.2590
+	  [B7]  scr: 0.2758
+	  [B10]  scr: 0.2956
+     V
+	  [B1]  scr: 0.1451
+	  [B2]  scr: 0.2136
+Train Loss: 3.184467	Valid Loss: 3.240365
+
+* New best model (valid loss): 3.2982 --> 3.2404 *
+
+-------------- Epoch 10 --------------
+     T
+	  [B1]  scr: 0.2503
+	  [B4]  scr: 0.3063
+	  [B7]  scr: 0.3012
+	  [B10]  scr: 0.3142
+     V
+	  [B1]  scr: 0.1763
+	  [B2]  scr: 0.2627
+Train Loss: 3.117111	Valid Loss: 3.173304
+
+* New best model (valid loss): 3.2404 --> 3.1733 *
+
+-------------- Epoch 11 --------------
+     T
+	  [B1]  scr: 0.3909
+	  [B4]  scr: 0.3398
+	  [B7]  scr: 0.3388
+	  [B10]  scr: 0.3418
+     V
+	  [B1]  scr: 0.2966
+	  [B2]  scr: 0.4335
+Train Loss: 3.045887	Valid Loss: 3.112794
+
+* New best model (valid loss): 3.1733 --> 3.1128 *
+
+-------------- Epoch 12 --------------
+     T
+	  [B1]  scr: 0.3226
+	  [B4]  scr: 0.3577
+	  [B7]  scr: 0.3781
+	  [B10]  scr: 0.3760
+     V
+	  [B1]  scr: 0.4440
+	  [B2]  scr: 0.5528
+Train Loss: 2.970544	Valid Loss: 3.040166
+
+* New best model (valid loss): 3.1128 --> 3.0402 *
+
+-------------- Epoch 13 --------------
+     T
+	  [B1]  scr: 0.3645
+	  [B4]  scr: 0.4050
+	  [B7]  scr: 0.4134
+	  [B10]  scr: 0.4261
+     V
+	  [B1]  scr: 0.5538
+	  [B2]  scr: 0.5977
+Train Loss: 2.896764	Valid Loss: 2.957031
+
+* New best model (valid loss): 3.0402 --> 2.9570 *
+
+-------------- Epoch 14 --------------
+     T
+	  [B1]  scr: 0.5069
+	  [B4]  scr: 0.4427
+	  [B7]  scr: 0.4335
+	  [B10]  scr: 0.4420
+     V
+	  [B1]  scr: 0.6134
+	  [B2]  scr: 0.6252
+Train Loss: 2.808445	Valid Loss: 2.883522
+
+* New best model (valid loss): 2.9570 --> 2.8835 *
+
+-------------- Epoch 15 --------------
+     T
+	  [B1]  scr: 0.5033
+	  [B4]  scr: 0.4632
+	  [B7]  scr: 0.4551
+	  [B10]  scr: 0.4701
+     V
+	  [B1]  scr: 0.5789
+	  [B2]  scr: 0.6099
+Train Loss: 2.723816	Valid Loss: 2.792802
+
+* New best model (valid loss): 2.8835 --> 2.7928 *
+
+-------------- Epoch 16 --------------
+     T
+	  [B1]  scr: 0.4880
+	  [B4]  scr: 0.4774
+	  [B7]  scr: 0.4874
+	  [B10]  scr: 0.4911
+     V
+	  [B1]  scr: 0.5760
+	  [B2]  scr: 0.5922
+Train Loss: 2.630552	Valid Loss: 2.722795
+
+* New best model (valid loss): 2.7928 --> 2.7228 *
+
+-------------- Epoch 17 --------------
+     T
+	  [B1]  scr: 0.5577
+	  [B4]  scr: 0.5179
+	  [B7]  scr: 0.4797
+	  [B10]  scr: 0.4722
+     V
+	  [B1]  scr: 0.5279
+	  [B2]  scr: 0.5639
+Train Loss: 2.554257	Valid Loss: 2.631498
+
+* New best model (valid loss): 2.7228 --> 2.6315 *
+
+-------------- Epoch 18 --------------
+     T
+	  [B1]  scr: 0.4714
+	  [B4]  scr: 0.5387
+	  [B7]  scr: 0.5279
+	  [B10]  scr: 0.5185
+     V
+	  [B1]  scr: 0.5317
+	  [B2]  scr: 0.5619
+Train Loss: 2.455253	Valid Loss: 2.548527
+
+* New best model (valid loss): 2.6315 --> 2.5485 *
+
+-------------- Epoch 19 --------------
+     T
+	  [B1]  scr: 0.4651
+	  [B4]  scr: 0.4824
+	  [B7]  scr: 0.5154
+	  [B10]  scr: 0.5399
+     V
+	  [B1]  scr: 0.6022
+	  [B2]  scr: 0.5975
+Train Loss: 2.364756	Valid Loss: 2.480886
+
+* New best model (valid loss): 2.5485 --> 2.4809 *
+
+-------------- Epoch 20 --------------
+     T
+	  [B1]  scr: 0.5602
+	  [B4]  scr: 0.6075
+	  [B7]  scr: 0.5465
+	  [B10]  scr: 0.5606
+     V
+	  [B1]  scr: 0.5337
+	  [B2]  scr: 0.5625
+Train Loss: 2.270498	Valid Loss: 2.398298
+
+* New best model (valid loss): 2.4809 --> 2.3983 *
+
+-------------- Epoch 21 --------------
+     T
+	  [B1]  scr: 0.5515
+	  [B4]  scr: 0.5645
+	  [B7]  scr: 0.5793
+	  [B10]  scr: 0.5791
+     V
+	  [B1]  scr: 0.6080
+	  [B2]  scr: 0.5893
+Train Loss: 2.176528	Valid Loss: 2.327841
+
+* New best model (valid loss): 2.3983 --> 2.3278 *
+
+-------------- Epoch 22 --------------
+     T
+	  [B1]  scr: 0.6609
+	  [B4]  scr: 0.6094
+	  [B7]  scr: 0.6084
+	  [B10]  scr: 0.6140
+     V
+	  [B1]  scr: 0.5693
+	  [B2]  scr: 0.5828
+Train Loss: 2.100586	Valid Loss: 2.279246
+
+* New best model (valid loss): 2.3278 --> 2.2792 *
+
+-------------- Epoch 23 --------------
+     T
+	  [B1]  scr: 0.5628
+	  [B4]  scr: 0.6403
+	  [B7]  scr: 0.6385
+	  [B10]  scr: 0.6338
+     V
+	  [B1]  scr: 0.6354
+	  [B2]  scr: 0.6105
+Train Loss: 2.025280	Valid Loss: 2.177682
+
+* New best model (valid loss): 2.2792 --> 2.1777 *
+
+-------------- Epoch 24 --------------
+     T
+	  [B1]  scr: 0.6757
+	  [B4]  scr: 0.6616
+	  [B7]  scr: 0.6196
+	  [B10]  scr: 0.6152
+     V
+	  [B1]  scr: 0.6602
+	  [B2]  scr: 0.6137
+Train Loss: 1.950462	Valid Loss: 2.109459
+
+* New best model (valid loss): 2.1777 --> 2.1095 *
+
+-------------- Epoch 25 --------------
+     T
+	  [B1]  scr: 0.7074
+	  [B4]  scr: 0.6147
+	  [B7]  scr: 0.6422
+	  [B10]  scr: 0.6540
+     V
+	  [B1]  scr: 0.6178
+	  [B2]  scr: 0.6019
+Train Loss: 1.858675	Valid Loss: 2.061510
+
+* New best model (valid loss): 2.1095 --> 2.0615 *
+
+
+* Learning rate changed to 0.000010 *
+-------------- Epoch 26 --------------
+     T
+	  [B1]  scr: 0.6489
+	  [B4]  scr: 0.6668
+	  [B7]  scr: 0.6825
+	  [B10]  scr: 0.6595
+     V
+	  [B1]  scr: 0.6353
+	  [B2]  scr: 0.6124
+Train Loss: 1.799526	Valid Loss: 2.047610
+
+* New best model (valid loss): 2.0615 --> 2.0476 *
+
+-------------- Epoch 27 --------------
+     T
+	  [B1]  scr: 0.7156
+	  [B4]  scr: 0.6934
+	  [B7]  scr: 0.6570
+	  [B10]  scr: 0.6662
+     V
+	  [B1]  scr: 0.6412
+	  [B2]  scr: 0.6174
+Train Loss: 1.787720	Valid Loss: 2.039269
+
+* New best model (valid loss): 2.0476 --> 2.0393 *
+
+-------------- Epoch 28 --------------
+     T
+	  [B1]  scr: 0.7455
+	  [B4]  scr: 0.7005
+	  [B7]  scr: 0.6790
+	  [B10]  scr: 0.6690
+     V
+	  [B1]  scr: 0.6530
+	  [B2]  scr: 0.6240
+Train Loss: 1.786709	Valid Loss: 2.029819
+
+* New best model (valid loss): 2.0393 --> 2.0298 *
+
+-------------- Epoch 29 --------------
+     T
+	  [B1]  scr: 0.5622
+	  [B4]  scr: 0.6772
+	  [B7]  scr: 0.6962
+	  [B10]  scr: 0.6730
+     V
+	  [B1]  scr: 0.6543
+	  [B2]  scr: 0.6241
+Train Loss: 1.773476	Valid Loss: 2.023271
+
+* New best model (valid loss): 2.0298 --> 2.0233 *
+
+-------------- Epoch 30 --------------
+     T
+	  [B1]  scr: 0.6573
+	  [B4]  scr: 0.6306
+	  [B7]  scr: 0.6611
+	  [B10]  scr: 0.6726
+     V
+	  [B1]  scr: 0.6482
+	  [B2]  scr: 0.6219
+Train Loss: 1.773305	Valid Loss: 2.019283
+
+* New best model (valid loss): 2.0233 --> 2.0193 *
+
+-------------- Epoch 31 --------------
+     T
+	  [B1]  scr: 0.5906
+	  [B4]  scr: 0.6232
+	  [B7]  scr: 0.6651
+	  [B10]  scr: 0.6708
+     V
+	  [B1]  scr: 0.6440
+	  [B2]  scr: 0.6207
+Train Loss: 1.763961	Valid Loss: 2.013650
+
+* New best model (valid loss): 2.0193 --> 2.0136 *
+
+-------------- Epoch 32 --------------
+     T
+	  [B1]  scr: 0.7602
+	  [B4]  scr: 0.6498
+	  [B7]  scr: 0.6662
+	  [B10]  scr: 0.6751
+     V
+	  [B1]  scr: 0.6501
+	  [B2]  scr: 0.6249
+Train Loss: 1.753583	Valid Loss: 2.007011
+
+* New best model (valid loss): 2.0136 --> 2.0070 *
+
+-------------- Epoch 33 --------------
+     T
+	  [B1]  scr: 0.5938
+	  [B4]  scr: 0.6830
+	  [B7]  scr: 0.6668
+	  [B10]  scr: 0.6752
+     V
+	  [B1]  scr: 0.6480
+	  [B2]  scr: 0.6239
+Train Loss: 1.750286	Valid Loss: 2.000586
+
+* New best model (valid loss): 2.0070 --> 2.0006 *
+
+-------------- Epoch 34 --------------
+     T
+	  [B1]  scr: 0.6435
+	  [B4]  scr: 0.6248
+	  [B7]  scr: 0.6512
+	  [B10]  scr: 0.6712
+     V
+	  [B1]  scr: 0.6460
+	  [B2]  scr: 0.6227
+Train Loss: 1.746661	Valid Loss: 1.993242
+
+* New best model (valid loss): 2.0006 --> 1.9932 *
+
+-------------- Epoch 35 --------------
+     T
+	  [B1]  scr: 0.7631
+	  [B4]  scr: 0.6794
+	  [B7]  scr: 0.6876
+	  [B10]  scr: 0.6762
+     V
+	  [B1]  scr: 0.6559
+	  [B2]  scr: 0.6284
+Train Loss: 1.739346	Valid Loss: 1.987053
+
+* New best model (valid loss): 1.9932 --> 1.9871 *
+
+-------------- Epoch 36 --------------
+     T
+	  [B1]  scr: 0.5835
+	  [B4]  scr: 0.6565
+	  [B7]  scr: 0.6686
+	  [B10]  scr: 0.6751
+     V
+	  [B1]  scr: 0.6466
+	  [B2]  scr: 0.6250
+Train Loss: 1.731384	Valid Loss: 1.984598
+
+* New best model (valid loss): 1.9871 --> 1.9846 *
+
+-------------- Epoch 37 --------------
+     T
+	  [B1]  scr: 0.6903
+	  [B4]  scr: 0.6599
+	  [B7]  scr: 0.6808
+	  [B10]  scr: 0.6750
+     V
+	  [B1]  scr: 0.6493
+	  [B2]  scr: 0.6261
+Train Loss: 1.730600	Valid Loss: 1.977205
+
+* New best model (valid loss): 1.9846 --> 1.9772 *
+
+-------------- Epoch 38 --------------
+     T
+	  [B1]  scr: 0.7253
+	  [B4]  scr: 0.7323
+	  [B7]  scr: 0.6866
+	  [B10]  scr: 0.6782
+     V
+	  [B1]  scr: 0.6566
+	  [B2]  scr: 0.6308
+Train Loss: 1.721798	Valid Loss: 1.972449
+
+* New best model (valid loss): 1.9772 --> 1.9724 *
+
+-------------- Epoch 39 --------------
+     T
+	  [B1]  scr: 0.5659
+	  [B4]  scr: 0.6816
+	  [B7]  scr: 0.6725
+	  [B10]  scr: 0.6808
+     V
+	  [B1]  scr: 0.6563
+	  [B2]  scr: 0.6304
+Train Loss: 1.722198	Valid Loss: 1.968409
+
+* New best model (valid loss): 1.9724 --> 1.9684 *
+
+-------------- Epoch 40 --------------
+     T
+	  [B1]  scr: 0.7705
+	  [B4]  scr: 0.7361
+	  [B7]  scr: 0.6981
+	  [B10]  scr: 0.6833
+     V
+	  [B1]  scr: 0.6582
+	  [B2]  scr: 0.6303
+Train Loss: 1.713698	Valid Loss: 1.961843
+
+* New best model (valid loss): 1.9684 --> 1.9618 *
+
+-------------- Epoch 41 --------------
+     T
+	  [B1]  scr: 0.7730
+	  [B4]  scr: 0.6568
+	  [B7]  scr: 0.6633
+	  [B10]  scr: 0.6820
+     V
+	  [B1]  scr: 0.6535
+	  [B2]  scr: 0.6296
+Train Loss: 1.704140	Valid Loss: 1.956736
+
+* New best model (valid loss): 1.9618 --> 1.9567 *
+
+-------------- Epoch 42 --------------
+     T
+	  [B1]  scr: 0.6890
+	  [B4]  scr: 0.6653
+	  [B7]  scr: 0.6896
+	  [B10]  scr: 0.6806
+     V
+	  [B1]  scr: 0.6551
+	  [B2]  scr: 0.6304
+Train Loss: 1.696146	Valid Loss: 1.950161
+
+* New best model (valid loss): 1.9567 --> 1.9502 *
+
+-------------- Epoch 43 --------------
+     T
+	  [B1]  scr: 0.7740
+	  [B4]  scr: 0.6644
+	  [B7]  scr: 0.6768
+	  [B10]  scr: 0.6820
+     V
+	  [B1]  scr: 0.6579
+	  [B2]  scr: 0.6316
+Train Loss: 1.690660	Valid Loss: 1.945474
+
+* New best model (valid loss): 1.9502 --> 1.9455 *
+
+-------------- Epoch 44 --------------
+     T
+	  [B1]  scr: 0.6770
+	  [B4]  scr: 0.7145
+	  [B7]  scr: 0.6878
+	  [B10]  scr: 0.6830
+     V
+	  [B1]  scr: 0.6568
+	  [B2]  scr: 0.6314
+Train Loss: 1.690278	Valid Loss: 1.941266
+
+* New best model (valid loss): 1.9455 --> 1.9413 *
+
+-------------- Epoch 45 --------------
+     T
+	  [B1]  scr: 0.6523
+	  [B4]  scr: 0.6905
+	  [B7]  scr: 0.6667
+	  [B10]  scr: 0.6861
+     V
+	  [B1]  scr: 0.6590
+	  [B2]  scr: 0.6340
+Train Loss: 1.682740	Valid Loss: 1.936371
+
+* New best model (valid loss): 1.9413 --> 1.9364 *
+
+-------------- Epoch 46 --------------
+     T
+	  [B1]  scr: 0.7323
+	  [B4]  scr: 0.7150
+	  [B7]  scr: 0.6923
+	  [B10]  scr: 0.6873
+     V
+	  [B1]  scr: 0.6577
+	  [B2]  scr: 0.6336
+Train Loss: 1.676569	Valid Loss: 1.932416
+
+* New best model (valid loss): 1.9364 --> 1.9324 *
+
+-------------- Epoch 47 --------------
+     T
+	  [B1]  scr: 0.5981
+	  [B4]  scr: 0.6952
+	  [B7]  scr: 0.6823
+	  [B10]  scr: 0.6888
+     V
+	  [B1]  scr: 0.6644
+	  [B2]  scr: 0.6351
+Train Loss: 1.672762	Valid Loss: 1.924607
+
+* New best model (valid loss): 1.9324 --> 1.9246 *
+
+-------------- Epoch 48 --------------
+     T
+	  [B1]  scr: 0.6841
+	  [B4]  scr: 0.6495
